@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 경영관리</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #F2F4F7;
+    --surface:   #FFFFFF;
+    --surface2:  #F7F9FC;
+    --border:    #E2E8F0;
+    --text:      #1A202C;
+    --text2:     #4A5568;
+    --text3:     #A0AEC0;
+    --blue:      #2563EB;
+    --blue-lt:   #EBF4FF;
+    --green:     #059669;
+    --green-lt:  #ECFDF5;
+    --amber:     #D97706;
+    --amber-lt:  #FFFBEB;
+    --red:       #DC2626;
+    --red-lt:    #FEF2F2;
+    --nav-h:     56px;
+    --radius:    12px;
+    --shadow:    0 1px 4px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100dvh; }
+
+  /* ── 헤더 ── */
+  .app-header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    height: 52px; display: flex; align-items: center;
+    padding: 0 16px; gap: 10px;
+  }
+  .app-logo { font-weight: 700; font-size: 15px; color: var(--blue); flex: 1; }
+  .app-logo span { color: var(--text3); font-weight: 400; font-size: 13px; margin-left: 4px; }
+  .btn-icon {
+    width: 36px; height: 36px; border-radius: 8px; border: none;
+    background: var(--surface2); cursor: pointer; display: flex;
+    align-items: center; justify-content: center; font-size: 16px;
+    position: relative; color: var(--text2);
+  }
+  .badge {
+    position: absolute; top: 4px; right: 4px;
+    background: var(--red); color: #fff; font-size: 9px; font-weight: 700;
+    width: 14px; height: 14px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── 경고 배너 ── */
+  .alert-banner {
+    background: var(--amber-lt); border-bottom: 1px solid #FDE68A;
+    padding: 9px 16px; font-size: 12px; color: #92400E;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .alert-banner.red { background: var(--red-lt); border-color: #FECACA; color: #991B1B; }
+  .alert-banner.hidden { display: none; }
+
+  /* ── 메인 스크롤 영역 ── */
+  .main { padding: 14px 14px 80px; }
+
+  /* ── KPI 그리드 ── */
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .kpi-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 14px; box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .kpi-label { font-size: 11px; color: var(--text3); margin-bottom: 5px; font-weight: 500; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  .kpi-sub   { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .kpi-card.blue  .kpi-value { color: var(--blue); }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-card.amber .kpi-value { color: var(--amber); }
+
+  /* ── 섹션 카드 ── */
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600; color: var(--text2);
+    margin-bottom: 12px; display: flex; align-items: center;
+    justify-content: space-between;
+  }
+  .card-title select {
+    font-size: 12px; color: var(--text2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 8px; background: var(--surface2);
+    outline: none;
+  }
+
+  /* ── 차트 ── */
+  .chart-wrap { position: relative; height: 180px; }
+
+  /* ── 자금수지 비교 ── */
+  .cf-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .cf-row:last-child { border-bottom: none; }
+  .cf-label { color: var(--text2); font-size: 12px; }
+  .cf-value { font-weight: 600; }
+  .cf-diff.pos { color: var(--green); }
+  .cf-diff.neg { color: var(--red); }
+
+  /* ── 정합도 게이지 ── */
+  .gauge-wrap { margin-top: 10px; }
+  .gauge-bar {
+    height: 8px; border-radius: 4px; background: var(--border);
+    overflow: hidden; margin: 4px 0;
+  }
+  .gauge-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+  .gauge-fill.green { background: var(--green); }
+  .gauge-fill.amber { background: var(--amber); }
+  .gauge-fill.red   { background: var(--red); }
+  .gauge-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); }
+
+  /* ── 알림 패널 ── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.35);
+    z-index: 200; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .notif-panel {
+    position: fixed; top: 0; right: -320px; width: 310px; height: 100dvh;
+    background: var(--surface); z-index: 300; transition: right .25s;
+    display: flex; flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,.12);
+  }
+  .notif-panel.open { right: 0; }
+  .notif-head {
+    padding: 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 600; font-size: 14px;
+  }
+  .notif-list { flex: 1; overflow-y: auto; }
+  .notif-item {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .notif-item:hover { background: var(--surface2); }
+  .notif-item .ni-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .notif-item .ni-desc  { font-size: 12px; color: var(--text2); line-height: 1.4; }
+  .notif-item.red  .ni-title { color: var(--red); }
+  .notif-item.amber .ni-title { color: var(--amber); }
+  .notif-item.yellow .ni-title { color: #B45309; }
+
+  /* ── 하단 탭바 ── */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-h);
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; z-index: 100;
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; font-size: 10px; color: var(--text3);
+    cursor: pointer; border: none; background: none; padding: 4px 0;
+    transition: color .15s;
+  }
+  .tab-item.active { color: var(--blue); }
+  .tab-item .tab-icon { font-size: 20px; }
+
+  /* ── 로딩 ── */
+  .loading-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 200px; gap: 12px; color: var(--text3);
+  }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 에러 ── */
+  .error-box {
+    background: var(--red-lt); border: 1px solid #FECACA; border-radius: var(--radius);
+    padding: 16px; color: var(--red); font-size: 13px; text-align: center;
+  }
+
+  /* ── 토스트 ── */
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1A202C; color: #fff; padding: 10px 20px; border-radius: 20px;
+    font-size: 13px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 500;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── 프로젝트 미니 리스트 ── */
+  .prj-item {
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .prj-item:last-child { border-bottom: none; }
+  .prj-row1 { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .prj-name { font-size: 13px; font-weight: 600; flex: 1; }
+  .badge-status {
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+  }
+  .badge-status.on  { background: var(--blue-lt); color: var(--blue); }
+  .badge-status.plan{ background: var(--green-lt); color: var(--green); }
+  .badge-status.hold{ background: var(--amber-lt); color: var(--amber); }
+  .prj-row2 { font-size: 11px; color: var(--text3); }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--blue); border-radius: 2px; }
+
+  /* ── PC 레이아웃 ── */
+  @media (min-width: 768px) {
+    .app-header { padding: 0 24px; }
+    body { display: grid; grid-template-columns: 220px 1fr; }
+    .app-header { grid-column: 1 / -1; }
+    .side-nav {
+      background: var(--surface); border-right: 1px solid var(--border);
+      padding: 20px 12px; display: flex; flex-direction: column; gap: 4px;
+      height: calc(100dvh - 52px); position: sticky; top: 52px;
+    }
+    .side-nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text2);
+      border: none; background: none; width: 100%; text-align: left;
+    }
+    .side-nav-item.active { background: var(--blue-lt); color: var(--blue); font-weight: 600; }
+    .side-nav-item .sn-icon { font-size: 18px; }
+    .tab-bar { display: none; }
+    .main { max-width: 860px; padding: 20px 24px 24px; }
+    .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 767px) {
+    .side-nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>에이치에프씨 컨설팅</span></div>
+  <button class="btn-icon" id="btnNotif" title="알림">
+    🔔<span class="badge" id="notifBadge" style="display:none"></span>
+  </button>
+  <button class="btn-icon" title="설정" onclick="location.href='settings.html'">⚙️</button>
+</header>
+
+<!-- PC 사이드 네비 -->
+<nav class="side-nav" aria-label="메인 메뉴">
+  <button class="side-nav-item active"><span class="sn-icon">🏠</span> 대시보드</button>
+  <button class="side-nav-item" onclick="location.href='projects.html'"><span class="sn-icon">📋</span> 프로젝트</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span> 데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span> 자금수지</button>
+  <button class="side-nav-item" onclick="location.href='simulation.html'"><span class="sn-icon">📊</span> 시뮬레이션</button>
+</nav>
+
+<!-- 메인 -->
+<main class="main" id="mainContent">
+  <div class="loading-wrap" id="loadingWrap">
+    <div class="spinner"></div>
+    <div>데이터 불러오는 중…</div>
+  </div>
+</main>
+
+<!-- 알림 오버레이 -->
+<div class="overlay" id="overlay" onclick="closeNotif()"></div>
+<div class="notif-panel" id="notifPanel" role="dialog" aria-label="알림">
+  <div class="notif-head">
+    알림
+    <button class="btn-icon" onclick="closeNotif()" style="background:none">✕</button>
+  </div>
+  <div class="notif-list" id="notifList"></div>
+</div>
+
+<!-- 하단 탭바 (모바일) -->
+<nav class="tab-bar" aria-label="하단 메뉴">
+  <button class="tab-item active"><span class="tab-icon">🏠</span>대시보드</button>
+  <button class="tab-item" onclick="location.href='projects.html'"><span class="tab-icon">📋</span>프로젝트</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
+  <button class="tab-item" onclick="location.href='simulation.html'"><span class="tab-icon">📊</span>시뮬</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 설정 ──────────────────────────────────────────────────────
+const SHEETS_ID  = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
+const API_KEY    = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE'; // ← Google Cloud Console에서 발급한 API Key 입력
+
+// ── Sheets API 호출 ──────────────────────────────────────────
+async function fetchSheet(sheetName, range) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheetName + '!' + range)}?key=${API_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Sheets API 오류: ${res.status}`);
+  const data = await res.json();
+  return data.values || [];
+}
+
+// 행 배열 → 객체 배열 변환
+function toObjects(rows) {
+  if (!rows.length) return [];
+  const headers = rows[0];
+  return rows.slice(1).map(r =>
+    Object.fromEntries(headers.map((h, i) => [h, r[i] ?? '']))
+  );
+}
+
+// ── 날짜 계산 ─────────────────────────────────────────────────
+function today() { return new Date(); }
+function parseDate(s) { return s ? new Date(s) : null; }
+function diffDays(a, b) { return Math.round((b - a) / 86400000); }
+function progress(start, end) {
+  const now = today(), s = parseDate(start), e = parseDate(end);
+  if (!s || !e) return 0;
+  return Math.min(100, Math.max(0, Math.round((now - s) / (e - s) * 100)));
+}
+
+// ── 숫자 포맷 ─────────────────────────────────────────────────
+function won(n) {
+  const v = parseInt(n) || 0;
+  if (Math.abs(v) >= 100000000) return (v / 100000000).toFixed(2) + '억';
+  if (Math.abs(v) >= 10000)     return Math.round(v / 10000) + '만';
+  return v.toLocaleString() + '원';
+}
+function wonFull(n) { return (parseInt(n)||0).toLocaleString() + '원'; }
+function pct(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
+
+// ── 알림 ─────────────────────────────────────────────────────
+const alerts = [];
+
+function addAlert(type, title, desc) {
+  alerts.push({ type, title, desc });
+}
+
+function renderNotif() {
+  const list = document.getElementById('notifList');
+  if (!alerts.length) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:#A0AEC0;font-size:13px">알림이 없습니다</div>';
+    return;
+  }
+  list.innerHTML = alerts.map(a => `
+    <div class="notif-item ${a.type}">
+      <div class="ni-title">${a.title}</div>
+      <div class="ni-desc">${a.desc}</div>
+    </div>`).join('');
+  const badge = document.getElementById('notifBadge');
+  badge.textContent = alerts.length;
+  badge.style.display = 'flex';
+}
+
+function openNotif()  {
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('notifPanel').classList.add('open');
+}
+function closeNotif() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('notifPanel').classList.remove('open');
+}
+document.getElementById('btnNotif').addEventListener('click', openNotif);
+
+// ── 토스트 ───────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── 메인 렌더 ────────────────────────────────────────────────
+async function render() {
+  const main = document.getElementById('mainContent');
+
+  try {
+    // ── API Key 미설정 체크 ──
+    if (API_KEY === 'DISABLED_CHECK') {
+      main.innerHTML = `
+        <div class="error-box" style="margin-top:20px">
+          <div style="font-size:20px;margin-bottom:8px">⚙️</div>
+          <div style="font-weight:600;margin-bottom:6px">API Key 설정 필요</div>
+          <div style="font-size:12px;color:#4A5568;line-height:1.6">
+            index.html 파일 상단 <code>API_KEY</code> 변수에<br>
+            Google Cloud Console에서 발급받은 API Key를 입력해 주세요.
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ── 데이터 호출 ──
+    const [projRows, revRows, costRows, fixRows, dashRows, estRows] = await Promise.all([
+      fetchSheet('S03_PROJECT',      'A1:K100'),
+      fetchSheet('S04_REVENUE',      'A1:H200'),
+      fetchSheet('S05_COST',         'A1:J200'),
+      fetchSheet('S06_FIXED_COST',   'A1:F200'),
+      fetchSheet('S09_DASHBOARD',    'A1:H24'),
+      fetchSheet('S02_CASHFLOW_EST', 'A1:G24'),
+    ]);
+
+    const projects = toObjects(projRows);
+    const revenues  = toObjects(revRows);
+    const costs     = toObjects(costRows);
+    const fixed     = toObjects(fixRows);
+    const dashboard = toObjects(dashRows);
+    const estimates = toObjects(estRows);
+
+    // ── KPI 계산 ──
+    const yr = new Date().getFullYear().toString();
+    const yrRevs = revenues.filter(r => (r.year_month||'').startsWith(yr));
+    const yrCosts = costs.filter(c => (c.year_month||'').startsWith(yr));
+    const yrFixed = fixed.filter(f => (f.year_month||'').startsWith(yr));
+
+    const totalRevenue = yrRevs.reduce((s, r) => s + (parseInt(r.tax_invoice_amt)||0), 0);
+    const totalCost    = yrCosts.reduce((s, c) => s + (parseInt(c.amount)||0), 0);
+    const totalFixed   = yrFixed.reduce((s, f) => s + (parseInt(f.amount)||0), 0);
+    const grossProfit  = totalRevenue - totalCost;
+    const opProfit     = grossProfit - totalFixed;
+    const opMargin     = totalRevenue ? (opProfit / totalRevenue * 100) : 0;
+
+    const latestDash   = dashboard.filter(d => d.act_balance).slice(-1)[0] || {};
+    const latestEst    = estimates.slice(-1)[0] || {};
+    const cashBalance  = latestDash.act_balance || latestEst.est_balance || 0;
+    const accuracy     = parseFloat(latestDash.accuracy_pct) || null;
+
+    // ── 월별 매출 데이터 (12개월) ──
+    const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    const monthlyRev = Array(12).fill(0);
+    const monthlyOp  = Array(12).fill(0);
+    yrRevs.forEach(r => {
+      const m = parseInt((r.year_month||'').split('-')[1]) - 1;
+      if (m >= 0 && m < 12) monthlyRev[m] += parseInt(r.tax_invoice_amt)||0;
+    });
+    yrCosts.forEach(c => {
+      const m = parseInt((c.year_month||'').split('-')[1]) - 1;
+      if (m >= 0 && m < 12) monthlyOp[m] -= parseInt(c.amount)||0;
+    });
+    yrFixed.forEach(f => {
+      const m = parseInt((f.year_month||'').split('-')[1]) - 1;
+      if (m >= 0 && m < 12) monthlyOp[m] -= parseInt(f.amount)||0;
+    });
+    yrRevs.forEach(r => {
+      const m = parseInt((r.year_month||'').split('-')[1]) - 1;
+      if (m >= 0 && m < 12) monthlyOp[m] += parseInt(r.tax_invoice_amt)||0;
+    });
+
+    // ── 알림 판단 ──
+    const todayDate = today();
+    projects.filter(p => p.status === '진행중').forEach(p => {
+      const end = parseDate(p.end_date);
+      if (end) {
+        const d = diffDays(todayDate, end);
+        if (d >= 0 && d <= 7) addAlert('red', `마감 D-${d} ⚠️`, `${p.project_name} (${p.end_date} 종료)`);
+      }
+    });
+    revenues.filter(r => r.is_received === 'N' && r.cash_recv_date).forEach(r => {
+      const due = parseDate(r.cash_recv_date);
+      if (due && due < todayDate)
+        addAlert('amber', '입금 미확인', `${r.project_id} ${r.year_month} ${won(r.cash_recv_amt)} — 예정일 초과`);
+    });
+    estimates.forEach(e => {
+      const bal = parseInt(e.est_balance)||0;
+      if (bal < 0) {
+        const [, m] = (e.year_month||'').split('-');
+        addAlert('red', `${m}월 현금 부족 예상`, `추정 잔액 ${won(bal)}`);
+      }
+    });
+    if (accuracy !== null && accuracy < 80)
+      addAlert('yellow', '정합도 이탈', `추정 vs 실잔액 차이 — 정합도 ${pct(accuracy)}`);
+
+    renderNotif();
+
+    // ── 자금수지 비교 데이터 ──
+    const thisMon = `${yr}-${String(todayDate.getMonth()+1).padStart(2,'0')}`;
+    const dashRow  = dashboard.find(d => d.year_month === thisMon) || {};
+    const estRow   = estimates.find(e => e.year_month === thisMon) || {};
+    const estBal   = parseInt(estRow.est_balance)  || 0;
+    const actBal   = parseInt(dashRow.act_balance) || null;
+    const diff     = actBal !== null ? actBal - estBal : null;
+    const acc      = parseFloat(dashRow.accuracy_pct) || null;
+    const gaugeColor = acc === null ? 'amber' : acc >= 80 ? 'green' : acc >= 60 ? 'amber' : 'red';
+    const gaugeW     = acc !== null ? Math.max(0, Math.min(100, acc)) : 0;
+
+    // ── 진행중 프로젝트 ──
+    const activeProjects = projects.filter(p => ['진행중','예정'].includes(p.status)).slice(0, 4);
+
+    // ── 경고 배너 ──
+    const negEst = estimates.find(e => parseInt(e.est_balance) < 0);
+    const bannerHtml = negEst
+      ? `<div class="alert-banner">⚠️ ${negEst.year_month.split('-')[1]}월 현금 부족 예상 (추정 ${won(negEst.est_balance)}) — <a href="cashflow.html" style="color:inherit;text-decoration:underline;margin-left:4px">자금수지 확인</a></div>`
+      : '';
+
+    // ── HTML 렌더 ──
+    main.innerHTML = `
+      ${bannerHtml}
+
+      <div class="kpi-grid">
+        <div class="kpi-card blue">
+          <div class="kpi-label">연간 매출</div>
+          <div class="kpi-value">${won(totalRevenue)}</div>
+          <div class="kpi-sub">${wonFull(totalRevenue)}</div>
+        </div>
+        <div class="kpi-card ${opMargin >= 0 ? 'green' : ''}">
+          <div class="kpi-label">영업이익률</div>
+          <div class="kpi-value">${opMargin.toFixed(1)}%</div>
+          <div class="kpi-sub">영업이익 ${won(opProfit)}</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-label">기말 현금 (추정)</div>
+          <div class="kpi-value">${won(cashBalance)}</div>
+          <div class="kpi-sub">최근 기준</div>
+        </div>
+        <div class="kpi-card ${accuracy === null ? '' : accuracy >= 80 ? 'green' : ''}">
+          <div class="kpi-label">정합도</div>
+          <div class="kpi-value">${accuracy !== null ? pct(accuracy) : '─'}</div>
+          <div class="kpi-sub">${accuracy !== null ? (accuracy >= 80 ? '양호' : accuracy >= 60 ? '주의' : '이탈') : 'CSV 미업로드'}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          월별 매출 · 영업이익
+          <select id="yearSel"><option value="${yr}">${yr}년</option></select>
+        </div>
+        <div class="chart-wrap"><canvas id="revChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">이번 달 자금수지 <span style="font-size:11px;color:var(--text3)">${thisMon}</span></div>
+        <div class="cf-row">
+          <span class="cf-label">추정 잔액</span>
+          <span class="cf-value">${won(estBal)}</span>
+        </div>
+        <div class="cf-row">
+          <span class="cf-label">실잔액</span>
+          <span class="cf-value">${actBal !== null ? won(actBal) : '─ (CSV 미업로드)'}</span>
+        </div>
+        ${diff !== null ? `
+        <div class="cf-row">
+          <span class="cf-label">차이</span>
+          <span class="cf-value cf-diff ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : ''}${won(diff)}</span>
+        </div>` : ''}
+        <div class="gauge-wrap">
+          <div class="gauge-meta"><span>정합도</span><span>${acc !== null ? pct(acc) : '─'}</span></div>
+          <div class="gauge-bar"><div class="gauge-fill ${gaugeColor}" style="width:${gaugeW}%"></div></div>
+          <div class="gauge-meta" style="justify-content:flex-end">
+            <a href="cashflow.html" style="color:var(--blue);font-size:11px;text-decoration:none">자세히 보기 →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          프로젝트 현황
+          <a href="projects.html" style="font-size:12px;color:var(--blue);text-decoration:none">전체 보기 →</a>
+        </div>
+        ${activeProjects.length ? activeProjects.map(p => {
+          const pg = progress(p.start_date, p.end_date);
+          const statusClass = p.status === '진행중' ? 'on' : p.status === '예정' ? 'plan' : 'hold';
+          return `
+          <div class="prj-item">
+            <div class="prj-row1">
+              <div class="prj-name">${p.project_name}</div>
+              <span class="badge-status ${statusClass}">${p.status}</span>
+            </div>
+            <div class="prj-row2">${p.client} · ${won(p.contract_amount)} · ${p.end_date} 종료</div>
+            ${p.status === '진행중' ? `<div class="progress-bar"><div class="progress-fill" style="width:${pg}%"></div></div>` : ''}
+          </div>`;
+        }).join('') : '<div style="text-align:center;color:var(--text3);padding:20px;font-size:13px">등록된 프로젝트가 없습니다</div>'}
+      </div>`;
+
+    // ── 차트 ──
+    new Chart(document.getElementById('revChart'), {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: [
+          {
+            label: '매출',
+            data: monthlyRev.map(v => Math.round(v / 10000)),
+            backgroundColor: 'rgba(37,99,235,.15)',
+            borderColor: 'rgba(37,99,235,.7)',
+            borderWidth: 1.5, borderRadius: 4,
+          },
+          {
+            label: '영업이익',
+            data: monthlyOp.map(v => Math.round(v / 10000)),
+            type: 'line',
+            borderColor: '#059669', backgroundColor: 'rgba(5,150,105,.08)',
+            borderWidth: 2, pointRadius: 3, tension: .3, fill: false,
+            yAxisID: 'y',
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { callback: v => v + '만', font: { size: 10 } }, grid: { color: '#E2E8F033' } },
+          x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+
+  } catch (err) {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="error-box" style="margin-top:20px">
+        <div style="font-size:20px;margin-bottom:8px">⚠️</div>
+        <div style="font-weight:600;margin-bottom:6px">데이터를 불러오지 못했습니다</div>
+        <div style="font-size:12px;color:#4A5568">${err.message}</div>
+        <div style="margin-top:12px">
+          <button onclick="location.reload()" style="background:var(--red);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px">다시 시도</button>
+        </div>
+      </div>`;
+  }
+}
+
+render();
+</script>
+</body>
+</html>
