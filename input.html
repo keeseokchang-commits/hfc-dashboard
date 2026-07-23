@@ -499,7 +499,7 @@
 <script>
 const SHEETS_ID = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
 const API_KEY   = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-const CLIENT_ID = 'YOUR_OAUTH_CLIENT_ID'; // OAuth 설정 후 입력
+const CLIENT_ID = '129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com'; // OAuth 설정 후 입력
 const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
 
 let tokenClient, accessToken = null;
@@ -548,7 +548,7 @@ async function updateRow(sheet, rowNum, values){
 
 // ── OAuth ─────────────────────────────────────────
 function initOAuth(){
-  if(CLIENT_ID==='YOUR_OAUTH_CLIENT_ID'){ return; }
+  // OAuth ready
   tokenClient=google.accounts.oauth2.initTokenClient({
     client_id:CLIENT_ID, scope:SCOPES,
     callback:(resp)=>{ if(resp.access_token){ accessToken=resp.access_token; document.getElementById('authBanner').classList.add('hidden'); toast('로그인 완료 ✓'); } }
@@ -556,7 +556,7 @@ function initOAuth(){
 }
 function signIn(){
   return new Promise(resolve=>{
-    if(CLIENT_ID==='YOUR_OAUTH_CLIENT_ID'){
+    if(CLIENT_ID==='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com'){
       toast('⚙️ OAuth Client ID 설정 후 저장 가능합니다',true); resolve(false); return;
     }
     if(tokenClient){ tokenClient.requestAccessToken(); resolve(true); }
@@ -931,7 +931,7 @@ function togglePersonFields(){
 // ── 초기 로드 ─────────────────────────────────────
 window.addEventListener('load',()=>{
   // OAuth 배너: CLIENT_ID 미설정 시 안내
-  if(CLIENT_ID==='YOUR_OAUTH_CLIENT_ID'){
+  if(CLIENT_ID==='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com'){
     document.getElementById('authBanner').classList.remove('hidden');
     document.getElementById('authBanner').querySelector('.auth-banner-text').textContent='⚙️ 저장 기능을 사용하려면 OAuth Client ID 설정이 필요합니다. 현재는 조회만 가능합니다.';
     document.getElementById('authBanner').querySelector('.btn-auth').style.display='none';
