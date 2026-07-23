@@ -556,9 +556,7 @@ function initOAuth(){
 }
 function signIn(){
   return new Promise(resolve=>{
-    if(CLIENT_ID==='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com'){
-      toast('⚙️ OAuth Client ID 설정 후 저장 가능합니다',true); resolve(false); return;
-    }
+    // OAuth 활성화됨
     if(tokenClient){ tokenClient.requestAccessToken(); resolve(true); }
   });
 }
@@ -930,12 +928,8 @@ function togglePersonFields(){
 
 // ── 초기 로드 ─────────────────────────────────────
 window.addEventListener('load',()=>{
-  // OAuth 배너: CLIENT_ID 미설정 시 안내
-  if(CLIENT_ID==='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com'){
-    document.getElementById('authBanner').classList.remove('hidden');
-    document.getElementById('authBanner').querySelector('.auth-banner-text').textContent='⚙️ 저장 기능을 사용하려면 OAuth Client ID 설정이 필요합니다. 현재는 조회만 가능합니다.';
-    document.getElementById('authBanner').querySelector('.btn-auth').style.display='none';
-  }
+  // OAuth 활성화됨 — 배너 숨김
+  document.getElementById('authBanner').classList.add('hidden');
   loadAll();
 });
 </script>
