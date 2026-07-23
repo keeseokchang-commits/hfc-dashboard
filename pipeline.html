@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 사업기회 관리</title>
+<style>
+  :root {
+    --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
+    --border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;
+    --blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;
+    --amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;
+    --purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;
+    --nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .main{padding:14px 14px 80px}
+
+  /* 상태 필터 */
+  .filter-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .filter-bar::-webkit-scrollbar{display:none}
+  .filter-chip{flex-shrink:0;padding:7px 14px;border-radius:18px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s}
+  .filter-chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .filter-chip .cnt{font-size:10px;opacity:.7;margin-left:3px}
+
+  /* 상단 액션 */
+  .top-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .btn{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:disabled{background:var(--text3)}
+  .btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+
+  /* 카드 */
+  .opp-card{background:var(--surface);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:10px}
+  .opp-card.dimmed{opacity:.55}
+  .opp-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+  .opp-name{font-size:14px;font-weight:600;flex:1;line-height:1.4;word-break:keep-all}
+  .badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+  .badge-기회{background:var(--purple-lt);color:var(--purple)}
+  .badge-확정{background:var(--blue-lt);color:var(--blue)}
+  .badge-수주{background:var(--green-lt);color:var(--green)}
+  .badge-계약{background:var(--teal-lt);color:var(--teal)}
+  .badge-종료{background:#F1F5F9;color:#64748B}
+  .badge-포기{background:var(--amber-lt);color:var(--amber)}
+  .badge-실주{background:var(--red-lt);color:var(--red)}
+  .opp-meta{font-size:12px;color:var(--text3);margin-bottom:4px;line-height:1.5}
+  .opp-amount{font-size:14px;font-weight:700;color:var(--blue)}
+  .opp-prob{font-size:11px;color:var(--text3)}
+  .finance-mark{font-size:10px;background:var(--green-lt);color:var(--green);padding:2px 7px;border-radius:4px;margin-left:6px}
+  .opp-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .btn-transition{background:var(--green-lt);color:var(--green);border:1px solid #A7F3D0;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500}
+  .btn-edit-opp{background:var(--blue-lt);color:var(--blue);border:1px solid #BFDBFE;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
+  .btn-drop{background:var(--surface2);color:var(--text3);border:1px solid var(--border);font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
+
+  /* 모달 */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:90dvh;overflow-y:auto;padding:20px 16px 32px}
+  .modal-title{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  .form-group{margin-bottom:12px}
+  .form-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;display:block}
+  .form-label .req{color:var(--red);font-size:11px}
+  .form-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;background:var(--surface)}
+  .form-input:focus{border-color:var(--blue)}
+  .form-input.error{border-color:var(--red)}
+  select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234A5568' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .slider-wrap{display:flex;align-items:center;gap:10px}
+  .slider-wrap input[type=range]{flex:1;height:4px;accent-color:var(--blue)}
+  .slider-val{font-size:13px;font-weight:600;color:var(--blue);min-width:40px;text-align:right}
+  .transition-info{background:var(--green-lt);border:1px solid #A7F3D0;border-radius:8px;padding:10px 12px;font-size:12px;color:#065F46;margin-bottom:12px;line-height:1.5}
+  .btn-row{display:flex;gap:8px;margin-top:16px}
+  .btn-row .btn{flex:1;padding:12px}
+  .empty-state{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:150px;gap:10px;color:var(--text3);font-size:13px}
+
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}
+  .tab-item .tab-icon{font-size:20px}
+
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:760px;padding:20px 24px 24px}
+    .modal{border-radius:16px;max-width:560px;margin:auto}
+    .modal-overlay{align-items:center;justify-content:center}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>사업기회</span></div>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+  <button class="btn-icon" onclick="location.href='settings.html'" title="설정">⚙️</button>
+</header>
+
+<nav class="side-nav">
+  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
+  <button class="side-nav-item active"><span class="sn-icon">📋</span>사업기회</button>
+  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+</nav>
+
+<main class="main">
+  <div class="top-actions">
+    <span style="font-size:15px;font-weight:600">사업기회 관리</span>
+    <button class="btn btn-primary" onclick="openNewForm()">+ 새 기회 등록</button>
+  </div>
+
+  <div class="filter-bar" id="filterBar"></div>
+
+  <div id="oppList">
+    <div class="loading-wrap"><div class="spinner"></div><div>불러오는 중…</div></div>
+  </div>
+</main>
+
+<!-- 등록·수정 모달 -->
+<div class="modal-overlay" id="formModal">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="formTitle">새 사업기회 등록</span>
+      <button onclick="closeForm()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+    <div class="transition-info" id="transitionInfo" style="display:none"></div>
+    <input type="hidden" id="f_id">
+    <input type="hidden" id="f_target_status">
+    <div class="form-group">
+      <label class="form-label">프로젝트명 <span class="req">*</span> <span id="nameHint" style="font-weight:400;color:var(--text3)"></span></label>
+      <input class="form-input" id="f_name" placeholder="프로젝트명 (기회 단계는 가칭 가능)">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">거래처 <span class="req">*</span></label>
+        <input class="form-input" id="f_client" placeholder="계약 거래처">
+      </div>
+      <div class="form-group">
+        <label class="form-label">최종 고객사</label>
+        <input class="form-input" id="f_end_client" placeholder="최종 발주처">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">금액 (원) <span class="req" id="amountReq">*</span></label>
+      <input class="form-input" id="f_amount" inputmode="numeric" placeholder="예: 158,400,000" oninput="this.value=formatComma(this.value)">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" id="startLabel">시작 예정일</label>
+        <input class="form-input" id="f_start" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="endLabel">종료 예정일</label>
+        <input class="form-input" id="f_end" type="date">
+      </div>
+    </div>
+    <div class="form-group" id="probGroup">
+      <label class="form-label">확도</label>
+      <div class="slider-wrap">
+        <input type="range" min="0" max="100" step="10" value="50" id="f_prob" oninput="document.getElementById('probVal').textContent=this.value+'%'">
+        <span class="slider-val" id="probVal">50%</span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">지급 조건</label>
+        <select class="form-input" id="f_payment">
+          <option>월말</option><option>익월말</option><option>완료후30일</option><option>기타</option>
+        </select>
+      </div>
+      <div class="form-group" id="statusGroup">
+        <label class="form-label">상태</label>
+        <select class="form-input" id="f_status">
+          <option>기회</option><option>확정</option><option>수주</option><option>계약</option>
+          <option>종료</option><option>포기</option><option>실주</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" id="extraGroup" style="display:none">
+      <label class="form-label" id="extraLabel">추가 정보</label>
+      <input class="form-input" id="f_extra" placeholder="">
+    </div>
+    <div class="form-group">
+      <label class="form-label">메모</label>
+      <input class="form-input" id="f_memo" placeholder="비고">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeForm()">취소</button>
+      <button class="btn btn-primary" id="f_save_btn" onclick="saveOpp()">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<nav class="tab-bar">
+  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
+  <button class="tab-item active"><span class="tab-icon">📋</span>사업기회</button>
+  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const SHEETS_ID = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
+const API_KEY   = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
+const CLIENT_ID = '129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
+const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
+
+let accessToken=null, tokenClient;
+let opps=[];
+let currentFilter='전체';
+
+const STATUS_ORDER=['기회','확정','수주','계약','종료','포기','실주'];
+const FINANCE_STATUS=['수주','계약','종료'];
+const NEXT_STATUS={'기회':'확정','확정':'수주','수주':'계약','계약':'종료'};
+
+// ── 유틸 ──────────────────────────────────────────────────────
+function comma(n){ return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString(); }
+function uncomma(s){ return parseInt(String(s).replace(/,/g,''))||0; }
+function formatComma(v){ const n=String(v).replace(/[^\d]/g,''); return n?parseInt(n).toLocaleString():''; }
+function wonFull(n){ return comma(n)+'원'; }
+function toast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ── Sheets ────────────────────────────────────────────────────
+async function fetchSheet(sheet,range){
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
+  const r=await fetch(url); if(!r.ok) throw new Error('읽기 오류 '+r.status);
+  return (await r.json()).values||[];
+}
+function toObj(rows){
+  if(!rows.length) return [];
+  const h=rows[0]; return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));
+}
+async function clearAndWrite(sheet,range,rows){
+  if(!accessToken){ await signIn(); if(!accessToken) return false; }
+  const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
+  await fetch(`${base}/values/${encodeURIComponent(sheet+'!'+range)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
+  const r=await fetch(`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
+  return r.ok;
+}
+function initOAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{ if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); } }
+  });
+}
+function signIn(){ return new Promise(res=>{ tokenClient.requestAccessToken(); setTimeout(()=>res(!!accessToken),3000); }); }
+
+// ── 데이터 로드 ───────────────────────────────────────────────
+async function loadOpps(){
+  try{
+    const rows=await fetchSheet('S01_PIPELINE','A1:L300');
+    opps=toObj(rows).filter(o=>o.pipeline_id);
+    renderFilter();
+    renderList();
+  }catch(e){
+    document.getElementById('oppList').innerHTML=`<div class="empty-state" style="color:var(--red)">S01_PIPELINE 로드 실패<br><span style="font-size:11px">${e.message}</span></div>`;
+  }
+}
+
+// ── 필터 ─────────────────────────────────────────────────────
+function renderFilter(){
+  const counts={전체:opps.length};
+  STATUS_ORDER.forEach(s=>{ counts[s]=opps.filter(o=>o.status===s).length; });
+  const bar=document.getElementById('filterBar');
+  bar.innerHTML=['전체',...STATUS_ORDER].map(s=>`
+    <button class="filter-chip ${s===currentFilter?'active':''}" onclick="setFilter('${s}')">
+      ${s}<span class="cnt">${counts[s]||0}</span>
+    </button>`).join('');
+}
+function setFilter(s){ currentFilter=s; renderFilter(); renderList(); }
+
+// ── 목록 렌더 ─────────────────────────────────────────────────
+function renderList(){
+  const list=currentFilter==='전체'?opps:opps.filter(o=>o.status===currentFilter);
+  const el=document.getElementById('oppList');
+  if(!list.length){ el.innerHTML='<div class="empty-state">해당 상태의 사업기회가 없습니다</div>'; return; }
+
+  // 상태 순서대로 정렬
+  const sorted=[...list].sort((a,b)=>STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status));
+
+  el.innerHTML=sorted.map(o=>{
+    const idx=opps.indexOf(o);
+    const isFinance=FINANCE_STATUS.includes(o.status);
+    const isDead=['포기','실주','종료'].includes(o.status);
+    const next=NEXT_STATUS[o.status];
+    const period=(o.expected_start||'─')+' ~ '+(o.expected_end||'─');
+    return `
+    <div class="opp-card ${['포기','실주'].includes(o.status)?'dimmed':''}">
+      <div class="opp-head">
+        <div class="opp-name">${o.opportunity||'(이름 없음)'}</div>
+        <span class="badge badge-${o.status}">${o.status}</span>
+      </div>
+      <div class="opp-meta">
+        ${o.pipeline_id} · ${o.client||'거래처 미정'}${o.end_client?' → '+o.end_client:''}<br>
+        ${period}${o.status==='기회'?` · 확도 ${o.probability||0}%`:''}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="opp-amount">${o.contract_amount?wonFull(o.contract_amount):'금액 미정'}${isFinance?'<span class="finance-mark">재무반영</span>':''}</span>
+      </div>
+      <div class="opp-actions">
+        ${next?`<button class="btn-transition" onclick="openTransition(${idx},'${next}')">${next}(으)로 전환 →</button>`:''}
+        ${o.status==='수주'||o.status==='계약'?`<button class="btn-edit-opp" onclick="location.href='estimate.html?pid=${o.pipeline_id}'">견적 보기</button>`:''}
+        <button class="btn-edit-opp" onclick="openEdit(${idx})">수정</button>
+        ${!isDead&&o.status!=='계약'?`<button class="btn-drop" onclick="openDrop(${idx})">포기/실주</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 폼 열기·닫기 ──────────────────────────────────────────────
+function openNewForm(){
+  resetForm();
+  document.getElementById('formTitle').textContent='새 사업기회 등록';
+  document.getElementById('f_status').value='기회';
+  document.getElementById('nameHint').textContent='(가칭 가능)';
+  document.getElementById('amountReq').style.display='none';
+  document.getElementById('formModal').classList.add('open');
+}
+
+function openEdit(idx){
+  const o=opps[idx];
+  resetForm();
+  document.getElementById('formTitle').textContent='사업기회 수정';
+  document.getElementById('f_id').value=o.pipeline_id;
+  document.getElementById('f_name').value=o.opportunity||'';
+  document.getElementById('f_client').value=o.client||'';
+  document.getElementById('f_end_client').value=o.end_client||'';
+  document.getElementById('f_amount').value=o.contract_amount?comma(o.contract_amount):'';
+  document.getElementById('f_start').value=o.expected_start||'';
+  document.getElementById('f_end').value=o.expected_end||'';
+  document.getElementById('f_prob').value=o.probability||50;
+  document.getElementById('probVal').textContent=(o.probability||50)+'%';
+  document.getElementById('f_payment').value=o.payment_cycle||'월말';
+  document.getElementById('f_status').value=o.status||'기회';
+  document.getElementById('f_memo').value=o.memo||'';
+  document.getElementById('formModal').classList.add('open');
+}
+
+function openTransition(idx,targetStatus){
+  const o=opps[idx];
+  resetForm();
+  document.getElementById('f_id').value=o.pipeline_id;
+  document.getElementById('f_target_status').value=targetStatus;
+  document.getElementById('formTitle').textContent=`${o.status} → ${targetStatus} 전환`;
+  // 기존 값 채우기
+  document.getElementById('f_name').value=o.opportunity||'';
+  document.getElementById('f_client').value=o.client||'';
+  document.getElementById('f_end_client').value=o.end_client||'';
+  document.getElementById('f_amount').value=o.contract_amount?comma(o.contract_amount):'';
+  document.getElementById('f_start').value=o.expected_start||'';
+  document.getElementById('f_end').value=o.expected_end||'';
+  document.getElementById('f_payment').value=o.payment_cycle||'월말';
+  document.getElementById('f_memo').value=o.memo||'';
+  document.getElementById('f_status').value=targetStatus;
+  document.getElementById('statusGroup').style.display='none';
+
+  // 전환 안내
+  const info=document.getElementById('transitionInfo');
+  info.style.display='block';
+  const guides={
+    '확정':'📌 확정 단계: 정확한 프로젝트명·기간·금액을 확정하세요. 아직 수주는 아닙니다.',
+    '수주':'🎉 수주 단계: 수주 최종 금액을 확정하세요. 이 단계부터 재무·자금수지에 반영됩니다. 저장 후 [견적 보기]에서 인건비 등 구성요소를 입력하세요.',
+    '계약':'✍️ 계약 단계: 계약일과 최종 계약금액을 확정하세요. 계약일은 아래 추가 정보에 입력.',
+    '종료':'🏁 종료 단계: 프로젝트 종료일을 확인하세요.',
+  };
+  info.textContent=guides[targetStatus]||'';
+
+  // 단계별 필수값 조정
+  if(targetStatus==='확정'||targetStatus==='수주'){
+    document.getElementById('nameHint').textContent='(정확한 명칭 필수)';
+    document.getElementById('amountReq').style.display='inline';
+    document.getElementById('probGroup').style.display='none';
+  }
+  if(targetStatus==='계약'){
+    document.getElementById('extraGroup').style.display='block';
+    document.getElementById('extraLabel').textContent='계약일 (YYYY-MM-DD)';
+    document.getElementById('f_extra').placeholder='예: 2026-08-01';
+    document.getElementById('probGroup').style.display='none';
+  }
+  if(targetStatus==='종료'){
+    document.getElementById('extraGroup').style.display='block';
+    document.getElementById('extraLabel').textContent='종료일 (YYYY-MM-DD)';
+    document.getElementById('f_extra').placeholder='예: 2027-03-31';
+    document.getElementById('probGroup').style.display='none';
+  }
+  document.getElementById('formModal').classList.add('open');
+}
+
+function openDrop(idx){
+  const o=opps[idx];
+  const choice=prompt(`"${o.opportunity}"\n\n포기 또는 실주 중 선택하세요.\n1: 포기 (자체 판단으로 중단)\n2: 실주 (경쟁 실패)\n\n번호 입력:`);
+  if(choice!=='1'&&choice!=='2') return;
+  const status=choice==='1'?'포기':'실주';
+  const reason=prompt(`${status} 사유를 입력하세요:`)||'';
+  o.status=status;
+  o.memo=(o.memo?o.memo+' | ':'')+`${status}: ${reason}`;
+  saveAll(`${status} 처리 완료`);
+}
+
+function closeForm(){
+  document.getElementById('formModal').classList.remove('open');
+}
+
+function resetForm(){
+  ['f_id','f_target_status','f_name','f_client','f_end_client','f_amount','f_start','f_end','f_extra','f_memo'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  document.getElementById('f_prob').value=50;
+  document.getElementById('probVal').textContent='50%';
+  document.getElementById('f_payment').value='월말';
+  document.getElementById('nameHint').textContent='';
+  document.getElementById('amountReq').style.display='inline';
+  document.getElementById('probGroup').style.display='block';
+  document.getElementById('statusGroup').style.display='block';
+  document.getElementById('extraGroup').style.display='none';
+  document.getElementById('transitionInfo').style.display='none';
+}
+
+// ── 저장 ─────────────────────────────────────────────────────
+async function saveOpp(){
+  const name=document.getElementById('f_name').value.trim();
+  const client=document.getElementById('f_client').value.trim();
+  if(!name){ toast('프로젝트명을 입력하세요',true); return; }
+  if(!client){ toast('거래처를 입력하세요',true); return; }
+
+  const id=document.getElementById('f_id').value;
+  const targetStatus=document.getElementById('f_target_status').value;
+  const status=targetStatus||document.getElementById('f_status').value;
+  const amount=uncomma(document.getElementById('f_amount').value);
+
+  // 확정 이상 단계는 금액·기간 필수
+  if(['확정','수주','계약'].includes(status)){
+    if(!amount){ toast('금액을 입력하세요 (확정 단계부터 필수)',true); return; }
+    if(!document.getElementById('f_start').value||!document.getElementById('f_end').value){
+      toast('기간을 입력하세요 (확정 단계부터 필수)',true); return;
+    }
+  }
+
+  const extra=document.getElementById('f_extra').value.trim();
+  let memo=document.getElementById('f_memo').value.trim();
+  if(targetStatus==='계약'&&extra) memo=(memo?memo+' | ':'')+`계약일: ${extra}`;
+  if(targetStatus==='종료'&&extra) memo=(memo?memo+' | ':'')+`종료일: ${extra}`;
+
+  const btn=document.getElementById('f_save_btn');
+  btn.disabled=true; btn.textContent='저장 중…';
+
+  const today=new Date().toISOString().slice(0,10);
+  if(id){
+    // 수정 또는 전환
+    const o=opps.find(x=>x.pipeline_id===id);
+    if(o){
+      o.opportunity=name; o.client=client;
+      o.end_client=document.getElementById('f_end_client').value;
+      o.contract_amount=String(amount||'');
+      o.expected_start=document.getElementById('f_start').value;
+      o.expected_end=document.getElementById('f_end').value;
+      o.probability=document.getElementById('f_prob').value;
+      o.payment_cycle=document.getElementById('f_payment').value;
+      o.status=status;
+      o.memo=memo;
+    }
+  } else {
+    // 신규
+    const maxNum=opps.reduce((m,o)=>{ const n=parseInt((o.pipeline_id||'').replace(/\D/g,'').slice(-3))||0; return Math.max(m,n); },0);
+    opps.push({
+      pipeline_id:`PL-2026-${String(maxNum+1).padStart(3,'0')}`,
+      opportunity:name, client,
+      end_client:document.getElementById('f_end_client').value,
+      probability:document.getElementById('f_prob').value,
+      contract_amount:String(amount||''),
+      expected_start:document.getElementById('f_start').value,
+      expected_end:document.getElementById('f_end').value,
+      payment_cycle:document.getElementById('f_payment').value,
+      status, memo,
+      created_at:today
+    });
+  }
+
+  const ok=await saveAll(targetStatus?`${status} 전환 완료 ✓`:'저장 완료 ✓');
+  btn.disabled=false; btn.textContent='저장하기';
+  if(ok) closeForm();
+}
+
+async function saveAll(successMsg){
+  const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at'];
+  const rows=opps.map(o=>header.map(h=>o[h]||''));
+  const ok=await clearAndWrite('S01_PIPELINE','A:L',[header,...rows]);
+  if(ok){ toast(successMsg); renderFilter(); renderList(); }
+  else toast('저장 실패. 로그인 상태를 확인하세요',true);
+  return ok;
+}
+
+window.addEventListener('load',()=>{ loadOpps(); });
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>
