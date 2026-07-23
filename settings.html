@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 시스템 설정</title>
+<style>
+  :root {
+    --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
+    --border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;
+    --blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;
+    --amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;
+    --nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .main{padding:14px 14px 80px}
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .card-sub{font-size:12px;color:var(--text3);margin-top:-8px;margin-bottom:12px}
+
+  /* 단가 세트 */
+  .set-selector{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .set-chip{padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);font-size:13px;color:var(--text2);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
+  .set-chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .set-chip .default-mark{font-size:10px;background:var(--amber-lt);color:var(--amber);padding:1px 6px;border-radius:8px}
+  .set-chip.active .default-mark{background:rgba(255,255,255,.25);color:#fff}
+  .btn-add-set{padding:8px 14px;border-radius:20px;border:1px dashed var(--blue);background:var(--blue-lt);font-size:13px;color:var(--blue);cursor:pointer}
+
+  .rate-table{width:100%;border-collapse:collapse}
+  .rate-table th{font-size:11px;font-weight:600;color:var(--text3);text-align:center;padding:8px;border-bottom:2px solid var(--border)}
+  .rate-table th:first-child{text-align:left}
+  .rate-table td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+  .rate-table td:first-child{text-align:left;font-weight:600;font-size:13px}
+  .rate-table tr:last-child td{border-bottom:none}
+  .rate-input{width:100%;max-width:130px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;outline:none;background:var(--surface)}
+  .rate-input:focus{border-color:var(--blue)}
+  .btn-del-grade{font-size:12px;color:var(--red);background:none;border:none;cursor:pointer;padding:4px}
+  .set-name-input{padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;flex:1;min-width:150px}
+  .set-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btn{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:disabled{background:var(--text3);cursor:not-allowed}
+  .btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .btn-danger{background:var(--red-lt);color:var(--red);border:1px solid #FECACA}
+  .btn-sm{padding:6px 12px;font-size:12px}
+
+  /* 키워드 */
+  .kw-row{margin-bottom:12px}
+  .kw-label{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+  .kw-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+  .kw-green{background:var(--green-lt);color:var(--green)}
+  .kw-amber{background:var(--amber-lt);color:var(--amber)}
+  .kw-blue{background:var(--blue-lt);color:var(--blue)}
+  .kw-red{background:var(--red-lt);color:var(--red)}
+  .kw-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;background:var(--surface)}
+  .kw-input:focus{border-color:var(--blue)}
+  .kw-hint{font-size:11px;color:var(--text3);margin-top:3px}
+
+  /* 파라미터 */
+  .param-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+  .param-row:last-child{border-bottom:none}
+  .param-label{font-size:13px;color:var(--text2)}
+  .param-input{width:80px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;outline:none}
+  .param-input:focus{border-color:var(--blue)}
+  .param-unit{font-size:12px;color:var(--text3);margin-left:6px}
+
+  /* 시스템 정보 */
+  .info-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .info-row:last-child{border-bottom:none}
+  .info-label{color:var(--text2)}
+  .info-val{font-weight:500;color:var(--text);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}
+  .tab-item .tab-icon{font-size:20px}
+
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:760px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>시스템 설정</span></div>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+</header>
+
+<nav class="side-nav">
+  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
+  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
+  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item active"><span class="sn-icon">⚙️</span>설정</button>
+</nav>
+
+<main class="main">
+
+  <!-- ── 등급별 단가 세트 ── -->
+  <div class="card">
+    <div class="card-title">📌 등급별 단가 세트</div>
+    <div class="card-sub">단가 세트를 여러 개 관리하고, 견적 작성 시 원하는 세트를 선택합니다. 매입단가는 견적에서 건별 수정 가능합니다.</div>
+    <div class="set-selector" id="setSelector">
+      <div class="loading-wrap"><div class="spinner"></div></div>
+    </div>
+    <div id="setEditor" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <input class="set-name-input" id="setNameInput" placeholder="세트 이름">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap">
+          <input type="checkbox" id="setDefaultChk"> 기본 세트
+        </label>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rate-table">
+          <thead>
+            <tr><th>등급</th><th>매출 단가 (원/MM)</th><th>매입 단가 (원/MM)</th><th></th></tr>
+          </thead>
+          <tbody id="rateBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn btn-secondary btn-sm" onclick="addGradeRow()">+ 등급 추가</button>
+      </div>
+      <div class="set-actions">
+        <button class="btn btn-danger btn-sm" onclick="deleteSet()" id="btnDelSet">세트 삭제</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" onclick="saveRates()">단가 세트 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CSV 키워드 ── -->
+  <div class="card">
+    <div class="card-title">🏷️ CSV 거래 유형 키워드</div>
+    <div class="card-sub">하나은행 거래내역 업로드 시 적요·의뢰인 텍스트로 유형을 분류합니다. 쉼표로 구분해 입력하세요.</div>
+    <div id="kwSection">
+      <div class="kw-row">
+        <div class="kw-label"><span class="kw-badge kw-green">매출 입금</span></div>
+        <input class="kw-input" id="kw_revenue_inflow" placeholder="예: 이노라인,비플레이스">
+        <div class="kw-hint">거래처명이 적요 또는 의뢰인에 포함되면 매출 입금으로 분류</div>
+      </div>
+      <div class="kw-row">
+        <div class="kw-label"><span class="kw-badge kw-amber">매입 지급</span></div>
+        <input class="kw-input" id="kw_cost_outflow" placeholder="예: 오벳소프트,외주비">
+      </div>
+      <div class="kw-row">
+        <div class="kw-label"><span class="kw-badge kw-blue">고정비</span></div>
+        <input class="kw-input" id="kw_fixed_outflow" placeholder="예: 급여,임차료,4대보험,세무">
+      </div>
+      <div class="kw-row">
+        <div class="kw-label"><span class="kw-badge kw-red">세금</span></div>
+        <input class="kw-input" id="kw_tax_outflow" placeholder="예: 부가세,법인세,원천세">
+      </div>
+      <div class="kw-row">
+        <div class="kw-label"><span class="kw-badge kw-blue">자본 납입</span></div>
+        <input class="kw-input" id="kw_capital_inflow" placeholder="예: 장기석">
+        <div class="kw-hint">매출이 아닌 자본금·가수금 입금 (자금수지 별도 표시)</div>
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" onclick="saveKeywords()">키워드 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 거래점 분류 규칙 ── -->
+  <div class="card">
+    <div class="card-title">🏦 거래점 분류 규칙</div>
+    <div class="card-sub">거래점(Branch) 값 기준 자동 분류. 법인카드·AI 사용료 등을 거래점으로 묶습니다.</div>
+    <div class="kw-row">
+      <div class="kw-label"><span class="kw-badge kw-amber">법인카드 사용</span></div>
+      <input class="kw-input" id="kw_card_branch" placeholder="예: 하나은행0026,하나은행0996">
+    </div>
+    <div class="kw-row">
+      <div class="kw-label"><span class="kw-badge kw-blue">AI 사용료</span></div>
+      <input class="kw-input" id="kw_ai_branch" placeholder="예: 하나금융센터,하나증권금융센터">
+      <div class="kw-hint">거래점명에 이 텍스트가 포함되면 AI 사용료로 분류 (세금 키워드가 우선)</div>
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="saveBranchRules()">분류 규칙 저장</button>
+    </div>
+  </div>
+
+  <!-- ── 알림 파라미터 ── -->
+  <div class="card">
+    <div class="card-title">🔔 알림 파라미터</div>
+    <div class="param-row">
+      <span class="param-label">정합도 이탈 경고 기준</span>
+      <span><input class="param-input" type="number" id="param_alert_threshold" value="20"><span class="param-unit">%</span></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">마감 임박 경고 D-day</span>
+      <span><input class="param-input" type="number" id="param_alert_days" value="7"><span class="param-unit">일</span></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">현금 부족 경고 선행 개월</span>
+      <span><input class="param-input" type="number" id="param_cash_warn_months" value="3"><span class="param-unit">개월</span></span>
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="saveParams()">파라미터 저장</button>
+    </div>
+  </div>
+
+  <!-- ── 시스템 정보 ── -->
+  <div class="card">
+    <div class="card-title">ℹ️ 시스템 정보</div>
+    <div class="info-row">
+      <span class="info-label">연결된 Google Sheets</span>
+      <a class="info-val" id="sheetsLink" href="#" target="_blank" style="color:var(--blue);text-decoration:none">Sheets 열기 ↗</a>
+    </div>
+    <div class="info-row">
+      <span class="info-label">배포 URL</span>
+      <span class="info-val">keeseokchang-commits.github.io/hfc-dashboard</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">부가세 관리</span>
+      <a class="info-val" href="vat.html" style="color:var(--blue);text-decoration:none">부가세 관리 열기 →</a>
+    </div>
+  </div>
+
+</main>
+
+<nav class="tab-bar">
+  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
+  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
+  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const SHEETS_ID = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
+const API_KEY   = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
+const CLIENT_ID = '129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
+const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
+
+let accessToken=null, tokenClient;
+let rateRows=[];      // S11 전체 행 (객체 배열)
+let currentSetId=null;
+let settingsMap={};   // S10 설정
+
+document.getElementById('sheetsLink').href=`https://docs.google.com/spreadsheets/d/${SHEETS_ID}/edit`;
+
+// ── 유틸 ──────────────────────────────────────────────────────
+function comma(n){ return (parseInt(n)||0).toLocaleString(); }
+function uncomma(s){ return parseInt(String(s).replace(/,/g,''))||0; }
+function toast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ── Sheets ────────────────────────────────────────────────────
+async function fetchSheet(sheet,range){
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
+  const r=await fetch(url); if(!r.ok) throw new Error('읽기 오류 '+r.status);
+  return (await r.json()).values||[];
+}
+function toObj(rows){
+  if(!rows.length) return [];
+  const h=rows[0]; return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));
+}
+async function clearAndWrite(sheet,range,rows){
+  if(!accessToken){ await signIn(); if(!accessToken) return false; }
+  const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
+  await fetch(`${base}/values/${encodeURIComponent(sheet+'!'+range)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
+  const r=await fetch(`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
+  return r.ok;
+}
+function initOAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{ if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); } }
+  });
+}
+function signIn(){ return new Promise(res=>{ tokenClient.requestAccessToken(); setTimeout(()=>res(!!accessToken),3000); }); }
+
+// ── 단가 세트 ─────────────────────────────────────────────────
+async function loadRates(){
+  try{
+    const rows=await fetchSheet('S11_GRADE_RATE','A1:H100');
+    rateRows=toObj(rows).filter(r=>r.set_id);
+    renderSetSelector();
+    // 기본 세트 자동 선택
+    const def=rateRows.find(r=>r.is_default==='Y');
+    selectSet(def?def.set_id:(rateRows[0]?.set_id||null));
+  }catch(e){
+    document.getElementById('setSelector').innerHTML=`<div style="color:var(--red);font-size:13px">S11_GRADE_RATE 시트를 읽을 수 없습니다. Google Sheets에 시트를 추가했는지 확인하세요.<br><span style="font-size:11px;color:var(--text3)">${e.message}</span></div>`;
+  }
+}
+
+function getSets(){
+  const sets={};
+  rateRows.forEach(r=>{
+    if(!sets[r.set_id]) sets[r.set_id]={name:r.set_name,isDefault:r.is_default==='Y',grades:[]};
+    sets[r.set_id].grades.push(r);
+  });
+  return sets;
+}
+
+function renderSetSelector(){
+  const sets=getSets();
+  const el=document.getElementById('setSelector');
+  el.innerHTML=Object.entries(sets).map(([sid,s])=>`
+    <button class="set-chip ${sid===currentSetId?'active':''}" onclick="selectSet('${sid}')">
+      ${s.name}${s.isDefault?'<span class="default-mark">기본</span>':''}
+    </button>`).join('')+
+    `<button class="btn-add-set" onclick="addNewSet()">+ 새 세트</button>`;
+}
+
+function selectSet(sid){
+  if(!sid) return;
+  currentSetId=sid;
+  renderSetSelector();
+  const sets=getSets();
+  const s=sets[sid];
+  if(!s) return;
+  document.getElementById('setEditor').style.display='block';
+  document.getElementById('setNameInput').value=s.name;
+  document.getElementById('setDefaultChk').checked=s.isDefault;
+  renderRateBody(s.grades);
+}
+
+function renderRateBody(grades){
+  const body=document.getElementById('rateBody');
+  body.innerHTML=grades.map((g,i)=>`
+    <tr>
+      <td><input class="rate-input" style="max-width:90px;text-align:left" value="${g.grade}" id="grade_${i}"></td>
+      <td><input class="rate-input" value="${comma(g.sell_price)}" id="sell_${i}" oninput="this.value=formatComma(this.value)"></td>
+      <td><input class="rate-input" value="${comma(g.buy_price)}" id="buy_${i}" oninput="this.value=formatComma(this.value)"></td>
+      <td><button class="btn-del-grade" onclick="removeGradeRow(${i})">✕</button></td>
+    </tr>`).join('');
+  body.dataset.count=grades.length;
+}
+
+function formatComma(v){
+  const n=String(v).replace(/[^\d]/g,'');
+  return n?parseInt(n).toLocaleString():'';
+}
+
+function addGradeRow(){
+  const body=document.getElementById('rateBody');
+  const i=parseInt(body.dataset.count)||0;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
+    <td><input class="rate-input" style="max-width:90px;text-align:left" placeholder="등급명" id="grade_${i}"></td>
+    <td><input class="rate-input" placeholder="매출단가" id="sell_${i}" oninput="this.value=formatComma(this.value)"></td>
+    <td><input class="rate-input" placeholder="매입단가" id="buy_${i}" oninput="this.value=formatComma(this.value)"></td>
+    <td><button class="btn-del-grade" onclick="this.closest('tr').remove()">✕</button></td>`;
+  body.appendChild(tr);
+  body.dataset.count=i+1;
+}
+
+function removeGradeRow(i){
+  const rows=document.querySelectorAll('#rateBody tr');
+  if(rows[i]) rows[i].remove();
+}
+
+function addNewSet(){
+  // 새 세트 ID 채번
+  const sets=Object.keys(getSets());
+  const maxNum=sets.reduce((m,s)=>{ const n=parseInt(s.replace('SET-',''))||0; return Math.max(m,n); },0);
+  const newId=`SET-${String(maxNum+1).padStart(3,'0')}`;
+  // 빈 세트 추가 (기본 4개 등급 골격)
+  ['특급','고급','중급','초급'].forEach(g=>{
+    rateRows.push({set_id:newId,set_name:'새 단가 세트',grade:g,sell_price:'0',buy_price:'0',description:'',is_default:'N',updated_at:new Date().toISOString().slice(0,10)});
+  });
+  selectSet(newId);
+  document.getElementById('setNameInput').value='새 단가 세트';
+  document.getElementById('setNameInput').focus();
+}
+
+async function saveRates(){
+  const setName=document.getElementById('setNameInput').value.trim();
+  if(!setName){ toast('세트 이름을 입력하세요',true); return; }
+  const isDefault=document.getElementById('setDefaultChk').checked;
+
+  // 현재 편집 세트의 등급 행 수집
+  const trs=document.querySelectorAll('#rateBody tr');
+  const newGrades=[];
+  const today=new Date().toISOString().slice(0,10);
+  trs.forEach(tr=>{
+    const inputs=tr.querySelectorAll('input');
+    const grade=inputs[0].value.trim();
+    const sell=uncomma(inputs[1].value);
+    const buy=uncomma(inputs[2].value);
+    if(grade) newGrades.push({set_id:currentSetId,set_name:setName,grade,sell_price:String(sell),buy_price:String(buy),description:'',is_default:isDefault?'Y':'N',updated_at:today});
+  });
+  if(!newGrades.length){ toast('등급을 1개 이상 입력하세요',true); return; }
+
+  // rateRows에서 현재 세트 제거 후 새 값 추가
+  rateRows=rateRows.filter(r=>r.set_id!==currentSetId);
+  // 기본 세트 변경 시 다른 세트 is_default 해제
+  if(isDefault) rateRows.forEach(r=>{ r.is_default='N'; });
+  rateRows.push(...newGrades);
+
+  // S11 전체 재작성
+  const header=['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at'];
+  const dataRows=rateRows.map(r=>header.map(h=>r[h]||''));
+  toast('저장 중…');
+  const ok=await clearAndWrite('S11_GRADE_RATE','A:H',[header,...dataRows]);
+  if(ok){ toast('✓ 단가 세트 저장 완료'); await loadRates(); }
+  else toast('저장 실패. 로그인 상태를 확인하세요',true);
+}
+
+async function deleteSet(){
+  const sets=getSets();
+  if(Object.keys(sets).length<=1){ toast('최소 1개 세트는 유지해야 합니다',true); return; }
+  if(!confirm(`"${sets[currentSetId]?.name}" 세트를 삭제하시겠습니까?`)) return;
+  rateRows=rateRows.filter(r=>r.set_id!==currentSetId);
+  const header=['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at'];
+  const dataRows=rateRows.map(r=>header.map(h=>r[h]||''));
+  const ok=await clearAndWrite('S11_GRADE_RATE','A:H',[header,...dataRows]);
+  if(ok){ toast('세트 삭제 완료'); currentSetId=null; await loadRates(); }
+  else toast('삭제 실패',true);
+}
+
+// ── S10 설정 (키워드·파라미터) ─────────────────────────────────
+async function loadSettings(){
+  try{
+    const rows=await fetchSheet('S10_SETTINGS','A1:E30');
+    toObj(rows).forEach(r=>{ if(r.setting_key) settingsMap[r.setting_key]=r.setting_value; });
+    // 키워드 채우기
+    ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow','kw_card_branch','kw_ai_branch'].forEach(k=>{
+      const el=document.getElementById(k);
+      if(el&&settingsMap[k]) el.value=settingsMap[k];
+    });
+    // 기본값 세팅 (없으면)
+    if(!settingsMap.kw_capital_inflow) document.getElementById('kw_capital_inflow').value='장기석';
+    if(!settingsMap.kw_card_branch) document.getElementById('kw_card_branch').value='하나은행0026,하나은행0996';
+    if(!settingsMap.kw_ai_branch) document.getElementById('kw_ai_branch').value='하나금융센터,하나증권금융센터';
+    // 파라미터
+    ['param_alert_threshold','param_alert_days','param_cash_warn_months'].forEach(k=>{
+      const el=document.getElementById(k);
+      if(el&&settingsMap[k]) el.value=settingsMap[k];
+    });
+  }catch(e){ toast('S10 설정 로드 실패: '+e.message,true); }
+}
+
+async function saveSettingsToSheet(){
+  // settingsMap 전체를 S10에 재작성
+  const header=['setting_key','setting_value','category','description','updated_at'];
+  const today=new Date().toISOString().slice(0,10);
+  const descMap={
+    kw_revenue_inflow:'매출 입금 키워드',kw_cost_outflow:'매입 지급 키워드',
+    kw_fixed_outflow:'고정비 키워드',kw_tax_outflow:'세금 키워드',
+    kw_capital_inflow:'자본 납입 키워드',kw_card_branch:'법인카드 거래점',
+    kw_ai_branch:'AI 사용료 거래점',
+    param_alert_threshold:'정합도 이탈 경고 기준(%)',
+    param_alert_days:'마감 임박 경고 D-day',
+    param_cash_warn_months:'현금 부족 경고 선행 개월',
+  };
+  const rows=Object.entries(settingsMap).map(([k,v])=>[
+    k,v,k.startsWith('kw_')?'keyword':'parameter',descMap[k]||'',today
+  ]);
+  return await clearAndWrite('S10_SETTINGS','A:E',[header,...rows]);
+}
+
+async function saveKeywords(){
+  ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow'].forEach(k=>{
+    settingsMap[k]=document.getElementById(k).value.trim();
+  });
+  toast('저장 중…');
+  const ok=await saveSettingsToSheet();
+  toast(ok?'✓ 키워드 저장 완료':'저장 실패',!ok);
+}
+
+async function saveBranchRules(){
+  ['kw_card_branch','kw_ai_branch'].forEach(k=>{
+    settingsMap[k]=document.getElementById(k).value.trim();
+  });
+  toast('저장 중…');
+  const ok=await saveSettingsToSheet();
+  toast(ok?'✓ 분류 규칙 저장 완료':'저장 실패',!ok);
+}
+
+async function saveParams(){
+  ['param_alert_threshold','param_alert_days','param_cash_warn_months'].forEach(k=>{
+    settingsMap[k]=document.getElementById(k).value;
+  });
+  toast('저장 중…');
+  const ok=await saveSettingsToSheet();
+  toast(ok?'✓ 파라미터 저장 완료':'저장 실패',!ok);
+}
+
+window.addEventListener('load',()=>{ loadRates(); loadSettings(); });
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>
