@@ -288,13 +288,25 @@ async function clearAndWrite(sheet,range,rows){
   const r=await fetch(`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
   return r.ok;
 }
+let pendingAuth=null;
 function initOAuth(){
   tokenClient=google.accounts.oauth2.initTokenClient({
     client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{ if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); } }
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
   });
 }
-function signIn(){ return new Promise(res=>{ tokenClient.requestAccessToken(); setTimeout(()=>res(!!accessToken),3000); }); }
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
 // ── 단가 세트 ─────────────────────────────────────────────────
 async function loadRates(){
@@ -415,7 +427,9 @@ async function saveRates(){
   if(isDefault) rateRows.forEach(r=>{ r.is_default='N'; });
   rateRows.push(...newGrades);
 
-  // S11 전체 재작성
+  // S11 전체 재작성 (복합 PK: set_id+grade 중복 제거)
+  const uniq=new Map(); rateRows.forEach(r=>{ if(r.set_id&&r.grade) uniq.set(r.set_id+'|'+r.grade,r); });
+  rateRows=[...uniq.values()];
   const header=['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at'];
   const dataRows=rateRows.map(r=>header.map(h=>r[h]||''));
   toast('저장 중…');

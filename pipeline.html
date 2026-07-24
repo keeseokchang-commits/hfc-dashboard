@@ -277,19 +277,31 @@ async function clearAndWrite(sheet,range,rows){
   const r=await fetch(`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
   return r.ok;
 }
+let pendingAuth=null;
 function initOAuth(){
   tokenClient=google.accounts.oauth2.initTokenClient({
     client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{ if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); } }
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
   });
 }
-function signIn(){ return new Promise(res=>{ tokenClient.requestAccessToken(); setTimeout(()=>res(!!accessToken),3000); }); }
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
 // ── 데이터 로드 ───────────────────────────────────────────────
 async function loadOpps(){
   try{
     const rows=await fetchSheet('S01_PIPELINE','A1:L300');
-    opps=toObj(rows).filter(o=>o.pipeline_id);
+    opps=dedupe(toObj(rows).filter(o=>o.pipeline_id),'pipeline_id');
     renderFilter();
     renderList();
   }catch(e){
@@ -519,6 +531,7 @@ async function saveOpp(){
 
   const btn=document.getElementById('f_save_btn');
   btn.disabled=true; btn.textContent='저장 중…';
+  const snapshot=JSON.parse(JSON.stringify(opps)); // PK 무결성: 실패 시 롤백용
 
   const today=new Date().toISOString().slice(0,10);
   if(id){
@@ -553,6 +566,7 @@ async function saveOpp(){
   }
 
   const ok=await saveAll(targetStatus?`${status} 전환 완료 ✓`:'저장 완료 ✓');
+  if(!ok){ opps=snapshot; renderFilter(); renderList(); }
   if(ok && ['수주','계약','종료'].includes(status)){
     const plId=id||opps[opps.length-1].pipeline_id;
     await ensureProject(plId,status);
@@ -563,6 +577,7 @@ async function saveOpp(){
 
 async function saveAll(successMsg){
   const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at'];
+  opps=dedupe(opps,'pipeline_id'); // PK 무결성 규칙
   const rows=opps.map(o=>header.map(h=>o[h]||''));
   const ok=await clearAndWrite('S01_PIPELINE','A:L',[header,...rows]);
   if(ok){ toast(successMsg); renderFilter(); renderList(); }
@@ -590,7 +605,8 @@ async function ensureProject(plId,status){
         status,payment_terms:o.payment_cycle,pipeline_id:plId,memo:'수주 전환 자동생성'};
       prjs.push(p);
     }
-    const dataRows=prjs.map(x=>header.map(h=>x[h]||''));
+    const uniq=dedupe(prjs,'project_id');
+    const dataRows=uniq.map(x=>header.map(h=>x[h]||''));
     const ok=await clearAndWrite('S03_PROJECT','A:K',[header,...dataRows]);
     if(ok) toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
   }catch(e){ toast('S03 동기화 실패: '+e.message,true); }

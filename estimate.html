@@ -162,8 +162,25 @@ async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!acce
   await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
   const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
   return r.ok;}
-function initOAuth(){tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:r=>{if(r.access_token){accessToken=r.access_token;toast('로그인 완료 ✓');}}});}
-function signIn(){return new Promise(res=>{tokenClient.requestAccessToken();setTimeout(()=>res(!!accessToken),3000);});}
+let pendingAuth=null;
+function initOAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
+  });
+}
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
 function mmBetween(s,e){if(!s||!e)return 0;const a=new Date(s),b=new Date(e);
   return Math.max(0,((b-a)/86400000+1)/30.4).toFixed(2);}
@@ -175,7 +192,7 @@ async function loadAll(){
       fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S11_GRADE_RATE','A1:H100'),fetchSheet('S12_ESTIMATE','A1:O500')]);
     opps=toObj(plR).filter(o=>o.pipeline_id);
     rates=toObj(rtR).filter(r=>r.set_id);
-    estimates=toObj(esR).filter(e=>e.estimate_id);
+    estimates=dedupe(toObj(esR).filter(e=>e.estimate_id),'estimate_id');
     renderChips(); renderOppSel(); renderRateSets(); renderAllSummary();
     const pid=new URLSearchParams(location.search).get('pid');
     if(pid){document.getElementById('oppSel').value=pid;loadOpp();}
@@ -346,7 +363,7 @@ async function saveEstimate(){
       comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:'',
       amount:it.qty*it.price,mm:'',start_date:'',end_date:'',memo:it.memo,created_at:today});});});
   const H=['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'];
-  const all=[...others,...rows];
+  const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
   const ok=await clearAndWrite('S12_ESTIMATE','A:O',[H,...all.map(r=>H.map(h=>r[h]??''))]);
   btn.disabled=false;btn.textContent='견적 저장 (S12)';
   if(ok){estimates=all;toast('✓ 견적 저장 완료');renderAllSummary();}

@@ -137,15 +137,32 @@ async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!acce
   await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
   const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
   return r.ok;}
-function initOAuth(){tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:r=>{if(r.access_token){accessToken=r.access_token;toast('로그인 완료 ✓');}}});}
-function signIn(){return new Promise(res=>{tokenClient.requestAccessToken();setTimeout(()=>res(!!accessToken),3000);});}
+let pendingAuth=null;
+function initOAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
+  });
+}
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
 async function loadAll(){
   try{
     const [vtR,rvR,csR,plR,prR]=await Promise.all([
       fetchSheet('S13_VAT','A1:N20'),fetchSheet('S04_REVENUE','A1:I300'),
       fetchSheet('S05_COST','A1:K300'),fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S03_PROJECT','A1:K200')]);
-    vats=toObj(vtR).filter(v=>v.vat_id);
+    vats=dedupe(toObj(vtR).filter(v=>v.vat_id),'vat_id');
     const pls=toObj(plR),prjs=toObj(prR);
     // 재무 필터
     const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
@@ -206,6 +223,7 @@ function selectQ(code){
 }
 const H13=['vat_id','year','quarter_code','period_start','period_end','due_date','sales_vat','purchase_vat','estimated_payment','actual_payment','paid_date','cashflow_reflected','status','memo'];
 async function saveS13(){
+  vats=dedupe(vats,'vat_id'); // PK 무결성 규칙
   const rows=vats.map(v=>H13.map(h=>v[h]??''));
   return await clearAndWrite('S13_VAT','A:N',[H13,...rows]);
 }

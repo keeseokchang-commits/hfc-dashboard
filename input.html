@@ -217,8 +217,25 @@ async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!acce
   await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
   const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
   return r.ok;}
-function initOAuth(){tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:r=>{if(r.access_token){accessToken=r.access_token;toast('로그인 완료 ✓');}}});}
-function signIn(){return new Promise(res=>{tokenClient.requestAccessToken();setTimeout(()=>res(!!accessToken),3000);});}
+let pendingAuth=null;
+function initOAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
+  });
+}
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
 function switchTab(ev,t){
   document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
@@ -238,7 +255,7 @@ async function loadAll(){
       fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S03_PROJECT','A1:K200'),
       fetchSheet('S04_REVENUE','A1:I300'),fetchSheet('S05_COST','A1:K300'),fetchSheet('S06_FIXED_COST','A1:F300')]);
     const pls=toObj(plR), prjs=toObj(prR);
-    revenues=toObj(rvR); costs=toObj(csR); fixed=toObj(fxR);
+    revenues=dedupe(toObj(rvR),'revenue_id'); costs=dedupe(toObj(csR),'cost_id'); fixed=dedupe(toObj(fxR),'fixed_id');
     // 재무 반영 필터: S01 수주·계약·종료 → 연결 PRJ
     const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
     financePrjs=prjs.filter(p=>okPl.has(p.pipeline_id));
@@ -304,11 +321,10 @@ async function saveRev(){
     cash_recv_amt:Math.round(sup*1.1),cash_recv_date:document.getElementById('rev_date').value,
     is_received:document.getElementById('rev_received').value,memo:document.getElementById('rev_memo').value,
     vat_amt:Math.round(sup*.1)};
-  const i=revenues.findIndex(r=>r.revenue_id===id);
-  if(i>=0)revenues[i]=rec;else revenues.push(rec);
-  const ok=await clearAndWrite('S04_REVENUE','A:I',[H4,...revenues.filter(r=>r.revenue_id).map(r=>H4.map(h=>r[h]??''))]);
+  const next=dedupe([...revenues.filter(r=>r.revenue_id&&r.revenue_id!==id),rec],'revenue_id');
+  const ok=await clearAndWrite('S04_REVENUE','A:I',[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
-  if(ok){toast('계획 매출 저장 ✓');resetRev();renderLists();}else toast('저장 실패',true);}
+  if(ok){revenues=next;toast('계획 매출 저장 ✓');resetRev();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 async function saveCost(){
   const pj=document.getElementById('cost_project').value, ym=document.getElementById('cost_ym').value, sup=un(document.getElementById('cost_supply').value);
   if(!pj||!ym||!sup){toast('프로젝트·년월·공급가액은 필수입니다',true);return;}
@@ -318,11 +334,10 @@ async function saveCost(){
     person_name:document.getElementById('cost_person').value,unit_price:un(document.getElementById('cost_unit').value)||0,
     mm:document.getElementById('cost_mm').value||0,amount:sup,payment_date:document.getElementById('cost_date').value,
     memo:document.getElementById('cost_memo').value,vat_amt:Math.round(sup*.1)};
-  const i=costs.findIndex(c=>c.cost_id===id);
-  if(i>=0)costs[i]=rec;else costs.push(rec);
-  const ok=await clearAndWrite('S05_COST','A:K',[H5,...costs.filter(c=>c.cost_id).map(c=>H5.map(h=>c[h]??''))]);
+  const next=dedupe([...costs.filter(c=>c.cost_id&&c.cost_id!==id),rec],'cost_id');
+  const ok=await clearAndWrite('S05_COST','A:K',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
-  if(ok){toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패',true);}
+  if(ok){costs=next;toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 async function saveFix(){
   const ym=document.getElementById('fix_ym').value, amt=un(document.getElementById('fix_amount').value);
   if(!ym||!amt){toast('년월·금액은 필수입니다',true);return;}
@@ -330,11 +345,10 @@ async function saveFix(){
   const id=document.getElementById('fix_id').value||nextId(fixed,'fixed_id','FX');
   const rec={fixed_id:id,year_month:ym,category:document.getElementById('fix_category').value,
     amount:amt,payment_date:document.getElementById('fix_date').value,memo:document.getElementById('fix_memo').value};
-  const i=fixed.findIndex(f=>f.fixed_id===id);
-  if(i>=0)fixed[i]=rec;else fixed.push(rec);
-  const ok=await clearAndWrite('S06_FIXED_COST','A:F',[H6,...fixed.filter(f=>f.fixed_id).map(f=>H6.map(h=>f[h]??''))]);
+  const next=dedupe([...fixed.filter(f=>f.fixed_id&&f.fixed_id!==id),rec],'fixed_id');
+  const ok=await clearAndWrite('S06_FIXED_COST','A:F',[H6,...next.map(f=>H6.map(h=>f[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
-  if(ok){toast('고정비 저장 ✓');resetFix();renderLists();}else toast('저장 실패',true);}
+  if(ok){fixed=next;toast('고정비 저장 ✓');resetFix();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 
 // ── 수정·초기화 ──
 function editRev(id){const r=revenues.find(x=>x.revenue_id===id);if(!r)return;

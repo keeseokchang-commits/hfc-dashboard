@@ -321,13 +321,25 @@ async function clearAndWrite(sheet,range,rows){
 }
 
 // ── OAuth ─────────────────────────────────────────────────────
+let pendingAuth=null;
 function initOAuth(){
   tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID, scope:SCOPES,
-    callback:(resp)=>{ if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); } }
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
   });
 }
-function signIn(){ return new Promise(res=>{ tokenClient.requestAccessToken(); setTimeout(()=>res(!!accessToken),3000); }); }
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
 // ── CSV/XLSX 파싱 ─────────────────────────────────────────────
 function handleDrop(e){
@@ -678,6 +690,7 @@ async function saveToSheets(){
   // S08_CASHFLOW_ACT 헤더 + 데이터
   const s08Header=['year_month','act_balance','act_inflow','act_outflow','inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc','unclassified_cnt','csv_uploaded_at'];
   const today=new Date().toISOString().slice(0,10);
+  actData=dedupe(actData,'year_month'); // PK 무결성 규칙
   const s08Rows=actData.map(m=>[
     m.year_month,m.act_balance,m.act_inflow,m.act_outflow,
     m.inflow_revenue,m.outflow_cost,m.outflow_fixed,m.outflow_tax,

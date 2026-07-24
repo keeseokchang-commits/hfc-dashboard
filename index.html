@@ -317,9 +317,9 @@ function progress(start, end) {
 
 // ── 숫자 포맷 ─────────────────────────────────────────────────
 function won(n) {
+  // v2.2 보강 규칙: 대시보드는 백만원 단위 소수점 2자리 (예: 1,223.45 백만원)
   const v = parseInt(n) || 0;
-  if (Math.abs(v) >= 10000) return Math.round(v / 10000).toLocaleString() + '만원';
-  return v.toLocaleString() + '원';
+  return (v/1000000).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' 백만원';
 }
 function wonFull(n) { return (parseInt(n)||0).toLocaleString() + '원'; }
 function pct(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
@@ -460,7 +460,7 @@ async function render() {
       const due = parseDate(v.due_date);
       if (due) {
         const d = diffDays(todayDate, due);
-        if (d >= 0 && d <= 30) addAlert('amber', `부가세 납부 D-${d}`, `${v.memo||v.quarter_code} · ${wonFull(v.estimated_payment)} (기한 ${v.due_date})`);
+        if (d >= 0 && d <= 30) addAlert('amber', `부가세 납부 D-${d}`, `${v.memo||v.quarter_code} · ${won(v.estimated_payment)} (기한 ${v.due_date})`);
       }
     });
     revenues.filter(r => r.is_received === 'N' && r.cash_recv_date).forEach(r => {
@@ -587,14 +587,14 @@ async function render() {
         datasets: [
           {
             label: '매출',
-            data: monthlyRev.map(v => Math.round(v / 10000)),
+            data: monthlyRev.map(v => Math.round(v/10000)/100),
             backgroundColor: 'rgba(37,99,235,.15)',
             borderColor: 'rgba(37,99,235,.7)',
             borderWidth: 1.5, borderRadius: 4,
           },
           {
             label: '영업이익',
-            data: monthlyOp.map(v => Math.round(v / 10000)),
+            data: monthlyOp.map(v => Math.round(v/10000)/100),
             type: 'line',
             borderColor: '#059669', backgroundColor: 'rgba(5,150,105,.08)',
             borderWidth: 2, pointRadius: 3, tension: .3, fill: false,
@@ -606,7 +606,7 @@ async function render() {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          y: { ticks: { callback: v => v + '만', font: { size: 10 } }, grid: { color: '#E2E8F033' } },
+          y: { ticks: { callback: v => v.toLocaleString('ko-KR',{minimumFractionDigits:1}) + '백만', font: { size: 10 } }, grid: { color: '#E2E8F033' } },
           x: { ticks: { font: { size: 10 } }, grid: { display: false } }
         }
       }
