@@ -467,7 +467,7 @@ function resetCost(){['cost_id','cost_person','cost_unit','cost_mm','cost_supply
 function resetFix(){['fix_id','fix_amount','fix_date','fix_memo'].forEach(i=>document.getElementById(i).value='');}
 
 // ═══ 청구 스케줄 자동 생성 (v2.3) ═══
-let genRows=[], genPl=null;
+let genRows=[], genCostRows=[], genPl=null;
 function lastDayStr(y,m){return `${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;}
 function nextMonthEnd(dateStr){const d=new Date(dateStr);let y=d.getFullYear(),m=d.getMonth()+2;if(m>12){m-=12;y++;}return lastDayStr(y,m);}
 function recvDue(invDate){return (genPl&&genPl.payment_cycle==='기타')?invDate:nextMonthEnd(invDate);}
@@ -477,6 +477,7 @@ function ymList(s,e){const a=new Date(s),b=new Date(e);const r=[];let c=new Date
     const t=(c.getFullYear()===b.getFullYear()&&c.getMonth()===b.getMonth())?b.getDate():dim;
     r.push({y:c.getFullYear(),m:c.getMonth()+1,w:(t-f+1)/dim});
     c=new Date(c.getFullYear(),c.getMonth()+1,1);} return r;}
+function pad2(n){return String(n).padStart(2,'0');}
 function openGenModal(withCost){
   const sel=document.getElementById('genPrj');
   sel.innerHTML='<option value="">선택</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_id} ${p.project_name}</option>`).join('');
@@ -485,84 +486,85 @@ function openGenModal(withCost){
 }
 function closeGenModal(){document.getElementById('genModal').classList.remove('open');genRows=[];genCostRows=[];
   ['genPreviewWrap','genCostWrap','msArea','genInfo','genTargets'].forEach(i=>document.getElementById(i).style.display='none');
+  document.getElementById('msRows').innerHTML='';
   document.getElementById('genSaveBtn').disabled=true;}
 function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId);}
-function estSellSum(items){return items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);}
-function estBuySum(items){return items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);}
-function buildGen(){
-  const pid=document.getElementById('genPrj').value; if(!pid)return;
-  const prj=allPrjs.find(p=>p.project_id===pid);
-  genPl=prj?pipelines.find(p=>p.pipeline_id===prj.pipeline_id):null;
-  if(!genPl){toast('연결된 사업기회(S01)를 찾을 수 없습니다',true);return;}
-  const biz=genPl.biz_type||'인력공급', pay=genPl.payment_cycle||'익월말';
-  const start=genPl.expected_start||prj.start_date, end=genPl.expected_end||prj.end_date;
-  const amt=un(genPl.contract_amount||prj.contract_amount);
+function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);}
+function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);}
+function genCtx(){
+  const pid=document.getElementById('genPrj').value; if(!pid)return null;
+  const prj=allPrjs.find(p=>p.project_id===pid); if(!prj)return null;
+  genPl=pipelines.find(p=>p.pipeline_id===prj.pipeline_id); if(!genPl)return null;
   const items=estOf(genPl.pipeline_id);
-  const hasEst=items.length>0, eSell=estSellSum(items), eBuy=estBuySum(items);
-  document.getElementById('genTargets').style.display='block';
-  const doCostEl=document.getElementById('genDoCost');
-  document.getElementById('genCostHint').textContent=hasEst?`(견적 매입 합계 ${comma(eBuy)}원 기반)`:'(견적 없음 — 생성 불가)';
-  if(!hasEst){doCostEl.checked=false;doCostEl.disabled=true;}else doCostEl.disabled=false;
-  document.getElementById('revBaseEst').disabled=!hasEst;
-  const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
-  const revAmt=(revBase==='est'&&hasEst)?eSell:amt;
-  const info=document.getElementById('genInfo');
-  info.style.display='block';
-  info.innerHTML=`<b>${biz}</b> · 지급조건 <b>${pay}</b> · 기간 ${start||'─'}~${end||'─'}<br>계약금액 <b>${comma(amt)}원</b>${hasEst?` · 견적 매출 <b>${comma(eSell)}원</b> · 견적 매입 <b>${comma(eBuy)}원</b>`:' · 견적 없음'}`;
-  if(!start||!end||(!revAmt&&!eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';return;}
-  if(biz==='용역턴키'){document.getElementById('msArea').style.display='block';setupMs(revAmt,eBuy,hasEst);}
-  else{
-    document.getElementById('msArea').style.display='none';
-    // 매출: 월할
-    if(document.getElementById('genDoRev').checked&&revAmt){
-      const ms=ymList(start,end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
-      genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?revAmt-acc:Math.round(revAmt*x.w/totW/1000)*1000;acc+=sup;
-        const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
-    } else genRows=[];
-    // 매입: 견적 기반 (인건비 월할 + 비인건비 단건)
-    genCostRows=[];
-    if(document.getElementById('genDoCost').checked&&hasEst){
-      items.filter(e=>e.comp_type==='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
-        const es=e.start_date||start, ee=e.end_date||end;
-        ymList(es,ee).forEach(x=>{
-          const plan=lastDayStr(x.y,x.m);
-          genCostRows.push({plan,name:e.item_name||'인건비',supply:Math.round((parseInt(e.buy_price)||0)*x.w),
-            pay:nextMonthEnd(plan),ctype:'인건비',person:e.item_name||'',unit:parseInt(e.buy_price)||0,mm:x.w.toFixed(2)});
-        });});
-      items.filter(e=>e.comp_type!=='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
-        const sd=new Date(start); const plan=lastDayStr(sd.getFullYear(),sd.getMonth()+1);
-        genCostRows.push({plan,name:e.item_name||e.comp_type,supply:(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0),
-          pay:nextMonthEnd(plan),ctype:'기타원가',person:'',unit:'',mm:''});});
-    }
-    renderGenPreview(); renderGenCostPreview();
-  }
-}
-function setupMs(revAmt,eBuy,hasEst){
-  const n=parseInt(document.getElementById('genRounds').value);
-  const ratios=n===4?[30,30,20,20]:[30,40,30];
-  const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
-  const prj=allPrjs.find(p=>p.project_id===document.getElementById('genPrj').value);
-  const start=genPl.expected_start||prj.start_date, end=genPl.expected_end||prj.end_date;
-  const sd=new Date(start), ed=new Date(end), span=ed-sd;
-  if(!document.getElementById('msRows').innerHTML.trim()){
-    document.getElementById('msRows').innerHTML=labels.map((lb,i)=>{
-      const d=new Date(sd.getTime()+span*(i/(n-1)));
-      return `<div class="ms-row"><span>${lb}</span>
-        <input type="number" id="msR_${i}" value="${ratios[i]}" oninput="msCalc()">
-        <input type="date" id="msD_${i}" value="${d.toISOString().slice(0,10)}" onchange="msCalc()"></div>`;}).join('');
-  }
-  msCalc();
-}
-function msCalc(){
-  const n=parseInt(document.getElementById('genRounds').value);
-  // 회차 수 변경 시 행 재구성
-  if(document.querySelectorAll('#msRows .ms-row').length!==n){document.getElementById('msRows').innerHTML='';return setupMs();}
-  const prj=allPrjs.find(p=>p.project_id===document.getElementById('genPrj').value);
-  const items=estOf(genPl.pipeline_id); const hasEst=items.length>0;
+  const hasEst=items.length>0;
   const eSell=estSellSum(items), eBuy=estBuySum(items);
   const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
   const amt=un(genPl.contract_amount||prj.contract_amount);
-  const revAmt=(revBase==='est'&&hasEst)?eSell:amt;
+  return {pid,prj,biz:genPl.biz_type||'인력공급',pay:genPl.payment_cycle||'익월말',
+    start:genPl.expected_start||prj.start_date,end:genPl.expected_end||prj.end_date,
+    amt,items,hasEst,eSell,eBuy,revAmt:(revBase==='est'&&hasEst)?eSell:amt};
+}
+function buildGen(){
+ try{
+  const c=genCtx(); if(!c)return;
+  document.getElementById('genTargets').style.display='block';
+  const doCostEl=document.getElementById('genDoCost');
+  document.getElementById('genCostHint').textContent=c.hasEst?`(견적 매입 합계 ${comma(c.eBuy)}원 → 월 합산)`:'(견적 없음 — 생성 불가)';
+  doCostEl.disabled=!c.hasEst; if(!c.hasEst)doCostEl.checked=false;
+  document.getElementById('revBaseEst').disabled=!c.hasEst;
+  const info=document.getElementById('genInfo');
+  info.style.display='block';
+  info.innerHTML=`<b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>`;
+  if(!c.start||!c.end||(!c.revAmt&&!c.eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
+    genRows=[];genCostRows=[];renderGenPreview();renderGenCostPreview();return;}
+  if(c.biz==='용역턴키'){
+    document.getElementById('msArea').style.display='block';
+    ensureMsRows(c); msCalc();
+  } else {
+    document.getElementById('msArea').style.display='none';
+    // ── 매출: 월할 ──
+    genRows=[];
+    if(document.getElementById('genDoRev').checked&&c.revAmt){
+      const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
+      genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.revAmt-acc:Math.round(c.revAmt*x.w/totW/1000)*1000;acc+=sup;
+        const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
+    }
+    // ── 매입: 월 합산 1행 (매출과 동일 패턴) ──
+    genCostRows=[];
+    if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
+      const byM={};
+      c.items.filter(e=>e.comp_type==='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
+        ymList(e.start_date||c.start,e.end_date||c.end).forEach(x=>{
+          const k=`${x.y}-${pad2(x.m)}`;
+          byM[k]=(byM[k]||0)+Math.round((parseInt(e.buy_price)||0)*x.w);});});
+      c.items.filter(e=>e.comp_type!=='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
+        const sd=new Date(c.start); const k=`${sd.getFullYear()}-${pad2(sd.getMonth()+1)}`;
+        byM[k]=(byM[k]||0)+(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0);});
+      genCostRows=Object.keys(byM).sort().map(k=>{
+        const [y,m]=k.split('-').map(Number); const plan=lastDayStr(y,m);
+        return {plan,name:k+' 매입 합산',supply:byM[k],pay:nextMonthEnd(plan)};});
+    }
+    renderGenPreview(); renderGenCostPreview();
+  }
+ }catch(e){ toast('생성 계산 오류: '+e.message,true); }
+}
+function ensureMsRows(c){
+  const n=parseInt(document.getElementById('genRounds').value);
+  if(document.querySelectorAll('#msRows .ms-row').length===n)return;
+  const ratios=n===4?[30,30,20,20]:[30,40,30];
+  const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
+  const sd=new Date(c.start), ed=new Date(c.end), span=ed-sd;
+  document.getElementById('msRows').innerHTML=labels.map((lb,i)=>{
+    const d=new Date(sd.getTime()+span*(i/(n-1)));
+    return `<div class="ms-row"><span>${lb}</span>
+      <input type="number" id="msR_${i}" value="${ratios[i]}" oninput="msCalc()">
+      <input type="date" id="msD_${i}" value="${d.toISOString().slice(0,10)}" onchange="msCalc()"></div>`;}).join('');
+}
+function setupMs(){ document.getElementById('msRows').innerHTML=''; buildGen(); }
+function msCalc(){
+ try{
+  const c=genCtx(); if(!c)return;
+  const n=parseInt(document.getElementById('genRounds').value);
   const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
   let sum=0,rs=[];
   for(let i=0;i<n;i++){const r=parseFloat((document.getElementById('msR_'+i)||{}).value)||0;sum+=r;rs.push(r);}
@@ -572,43 +574,53 @@ function msCalc(){
   genRows=[]; genCostRows=[];
   rs.forEach((r,i)=>{
     const plan=(document.getElementById('msD_'+i)||{}).value||'';
-    if(document.getElementById('genDoRev').checked&&revAmt){
-      let sup=(i===n-1)?revAmt-acc:Math.round(revAmt*r/100/1000)*1000; acc+=sup;
+    if(document.getElementById('genDoRev').checked&&c.revAmt){
+      let sup=(i===n-1)?c.revAmt-acc:Math.round(c.revAmt*r/100/1000)*1000; acc+=sup;
       genRows.push({plan,supply:sup,recv:plan?recvDue(plan):''});}
-    if(document.getElementById('genDoCost').checked&&hasEst&&eBuy){
-      let supC=(i===n-1)?eBuy-accC:Math.round(eBuy*r/100/1000)*1000; accC+=supC;
-      genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):'',ctype:'외주비',person:labels[i],unit:'',mm:''});}
+    if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
+      let supC=(i===n-1)?c.eBuy-accC:Math.round(c.eBuy*r/100/1000)*1000; accC+=supC;
+      genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):''});}
   });
   renderGenPreview(); renderGenCostPreview();
+ }catch(e){ toast('마일스톤 계산 오류: '+e.message,true); }
 }
+// ── 미리보기 (셀 단위 실시간 갱신) ──
 function renderGenPreview(){
   const on=document.getElementById('genDoRev').checked&&genRows.length;
   document.getElementById('genPreviewWrap').style.display=on?'block':'none';
   if(on){
     document.getElementById('genCnt').textContent=`(${genRows.length}건)`;
     document.getElementById('genPreview').innerHTML=genRows.map((g,i)=>`
-      <tr><td><input type="date" value="${g.plan}" onchange="genRows[${i}].plan=this.value;genRows[${i}].recv=recvDue(this.value);renderGenPreview()"></td>
-      <td><input value="${comma(g.supply)}" oninput="this.value=fc(this.value);genRows[${i}].supply=un(this.value);updGenTotal()" style="text-align:right"></td>
-      <td style="text-align:right;font-size:12px;white-space:nowrap">${comma(Math.round(g.supply*1.1))}원</td>
-      <td><input type="date" value="${g.recv}" onchange="genRows[${i}].recv=this.value"></td></tr>`).join('');
+      <tr><td><input type="date" value="${g.plan}" onchange="chgRevPlan(${i},this.value)"></td>
+      <td><input value="${comma(g.supply)}" oninput="updRev(${i},this)" style="text-align:right"></td>
+      <td style="text-align:right;font-size:12px;white-space:nowrap" id="revVat_${i}">${comma(Math.round(g.supply*1.1))}원</td>
+      <td><input type="date" value="${g.recv}" id="revRecv_${i}" onchange="genRows[${i}].recv=this.value"></td></tr>`).join('');
     updGenTotal();
   }
-  document.getElementById('genSaveBtn').disabled=!(genRows.length||genCostRows.length);
+  syncSaveBtn();
 }
+function chgRevPlan(i,v){genRows[i].plan=v;genRows[i].recv=recvDue(v);
+  const el=document.getElementById('revRecv_'+i); if(el)el.value=genRows[i].recv;}
+function updRev(i,el){el.value=fc(el.value);genRows[i].supply=un(el.value);
+  const v=document.getElementById('revVat_'+i); if(v)v.textContent=comma(Math.round(genRows[i].supply*1.1))+'원';
+  updGenTotal();}
 function renderGenCostPreview(){
   const on=document.getElementById('genDoCost').checked&&genCostRows.length;
   document.getElementById('genCostWrap').style.display=on?'block':'none';
   if(on){
-    document.getElementById('genCostCnt').textContent=`(${genCostRows.length}건)`;
+    document.getElementById('genCostCnt').textContent=`(${genCostRows.length}건 · 월 합산)`;
     document.getElementById('genCostPreview').innerHTML=genCostRows.map((g,i)=>`
-      <tr><td><input type="date" value="${g.plan}" onchange="genCostRows[${i}].plan=this.value"></td>
+      <tr><td><input type="date" value="${g.plan}" onchange="chgCostPlan(${i},this.value)"></td>
       <td style="font-size:11px;white-space:nowrap">${g.name}</td>
-      <td><input value="${comma(g.supply)}" oninput="this.value=fc(this.value);genCostRows[${i}].supply=un(this.value);updGenCostTotal()" style="text-align:right"></td>
-      <td><input type="date" value="${g.pay}" onchange="genCostRows[${i}].pay=this.value"></td></tr>`).join('');
+      <td><input value="${comma(g.supply)}" oninput="updCost(${i},this)" style="text-align:right"></td>
+      <td><input type="date" value="${g.pay}" id="costPay_${i}" onchange="genCostRows[${i}].pay=this.value"></td></tr>`).join('');
     updGenCostTotal();
   }
-  document.getElementById('genSaveBtn').disabled=!(genRows.length&&document.getElementById('genDoRev').checked||genCostRows.length&&document.getElementById('genDoCost').checked);
+  syncSaveBtn();
 }
+function chgCostPlan(i,v){genCostRows[i].plan=v;genCostRows[i].pay=nextMonthEnd(v);
+  const el=document.getElementById('costPay_'+i); if(el)el.value=genCostRows[i].pay;}
+function updCost(i,el){el.value=fc(el.value);genCostRows[i].supply=un(el.value);updGenCostTotal();}
 function updGenTotal(){
   const t=genRows.reduce((s,g)=>s+g.supply,0);
   document.getElementById('genTotal').innerHTML=`매출 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
@@ -617,22 +629,27 @@ function updGenCostTotal(){
   const t=genCostRows.reduce((s,g)=>s+g.supply,0);
   document.getElementById('genCostTotal').innerHTML=`매입 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
 }
+function syncSaveBtn(){
+  const r=document.getElementById('genDoRev').checked&&genRows.length;
+  const co=document.getElementById('genDoCost').checked&&genCostRows.length;
+  document.getElementById('genSaveBtn').disabled=!(r||co);
+}
 async function saveGen(){
-  const pid=document.getElementById('genPrj').value;
+  const c=genCtx(); if(!c)return;
   const doRev=document.getElementById('genDoRev').checked&&genRows.length;
   const doCost=document.getElementById('genDoCost').checked&&genCostRows.length;
-  if(!pid||(!doRev&&!doCost))return;
+  if(!doRev&&!doCost)return;
   if(doRev&&genRows.some(g=>!g.plan||!g.supply)){toast('매출: 발행예정일·금액을 확인하세요',true);return;}
   if(doCost&&genCostRows.some(g=>!g.plan||!g.supply)){toast('매입: 수취예정일·금액을 확인하세요',true);return;}
   const btn=document.getElementById('genSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
   let allOk=true, msgs=[];
   if(doRev){
     let base=revenues;
-    const existOpen=revenues.filter(r=>r.project_id===pid&&r.is_received!=='Y');
+    const existOpen=revenues.filter(r=>r.project_id===c.pid&&r.is_received!=='Y');
     if(existOpen.length&&confirm(`이 프로젝트의 기존 미수 청구 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
-      base=revenues.filter(r=>!(r.project_id===pid&&r.is_received!=='Y'));
+      base=revenues.filter(r=>!(r.project_id===c.pid&&r.is_received!=='Y'));
     let seq=revenues.reduce((m,r)=>{const n=parseInt((r.revenue_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
-    const recs=genRows.map(g=>{seq++;return {revenue_id:`REV-2026-${String(seq).padStart(3,'0')}`,project_id:pid,
+    const recs=genRows.map(g=>{seq++;return {revenue_id:`REV-2026-${String(seq).padStart(3,'0')}`,project_id:c.pid,
       year_month:g.plan.slice(0,7),tax_invoice_amt:g.supply,cash_recv_amt:Math.round(g.supply*1.1),
       cash_recv_date:g.recv,is_received:'N',memo:'청구 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
       invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',recv_actual_date:''};});
@@ -642,16 +659,16 @@ async function saveGen(){
   }
   if(allOk&&doCost){
     let base=costs;
-    const existOpen=costs.filter(c=>c.project_id===pid&&!c.invoice_date);
+    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date);
     if(existOpen.length&&confirm(`이 프로젝트의 기존 미수취 매입 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
-      base=costs.filter(c=>!(c.project_id===pid&&!c.invoice_date));
-    let seq=costs.reduce((m,c)=>{const n=parseInt((c.cost_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
-    const recs=genCostRows.map(g=>{seq++;return {cost_id:`COST-2026-${String(seq).padStart(3,'0')}`,project_id:pid,
-      year_month:g.plan.slice(0,7),cost_type:g.ctype,person_name:g.person||'',unit_price:g.unit||'',mm:g.mm||'',
-      amount:g.supply,payment_date:g.pay,memo:'매입 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
+      base=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
+    let seq=costs.reduce((m,x)=>{const n=parseInt((x.cost_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
+    const recs=genCostRows.map(g=>{seq++;return {cost_id:`COST-2026-${String(seq).padStart(3,'0')}`,project_id:c.pid,
+      year_month:g.plan.slice(0,7),cost_type:'외주비',person_name:'',unit_price:'',mm:'',
+      amount:g.supply,payment_date:g.pay,memo:'매입 스케줄 자동생성(월합산)',vat_amt:Math.round(g.supply*.1),
       invoice_plan_date:g.plan,invoice_date:''};});
     const next=dedupe([...base,...recs],'cost_id');
-    const ok=await clearAndWrite('S05_COST','A:M',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
+    const ok=await clearAndWrite('S05_COST','A:M',[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
     if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
   }
   btn.disabled=false;btn.textContent='생성 저장';

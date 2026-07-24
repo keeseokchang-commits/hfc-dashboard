@@ -116,7 +116,7 @@
 
     <div class="card">
       <div class="card-title">이 프로젝트 견적 요약 <span class="badge-vat">VAT 별도/포함 병기</span></div>
-      <table class="sum-table" id="prjSummary"></table>
+      <table class="sum-table"><tbody id="prjSummary"></tbody></table>
       <div class="btn-row">
         <button class="btn btn-secondary" onclick="loadOpp()">다시 불러오기</button>
         <button class="btn btn-primary" id="saveBtn" onclick="saveEstimate()">견적 저장 (S12)</button>
@@ -128,7 +128,7 @@
 
   <div class="card">
     <div class="card-title">회사 전체 합산 <span style="font-size:11px;color:var(--text3)" id="allScope"></span></div>
-    <table class="sum-table" id="allSummary"><tr><td class="empty" colspan="2">상태를 선택하면 합산됩니다</td></tr></table>
+    <table class="sum-table"><tbody id="allSummary"><tr><td class="empty" colspan="2">불러오는 중…</td></tr></tbody></table>
     <div style="font-size:11px;color:var(--text3);margin-top:8px">※ 매출 = 선택 상태 사업기회의 금액 합계 / 원가 = 저장된 견적(S12)의 매입 합계</div>
   </div>
 </main>
@@ -210,7 +210,15 @@ async function loadAll(){
     estimates=dedupe(toObj(esR).filter(e=>e.estimate_id),'estimate_id');
     renderChips(); renderOppSel(); renderRateSets(); renderAllSummary();
     const pid=new URLSearchParams(location.search).get('pid');
-    if(pid){document.getElementById('oppSel').value=pid;loadOpp();}
+    if(pid){
+      const target=opps.find(o=>o.pipeline_id===pid);
+      if(target){
+        if(!selStatus.has(target.status)){ selStatus.add(target.status); renderChips(); renderOppSel(); renderAllSummary(); }
+        document.getElementById('oppSel').value=pid;
+        try{ loadOpp(); }catch(e){ toast('견적 로드 오류: '+e.message,true); }
+        if(document.getElementById('oppSel').value!==pid) toast('사업기회 자동 선택 실패 — 목록에서 선택하세요',true);
+      } else toast('해당 사업기회('+pid+')를 찾을 수 없습니다',true);
+    }
   }catch(e){toast('로드 실패: '+e.message,true);}
 }
 function renderChips(){
@@ -288,7 +296,7 @@ function renderLabor(){
         <div><label class="fl">MM (소수점 2자리)</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" oninput="labor[${i}].mm=parseFloat(this.value)||0;recalc()"></div>
       </div>
       <div style="text-align:right;font-size:12px;color:var(--text2)">
-        매출 <b style="color:var(--blue)">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)">${wf(Math.round(p.buy*p.mm))}</b>
+        매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(Math.round(p.buy*p.mm))}</b>
       </div>
     </div>`).join('')||'<div class="empty">인력을 추가하세요</div>';
 }
@@ -340,6 +348,10 @@ function recalc(){
   document.getElementById('st_sol_s').textContent=wf(sS);   document.getElementById('st_sol_b').textContent=wf(sB);
   document.getElementById('st_etc_s').textContent=wf(eS);   document.getElementById('st_etc_b').textContent=wf(eB);
   // 항목별 금액 라이브 갱신
+  labor.forEach((p,i)=>{
+    const a=document.getElementById(`amtL_s_${i}`), b=document.getElementById(`amtL_b_${i}`);
+    if(a)a.textContent=wf(Math.round(p.sell*p.mm)); if(b)b.textContent=wf(Math.round(p.buy*p.mm));
+  });
   ['infra','sol','etc'].forEach(k=>items[k].forEach((it,i)=>{
     const a=document.getElementById(`amt_${k}_s_${i}`), b=document.getElementById(`amt_${k}_b_${i}`);
     if(a)a.textContent=wf(it.qty*it.price); if(b)b.textContent=wf(it.qty*(it.buy||0));
