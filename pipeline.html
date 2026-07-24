@@ -139,6 +139,9 @@
   <div class="top-actions">
     <span style="font-size:15px;font-weight:600">사업기회 관리</span>
     <div style="display:flex;gap:8px;align-items:center">
+      <select id="yearFilter" onchange="renderFilter();renderList()" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface);color:var(--text2);outline:none">
+        <option>전체</option>
+      </select>
       <div class="view-toggle"><button id="vList" class="active" onclick="setView('list')">목록</button><button id="vGantt" onclick="setView('gantt')">간트</button></div>
       <button class="btn btn-primary" onclick="openNewForm()">+ 새 기회 등록</button>
     </div>
@@ -161,6 +164,13 @@
     <div class="transition-info" id="transitionInfo" style="display:none"></div>
     <input type="hidden" id="f_id">
     <input type="hidden" id="f_target_status">
+    <div class="form-group" id="statusGroup">
+      <label class="form-label">상태</label>
+      <select class="form-input" id="f_status">
+        <option>기회</option><option>확정</option><option>수주</option><option>계약</option>
+        <option>종료</option><option>포기</option><option>실주</option>
+      </select>
+    </div>
     <div class="form-group">
       <label class="form-label">프로젝트명 <span class="req">*</span> <span id="nameHint" style="font-weight:400;color:var(--text3)"></span></label>
       <input class="form-input" id="f_name" placeholder="프로젝트명 (기회 단계는 가칭 가능)">
@@ -198,16 +208,15 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">지급 조건</label>
-        <select class="form-input" id="f_payment">
-          <option>월말</option><option>익월말</option><option>완료후30일</option><option>기타</option>
+        <label class="form-label">사업수행형태</label>
+        <select class="form-input" id="f_biz_type">
+          <option>인력공급</option><option>용역턴키</option>
         </select>
       </div>
-      <div class="form-group" id="statusGroup">
-        <label class="form-label">상태</label>
-        <select class="form-input" id="f_status">
-          <option>기회</option><option>확정</option><option>수주</option><option>계약</option>
-          <option>종료</option><option>포기</option><option>실주</option>
+      <div class="form-group">
+        <label class="form-label">지급 조건</label>
+        <select class="form-input" id="f_payment">
+          <option>익월말</option><option>기타</option>
         </select>
       </div>
     </div>
@@ -300,8 +309,14 @@ function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[ke
 // ── 데이터 로드 ───────────────────────────────────────────────
 async function loadOpps(){
   try{
-    const rows=await fetchSheet('S01_PIPELINE','A1:L300');
+    const rows=await fetchSheet('S01_PIPELINE','A1:M300');
     opps=dedupe(toObj(rows).filter(o=>o.pipeline_id),'pipeline_id');
+    const yf=document.getElementById('yearFilter');
+    const cur=yf.value;
+    const years=[...new Set(opps.map(o=>(o.created_at||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort().reverse();
+    yf.innerHTML='<option>전체</option>'+years.map(y=>`<option>${y}년</option>`).join('');
+    yf.innerHTML=yf.innerHTML.replace(/<option>(\d{4})년<\/option>/g,'<option value="$1">$1년</option>');
+    if([...yf.options].some(o=>o.value===cur)) yf.value=cur;
     renderFilter();
     renderList();
   }catch(e){
@@ -310,9 +325,14 @@ async function loadOpps(){
 }
 
 // ── 필터 ─────────────────────────────────────────────────────
+function yearFiltered(){
+  const y=document.getElementById('yearFilter').value;
+  return (!y||y==='전체')?opps:opps.filter(o=>(o.created_at||'').startsWith(y));
+}
 function renderFilter(){
-  const counts={전체:opps.length};
-  STATUS_ORDER.forEach(s=>{ counts[s]=opps.filter(o=>o.status===s).length; });
+  const base=yearFiltered();
+  const counts={전체:base.length};
+  STATUS_ORDER.forEach(s=>{ counts[s]=base.filter(o=>o.status===s).length; });
   const bar=document.getElementById('filterBar');
   bar.innerHTML=['전체',...STATUS_ORDER].map(s=>`
     <button class="filter-chip ${s===currentFilter?'active':''}" onclick="setFilter('${s}')">
@@ -358,7 +378,8 @@ function renderGantt(list){
 
 // ── 목록 렌더 ─────────────────────────────────────────────────
 function renderList(){
-  const list=currentFilter==='전체'?opps:opps.filter(o=>o.status===currentFilter);
+  const base=yearFiltered();
+  const list=currentFilter==='전체'?base:base.filter(o=>o.status===currentFilter);
   if(viewMode==='gantt'){ renderGantt(list); return; }
   const el=document.getElementById('oppList');
   if(!list.length){ el.innerHTML='<div class="empty-state">해당 상태의 사업기회가 없습니다</div>'; return; }
@@ -379,7 +400,7 @@ function renderList(){
         <span class="badge badge-${o.status}">${o.status}</span>
       </div>
       <div class="opp-meta">
-        ${o.pipeline_id} · ${o.client||'거래처 미정'}${o.end_client?' → '+o.end_client:''}<br>
+        ${o.pipeline_id} · ${o.client||'거래처 미정'}${o.end_client?' → '+o.end_client:''}${o.biz_type?' · '+o.biz_type:''}<br>
         ${period}${o.status==='기회'?` · 확도 ${o.probability||0}%`:''}
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -418,7 +439,8 @@ function openEdit(idx){
   document.getElementById('f_end').value=o.expected_end||'';
   document.getElementById('f_prob').value=o.probability||50;
   document.getElementById('probVal').textContent=(o.probability||50)+'%';
-  document.getElementById('f_payment').value=o.payment_cycle||'월말';
+  document.getElementById('f_payment').value=['익월말','기타'].includes(o.payment_cycle)?o.payment_cycle:'익월말';
+  document.getElementById('f_biz_type').value=o.biz_type||'인력공급';
   document.getElementById('f_status').value=o.status||'기회';
   document.getElementById('f_memo').value=o.memo||'';
   document.getElementById('formModal').classList.add('open');
@@ -437,7 +459,8 @@ function openTransition(idx,targetStatus){
   document.getElementById('f_amount').value=o.contract_amount?comma(o.contract_amount):'';
   document.getElementById('f_start').value=o.expected_start||'';
   document.getElementById('f_end').value=o.expected_end||'';
-  document.getElementById('f_payment').value=o.payment_cycle||'월말';
+  document.getElementById('f_payment').value=['익월말','기타'].includes(o.payment_cycle)?o.payment_cycle:'익월말';
+  document.getElementById('f_biz_type').value=o.biz_type||'인력공급';
   document.getElementById('f_memo').value=o.memo||'';
   document.getElementById('f_status').value=targetStatus;
   document.getElementById('statusGroup').style.display='none';
@@ -495,7 +518,8 @@ function resetForm(){
   });
   document.getElementById('f_prob').value=50;
   document.getElementById('probVal').textContent='50%';
-  document.getElementById('f_payment').value='월말';
+  document.getElementById('f_payment').value='익월말';
+  document.getElementById('f_biz_type').value='인력공급';
   document.getElementById('nameHint').textContent='';
   document.getElementById('amountReq').style.display='inline';
   document.getElementById('probGroup').style.display='block';
@@ -545,6 +569,7 @@ async function saveOpp(){
       o.expected_end=document.getElementById('f_end').value;
       o.probability=document.getElementById('f_prob').value;
       o.payment_cycle=document.getElementById('f_payment').value;
+      o.biz_type=document.getElementById('f_biz_type').value;
       o.status=status;
       o.memo=memo;
     }
@@ -560,6 +585,7 @@ async function saveOpp(){
       expected_start:document.getElementById('f_start').value,
       expected_end:document.getElementById('f_end').value,
       payment_cycle:document.getElementById('f_payment').value,
+      biz_type:document.getElementById('f_biz_type').value,
       status, memo,
       created_at:today
     });
@@ -576,10 +602,10 @@ async function saveOpp(){
 }
 
 async function saveAll(successMsg){
-  const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at'];
+  const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'];
   opps=dedupe(opps,'pipeline_id'); // PK 무결성 규칙
   const rows=opps.map(o=>header.map(h=>o[h]||''));
-  const ok=await clearAndWrite('S01_PIPELINE','A:L',[header,...rows]);
+  const ok=await clearAndWrite('S01_PIPELINE','A:M',[header,...rows]);
   if(ok){ toast(successMsg); renderFilter(); renderList(); }
   else toast('저장 실패. 로그인 상태를 확인하세요',true);
   return ok;
