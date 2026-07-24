@@ -634,7 +634,9 @@ async function ensureProject(plId,status){
     const uniq=dedupe(prjs,'project_id');
     const dataRows=uniq.map(x=>header.map(h=>x[h]||''));
     const ok=await clearAndWrite('S03_PROJECT','A:K',[header,...dataRows]);
-    if(ok) toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
+    if(ok){ toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
+      if(status==='수주' && confirm('청구 스케줄(세금계산서 발행·수금 계획)을 지금 생성하시겠습니까?\n확인 시 데이터 입력 화면으로 이동합니다.')){
+        location.href='input.html?gen='+plId; return; } }
   }catch(e){ toast('S03 동기화 실패: '+e.message,true); }
 }
 window.addEventListener('load',()=>{ loadOpps(); });

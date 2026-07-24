@@ -153,6 +153,26 @@
     </div>
   </div>
 
+  <!-- 통장 대사 -->
+  <div class="card" id="reconCard" style="display:none">
+    <div class="card-title">🔗 통장 대사 (매출입금 ↔ 청구 건) <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
+    <div id="reconUnmatched"></div>
+  </div>
+
+  <!-- 미수 Aging -->
+  <div class="card" id="agingCard" style="display:none">
+    <div class="card-title" style="color:var(--red)">⏰ 미수금 Aging <span style="font-size:11px;color:var(--text3);font-weight:400">수금예정일 경과 · 30일 초과 적색</span></div>
+    <div id="agingList"></div>
+  </div>
+
+  <!-- 추정 재계산 -->
+  <div class="card">
+    <div class="card-title">🔮 추정 자금수지 재계산
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;font-weight:400"><input type="checkbox" id="probToggle" checked> 확도가중 포함</label></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.5">확정 수금예정(미수 건) + 기회·확정 사업기회 확도가중 + 지급예정·고정비·VAT 납부월을 반영해 S02를 재작성합니다. <span id="recalcInfo" style="color:var(--blue)"></span></div>
+    <button id="recalcBtn" onclick="recalcEstimate()" style="width:100%;padding:11px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:500;cursor:pointer">추정 재계산 실행</button>
+  </div>
+
   <!-- CSV 업로드 -->
   <div class="card">
     <div class="card-title">
@@ -447,7 +467,8 @@ function processBankRows(rows){
     // 더미 행 제거 (입출금 모두 0이고 잔액도 0)
     if(inAmt===0&&outAmt===0&&bal===0) continue;
     const cat=classify(desc,recv,branch,inAmt,outAmt);
-    txns.push({date,ym:date.slice(0,7),desc,recv,inAmt,outAmt,bal,branch,cat});
+    const txnId='TXN-'+date.replace(/-/g,'')+'-'+String(txns.length+1).padStart(3,'0');
+    txns.push({date,ym:date.slice(0,7),desc,recv,inAmt,outAmt,bal,branch,cat,txnId});
   }
 
   if(!txns.length){ toast('파싱된 거래 데이터가 없습니다.',true); return; }
@@ -702,7 +723,7 @@ async function saveToSheets(){
   // S08_DETAIL 헤더 + 거래 상세
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
   const s08dRows=parsedTxns.map((t,i)=>[
-    `TXN-${t.date.replace(/-/g,'')}-${String(i+1).padStart(3,'0')}`,
+    t.txnId,
     t.date,t.desc,t.inAmt,t.outAmt,t.bal,t.recv,t.branch,t.cat,t.ym
   ]);
   const ok2=await clearAndWrite('S08_DETAIL','A:J',[s08dHeader,...s08dRows]);
@@ -710,7 +731,7 @@ async function saveToSheets(){
   // S09_DASHBOARD 업데이트 (실잔액·정합도)
   await updateDashboard();
 
-  if(ok1&&ok2){ toast('✓ Sheets 저장 완료'); await loadSheets(); }
+  if(ok1&&ok2){ toast('✓ Sheets 저장 완료'); await loadSheets(); await reconcile(); }
   else toast('저장 실패. 로그인 상태를 확인하세요.', true);
 }
 
@@ -732,7 +753,7 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[];
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],pipelinesAll=[],prjAll=[],unmatchedDep=[];
 async function loadSheets(){
   try{
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows]=await Promise.all([
@@ -741,7 +762,7 @@ async function loadSheets(){
       fetchSheet('S10_SETTINGS','A1:E30'),
       fetchSheet('S01_PIPELINE','A1:L300'),
       fetchSheet('S03_PROJECT','A1:K200'),
-      fetchSheet('S04_REVENUE','A1:I300'),
+      fetchSheet('S04_REVENUE','A1:M300'),
       fetchSheet('S05_COST','A1:K300'),
       fetchSheet('S06_FIXED_COST','A1:F300'),
       fetchSheet('S13_VAT','A1:N20'),
@@ -750,9 +771,11 @@ async function loadSheets(){
     dashData=toObj(dashRows);
     toObj(s10Rows).forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
     // 재무 반영 필터 (v2.2 §3)
-    const okPl=new Set(toObj(plRows).filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
-    const okPrj=new Set(toObj(prRows).filter(p=>okPl.has(p.pipeline_id)).map(p=>p.project_id));
-    planRev=toObj(rvRows).filter(r=>r.revenue_id&&okPrj.has(r.project_id));
+    pipelinesAll=toObj(plRows); prjAll=toObj(prRows);
+    const okPl=new Set(pipelinesAll.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    const okPrj=new Set(prjAll.filter(p=>okPl.has(p.pipeline_id)).map(p=>p.project_id));
+    s04All=dedupe(toObj(rvRows).filter(r=>r.revenue_id),'revenue_id');
+    planRev=s04All.filter(r=>okPrj.has(r.project_id));
     planCost=toObj(csRows).filter(c=>c.cost_id&&okPrj.has(c.project_id));
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
@@ -762,6 +785,7 @@ async function loadSheets(){
     renderAll();
     renderPlanAct();
     renderVatBanner();
+    renderAging();
   } catch(e){ toast('데이터 로드 실패: '+e.message,true); }
 }
 function renderPlanAct(){
@@ -795,6 +819,125 @@ function renderVatBanner(){
   }
 }
 
+// ═══ 통장 대사 엔진 (v2.3 §5) ═══
+function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
+const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
+async function saveS04(next){
+  return await clearAndWrite('S04_REVENUE','A:M',[H4C,...dedupe(next,'revenue_id').map(r=>H4C.map(h=>r[h]??''))]);
+}
+async function reconcile(){
+  if(!parsedTxns.length){renderAging();return;}
+  const deps=parsedTxns.filter(t=>t.cat==='매출입금'&&t.inAmt>0);
+  const open=s04All.filter(r=>r.is_received!=='Y');
+  const used=new Set(); unmatchedDep=[]; const matches=[];
+  deps.forEach(t=>{
+    const cands=open.filter(r=>!used.has(r.revenue_id)
+      &&Math.abs((parseInt(r.cash_recv_amt)||0)-t.inAmt)<=1000
+      &&r.cash_recv_date&&Math.abs(dDiff(r.cash_recv_date,t.date))<=45);
+    let pick=cands.length===1?cands[0]:null;
+    if(!pick&&cands.length>1){
+      const kw=kws('kw_revenue_inflow','').find(k=>(t.recv||'').includes(k)||(t.desc||'').includes(k));
+      if(kw){const byC=cands.filter(r=>{const p=prjAll.find(x=>x.project_id===r.project_id);return p&&((p.client||'')+(p.project_name||'')).includes(kw);});
+        if(byC.length)pick=byC[0];}
+      if(!pick)pick=cands[0];
+    }
+    if(pick){used.add(pick.revenue_id);matches.push([t,pick]);}
+    else unmatchedDep.push(t);
+  });
+  if(matches.length){
+    const next=s04All.map(r=>{const m=matches.find(x=>x[1].revenue_id===r.revenue_id);
+      return m?{...r,is_received:'Y',recv_actual_date:m[0].date,matched_txn_id:m[0].txnId||''}:r;});
+    const ok=await saveS04(next);
+    if(ok){s04All=dedupe(next,'revenue_id');toast(`🔗 대사 완료: ${matches.length}건 자동 수금확인`);}
+    else toast('대사 결과 저장 실패',true);
+  }
+  renderRecon(matches.length);
+  renderAging();
+}
+function renderRecon(autoCnt){
+  const card=document.getElementById('reconCard');
+  const openRows=s04All.filter(r=>r.is_received!=='Y');
+  card.style.display='block';
+  document.getElementById('reconSummary').textContent=`자동 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건`;
+  document.getElementById('reconUnmatched').innerHTML=unmatchedDep.length?unmatchedDep.map((t,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
+      <span style="flex:1;min-width:150px">${t.date} <b>${(t.inAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
+      <select id="mm_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
+        <option value="">청구 건 선택…</option>
+        ${openRows.map(r=>`<option value="${r.revenue_id}">${r.year_month} ${r.project_id} ${(parseInt(r.cash_recv_amt)||0).toLocaleString()}원</option>`).join('')}
+      </select>
+      <button onclick="manualMatch(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer">매칭</button>
+    </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">미매칭 입금이 없습니다.</div>';
+}
+async function manualMatch(i){
+  const t=unmatchedDep[i]; const revId=document.getElementById('mm_'+i).value;
+  if(!revId){toast('청구 건을 선택하세요',true);return;}
+  const next=s04All.map(r=>r.revenue_id===revId?{...r,is_received:'Y',recv_actual_date:t.date,matched_txn_id:t.txnId||''}:r);
+  const ok=await saveS04(next);
+  if(ok){s04All=dedupe(next,'revenue_id');unmatchedDep.splice(i,1);toast('수동 매칭 완료 ✓');renderRecon();renderAging();}
+  else toast('저장 실패',true);
+}
+function renderAging(){
+  const today=new Date().toISOString().slice(0,10);
+  const list=s04All.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today)
+    .map(r=>({...r,dd:dDiff(r.cash_recv_date,today)})).sort((a,b)=>b.dd-a.dd);
+  const card=document.getElementById('agingCard');
+  if(!list.length){card.style.display='none';return;}
+  card.style.display='block';
+  document.getElementById('agingList').innerHTML=list.map(r=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span>${r.project_id} · ${r.year_month}<br><span style="color:var(--text3)">수금예정 ${r.cash_recv_date}</span></span>
+      <span style="text-align:right"><b>${(parseInt(r.cash_recv_amt)||0).toLocaleString()}원</b><br>
+      <span style="color:${r.dd>30?'var(--red)':'var(--amber)'};font-weight:700">D+${r.dd}</span></span></div>`).join('');
+}
+
+// ═══ 추정 자금수지 재계산 엔진 (v2.3 §6) ═══
+async function recalcEstimate(){
+  const btn=document.getElementById('recalcBtn');btn.disabled=true;btn.textContent='재계산 중…';
+  function un2(v){return parseInt(String(v||'').replace(/,/g,''))||0;}
+  try{
+    const yr=String(new Date().getFullYear());
+    const months=Array.from({length:12},(_,i)=>`${yr}-${String(i+1).padStart(2,'0')}`);
+    const actBy={}; actData.forEach(a=>{if(a.year_month&&parseInt(a.act_balance))actBy[a.year_month]=parseInt(a.act_balance);});
+    let baseYm=null; months.forEach(m=>{if(actBy[m]!==undefined)baseYm=m;});
+    let bal=baseYm?actBy[baseYm]:0;
+    const weighted=document.getElementById('probToggle').checked;
+    const today=new Date().toISOString().slice(0,10);
+    const wRows=weighted?pipelinesAll.filter(p=>['기회','확정'].includes(p.status)&&un2(p.contract_amount)&&p.expected_start&&p.expected_end):[];
+    const okPl2=new Set(pipelinesAll.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    const okPrj2=new Set(prjAll.filter(p=>okPl2.has(p.pipeline_id)).map(p=>p.project_id));
+    const rows=[];
+    months.forEach(m=>{
+      if(baseYm&&m<=baseYm){ if(actBy[m]!==undefined)bal=actBy[m];
+        rows.push([m,'','','',actBy[m]!==undefined?actBy[m]:'','실적 기준',today]); return;}
+      const inf1=s04All.filter(r=>okPrj2.has(r.project_id)&&r.is_received!=='Y'&&(r.cash_recv_date||'').slice(0,7)===m)
+        .reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+      let inf2=0;
+      wRows.forEach(p=>{
+        const ms=[]; let c=new Date(p.expected_start); const e=new Date(p.expected_end);
+        c=new Date(c.getFullYear(),c.getMonth(),1);
+        while(c<=e){ms.push(`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}`);c=new Date(c.getFullYear(),c.getMonth()+1,1);}
+        if(ms.includes(m)) inf2+=Math.round(un2(p.contract_amount)*1.1*(parseInt(p.probability)||0)/100/ms.length);
+      });
+      const outCost=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===m)
+        .reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0);
+      const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(parseInt(f.amount)||0),0);
+      const vat=vatRows.filter(v=>(v.due_date||'').slice(0,7)===m)
+        .reduce((s,v)=>s+(parseInt(v.actual_payment)||parseInt(v.estimated_payment)||0),0);
+      const inflow=inf1+inf2, outflow=outCost+outFix+vat;
+      bal=bal+inflow-outflow;
+      rows.push([m,inflow,outflow,vat,bal,weighted?'확도가중 ON':'확정분만',today]);
+    });
+    const header=['year_month','est_inflow','est_outflow','est_vat','est_balance','pipeline_basis','updated_at'];
+    const ok=await clearAndWrite('S02_CASHFLOW_EST','A:G',[header,...rows]);
+    if(ok){
+      const er=await fetchSheet('S02_CASHFLOW_EST','A1:G24'); estData=toObj(er);
+      document.getElementById('recalcInfo').textContent=`마지막 재계산 ${today} (${weighted?'확도가중 ON':'확정분만'})`;
+      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct();
+    } else toast('재계산 저장 실패',true);
+  }catch(e){toast('재계산 오류: '+e.message,true);}
+  btn.disabled=false;btn.textContent='추정 재계산 실행';
+}
 window.addEventListener('load',()=>{ loadSheets(); });
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
