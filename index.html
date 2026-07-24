@@ -247,10 +247,10 @@
 <!-- PC 사이드 네비 -->
 <nav class="side-nav" aria-label="메인 메뉴">
   <button class="side-nav-item active"><span class="sn-icon">🏠</span> 대시보드</button>
-  <button class="side-nav-item" onclick="location.href='projects.html'"><span class="sn-icon">📋</span> 프로젝트</button>
+  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span> 사업기회</button>
+  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span> 견적</button>
   <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span> 데이터 입력</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span> 자금수지</button>
-  <button class="side-nav-item" onclick="location.href='simulation.html'"><span class="sn-icon">📊</span> 시뮬레이션</button>
 </nav>
 
 <!-- 메인 -->
@@ -274,10 +274,10 @@
 <!-- 하단 탭바 (모바일) -->
 <nav class="tab-bar" aria-label="하단 메뉴">
   <button class="tab-item active"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='projects.html'"><span class="tab-icon">📋</span>프로젝트</button>
+  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
+  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-  <button class="tab-item" onclick="location.href='simulation.html'"><span class="tab-icon">📊</span>시뮬</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -318,8 +318,7 @@ function progress(start, end) {
 // ── 숫자 포맷 ─────────────────────────────────────────────────
 function won(n) {
   const v = parseInt(n) || 0;
-  if (Math.abs(v) >= 100000000) return (v / 100000000).toFixed(2) + '억';
-  if (Math.abs(v) >= 10000)     return Math.round(v / 10000) + '만';
+  if (Math.abs(v) >= 10000) return Math.round(v / 10000).toLocaleString() + '만원';
   return v.toLocaleString() + '원';
 }
 function wonFull(n) { return (parseInt(n)||0).toLocaleString() + '원'; }
@@ -385,18 +384,26 @@ async function render() {
     }
 
     // ── 데이터 호출 ──
-    const [projRows, revRows, costRows, fixRows, dashRows, estRows] = await Promise.all([
-      fetchSheet('S03_PROJECT',      'A1:K100'),
-      fetchSheet('S04_REVENUE',      'A1:H200'),
-      fetchSheet('S05_COST',         'A1:J200'),
-      fetchSheet('S06_FIXED_COST',   'A1:F200'),
+    const [projRows, revRows, costRows, fixRows, dashRows, estRows, plRows, vtRows] = await Promise.all([
+      fetchSheet('S03_PROJECT',      'A1:K200'),
+      fetchSheet('S04_REVENUE',      'A1:I300'),
+      fetchSheet('S05_COST',         'A1:K300'),
+      fetchSheet('S06_FIXED_COST',   'A1:F300'),
       fetchSheet('S09_DASHBOARD',    'A1:H24'),
       fetchSheet('S02_CASHFLOW_EST', 'A1:G24'),
+      fetchSheet('S01_PIPELINE',     'A1:L300'),
+      fetchSheet('S13_VAT',          'A1:N20'),
     ]);
 
-    const projects = toObjects(projRows);
-    const revenues  = toObjects(revRows);
-    const costs     = toObjects(costRows);
+    // v2.2 §3 재무 반영 필터: 수주·계약·종료 사업기회 연결 프로젝트만
+    const pipelines = toObjects(plRows);
+    const okPl = new Set(pipelines.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    const allProjects = toObjects(projRows);
+    const projects = allProjects.filter(p=>okPl.has(p.pipeline_id));
+    const okPrj = new Set(projects.map(p=>p.project_id));
+    const vatList = toObjects(vtRows).filter(v=>v.vat_id);
+    const revenues  = toObjects(revRows).filter(r=>okPrj.has(r.project_id));
+    const costs     = toObjects(costRows).filter(c=>okPrj.has(c.project_id));
     const fixed     = toObjects(fixRows);
     const dashboard = toObjects(dashRows);
     const estimates = toObjects(estRows);
@@ -442,11 +449,18 @@ async function render() {
 
     // ── 알림 판단 ──
     const todayDate = today();
-    projects.filter(p => p.status === '진행중').forEach(p => {
+    projects.filter(p => ['수주','계약'].includes(p.status)).forEach(p => {
       const end = parseDate(p.end_date);
       if (end) {
         const d = diffDays(todayDate, end);
         if (d >= 0 && d <= 7) addAlert('red', `마감 D-${d} ⚠️`, `${p.project_name} (${p.end_date} 종료)`);
+      }
+    });
+    vatList.filter(v => v.status !== '납부완료' && (parseInt(v.estimated_payment)||0) > 0).forEach(v => {
+      const due = parseDate(v.due_date);
+      if (due) {
+        const d = diffDays(todayDate, due);
+        if (d >= 0 && d <= 30) addAlert('amber', `부가세 납부 D-${d}`, `${v.memo||v.quarter_code} · ${wonFull(v.estimated_payment)} (기한 ${v.due_date})`);
       }
     });
     revenues.filter(r => r.is_received === 'N' && r.cash_recv_date).forEach(r => {
@@ -478,7 +492,7 @@ async function render() {
     const gaugeW     = acc !== null ? Math.max(0, Math.min(100, acc)) : 0;
 
     // ── 진행중 프로젝트 ──
-    const activeProjects = projects.filter(p => ['진행중','예정'].includes(p.status)).slice(0, 4);
+    const activeProjects = projects.filter(p => ['수주','계약'].includes(p.status)).slice(0, 4);
 
     // ── 경고 배너 ──
     const negEst = estimates.find(e => parseInt(e.est_balance) < 0);
@@ -548,11 +562,11 @@ async function render() {
       <div class="card">
         <div class="card-title">
           프로젝트 현황
-          <a href="projects.html" style="font-size:12px;color:var(--blue);text-decoration:none">전체 보기 →</a>
+          <a href="pipeline.html" style="font-size:12px;color:var(--blue);text-decoration:none">사업기회·간트 →</a>
         </div>
         ${activeProjects.length ? activeProjects.map(p => {
           const pg = progress(p.start_date, p.end_date);
-          const statusClass = p.status === '진행중' ? 'on' : p.status === '예정' ? 'plan' : 'hold';
+          const statusClass = ['수주','계약'].includes(p.status) ? 'on' : p.status === '종료' ? 'hold' : 'plan';
           return `
           <div class="prj-item">
             <div class="prj-row1">
@@ -560,7 +574,7 @@ async function render() {
               <span class="badge-status ${statusClass}">${p.status}</span>
             </div>
             <div class="prj-row2">${p.client} · ${won(p.contract_amount)} · ${p.end_date} 종료</div>
-            ${p.status === '진행중' ? `<div class="progress-bar"><div class="progress-fill" style="width:${pg}%"></div></div>` : ''}
+            ${['수주','계약'].includes(p.status) ? `<div class="progress-bar"><div class="progress-fill" style="width:${pg}%"></div></div>` : ''}
           </div>`;
         }).join('') : '<div style="text-align:center;color:var(--text3);padding:20px;font-size:13px">등록된 프로젝트가 없습니다</div>'}
       </div>`;

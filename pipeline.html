@@ -78,6 +78,20 @@
   .btn-row{display:flex;gap:8px;margin-top:16px}
   .btn-row .btn{flex:1;padding:12px}
   .empty-state{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+  /* 간트 */
+  .view-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .view-toggle button{padding:8px 14px;font-size:12px;border:none;background:var(--surface);color:var(--text2);cursor:pointer}
+  .view-toggle button.active{background:var(--blue);color:#fff}
+  .gantt-wrap{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);overflow-x:auto}
+  .gantt-grid{min-width:720px}
+  .gantt-months{display:grid;grid-template-columns:180px repeat(12,1fr);font-size:10px;color:var(--text3);border-bottom:2px solid var(--border);padding-bottom:6px;margin-bottom:6px}
+  .gantt-months span{text-align:center}
+  .gantt-row{display:grid;grid-template-columns:180px repeat(12,1fr);align-items:center;min-height:34px;border-bottom:1px solid var(--border)}
+  .gantt-label{font-size:11px;font-weight:600;padding-right:8px;line-height:1.3;word-break:keep-all}
+  .gantt-label small{display:block;font-weight:400;color:var(--text3);font-size:10px}
+  .gantt-track{grid-column:2 / 14;position:relative;height:16px}
+  .gantt-bar{position:absolute;top:0;height:16px;border-radius:8px;opacity:.85}
+  .gantt-today{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--red);z-index:2}
 
   .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -124,7 +138,10 @@
 <main class="main">
   <div class="top-actions">
     <span style="font-size:15px;font-weight:600">사업기회 관리</span>
-    <button class="btn btn-primary" onclick="openNewForm()">+ 새 기회 등록</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="view-toggle"><button id="vList" class="active" onclick="setView('list')">목록</button><button id="vGantt" onclick="setView('gantt')">간트</button></div>
+      <button class="btn btn-primary" onclick="openNewForm()">+ 새 기회 등록</button>
+    </div>
   </div>
 
   <div class="filter-bar" id="filterBar"></div>
@@ -291,10 +308,46 @@ function renderFilter(){
     </button>`).join('');
 }
 function setFilter(s){ currentFilter=s; renderFilter(); renderList(); }
+let viewMode='list';
+function setView(m){
+  viewMode=m;
+  document.getElementById('vList').classList.toggle('active',m==='list');
+  document.getElementById('vGantt').classList.toggle('active',m==='gantt');
+  renderList();
+}
+function renderGantt(list){
+  const el=document.getElementById('oppList');
+  const yr=new Date().getFullYear();
+  const items=list.filter(o=>o.expected_start&&o.expected_end&&!['포기','실주'].includes(o.status));
+  if(!items.length){ el.innerHTML='<div class="empty-state">기간이 입력된 사업기회가 없습니다</div>'; return; }
+  const colors={'기회':'#7C3AED','확정':'#2563EB','수주':'#059669','계약':'#0891B2','종료':'#94A3B8'};
+  const now=new Date();
+  const todayPct=((now.getMonth()+now.getDate()/31)/12*100).toFixed(1);
+  const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const rows=items.map(o=>{
+    const s=new Date(o.expected_start), e=new Date(o.expected_end);
+    let sm=(s.getFullYear()-yr)*12+s.getMonth()+s.getDate()/31;
+    let em=(e.getFullYear()-yr)*12+e.getMonth()+e.getDate()/31;
+    sm=Math.max(0,Math.min(12,sm)); em=Math.max(0,Math.min(12,em));
+    if(em<=sm) return '';
+    const left=(sm/12*100).toFixed(1), width=((em-sm)/12*100).toFixed(1);
+    return `<div class="gantt-row">
+      <div class="gantt-label">${o.opportunity}<small>${o.status} · ${wonFull(o.contract_amount||0)}</small></div>
+      <div class="gantt-track"><div class="gantt-bar" style="left:${left}%;width:${width}%;background:${colors[o.status]||'#94A3B8'}"></div>
+      ${now.getFullYear()===yr?`<div class="gantt-today" style="left:${todayPct}%"></div>`:''}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="gantt-wrap"><div class="gantt-grid">
+    <div class="gantt-months"><span style="text-align:left">${yr}년</span>${months.map(m=>`<span>${m}</span>`).join('')}</div>
+    ${rows}</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:8px">■ <span style="color:#7C3AED">기회</span> · <span style="color:#2563EB">확정</span> · <span style="color:#059669">수주</span> · <span style="color:#0891B2">계약</span> · <span style="color:#94A3B8">종료</span> · 빨간 선 = 오늘</div>
+  </div>`;
+}
 
 // ── 목록 렌더 ─────────────────────────────────────────────────
 function renderList(){
   const list=currentFilter==='전체'?opps:opps.filter(o=>o.status===currentFilter);
+  if(viewMode==='gantt'){ renderGantt(list); return; }
   const el=document.getElementById('oppList');
   if(!list.length){ el.innerHTML='<div class="empty-state">해당 상태의 사업기회가 없습니다</div>'; return; }
 
@@ -500,6 +553,10 @@ async function saveOpp(){
   }
 
   const ok=await saveAll(targetStatus?`${status} 전환 완료 ✓`:'저장 완료 ✓');
+  if(ok && ['수주','계약','종료'].includes(status)){
+    const plId=id||opps[opps.length-1].pipeline_id;
+    await ensureProject(plId,status);
+  }
   btn.disabled=false; btn.textContent='저장하기';
   if(ok) closeForm();
 }
@@ -513,6 +570,31 @@ async function saveAll(successMsg){
   return ok;
 }
 
+// S03 자동생성·동기화 (v2.2 §3)
+async function ensureProject(plId,status){
+  try{
+    const o=opps.find(x=>x.pipeline_id===plId);
+    if(!o) return;
+    const rows=await fetchSheet('S03_PROJECT','A1:K200');
+    const header=rows[0]||['project_id','project_name','client','end_client','contract_amount','start_date','end_date','status','payment_terms','pipeline_id','memo'];
+    const prjs=toObj(rows);
+    let p=prjs.find(x=>x.pipeline_id===plId);
+    if(p){
+      p.project_name=o.opportunity; p.client=o.client; p.end_client=o.end_client;
+      p.contract_amount=o.contract_amount; p.start_date=o.expected_start; p.end_date=o.expected_end;
+      p.status=status; p.payment_terms=o.payment_cycle;
+    } else {
+      const maxN=prjs.reduce((m,x)=>{const n=parseInt((x.project_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
+      p={project_id:`PRJ-2026-${String(maxN+1).padStart(3,'0')}`,project_name:o.opportunity,client:o.client,
+        end_client:o.end_client,contract_amount:o.contract_amount,start_date:o.expected_start,end_date:o.expected_end,
+        status,payment_terms:o.payment_cycle,pipeline_id:plId,memo:'수주 전환 자동생성'};
+      prjs.push(p);
+    }
+    const dataRows=prjs.map(x=>header.map(h=>x[h]||''));
+    const ok=await clearAndWrite('S03_PROJECT','A:K',[header,...dataRows]);
+    if(ok) toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
+  }catch(e){ toast('S03 동기화 실패: '+e.message,true); }
+}
 window.addEventListener('load',()=>{ loadOpps(); });
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>

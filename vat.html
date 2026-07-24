@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 부가세 관리</title>
+<style>
+  :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .main{padding:14px 14px 80px}
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+  .q-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+  .q-card:hover{border-color:var(--blue)}
+  .q-card.sel{border-color:var(--blue);background:var(--blue-lt)}
+  .q-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .q-name{font-size:14px;font-weight:700}
+  .q-due{font-size:11px;color:var(--text3)}
+  .badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px}
+  .b-wait{background:var(--amber-lt);color:var(--amber)}
+  .b-done{background:var(--green-lt);color:var(--green)}
+  .b-calc{background:#F1F5F9;color:#64748B}
+  .q-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px}
+  .q-nums .lbl{color:var(--text3);margin-bottom:2px}
+  .q-nums .val{font-weight:700;font-size:13px}
+  .q-nums .val.pay{color:var(--red)}
+  .detail-table{width:100%;border-collapse:collapse;font-size:12px}
+  .detail-table th{font-size:11px;color:var(--text3);text-align:right;padding:6px;border-bottom:2px solid var(--border)}
+  .detail-table th:first-child,.detail-table td:first-child{text-align:left}
+  .detail-table td{padding:7px 6px;border-bottom:1px solid var(--border);text-align:right}
+  .detail-table tr.sum td{font-weight:700;color:var(--blue);border-bottom:none}
+  .fi{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+  .fi:focus{border-color:var(--blue)}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .fl{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+  .btn{padding:11px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;flex:1}
+  .btn-primary{background:var(--blue);color:#fff}.btn-primary:disabled{background:var(--text3)}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-row{display:flex;gap:8px;margin-top:12px}
+  .pay-formula{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:12px;font-size:13px;color:#92400E;margin-bottom:12px;line-height:1.6}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}.tab-item .tab-icon{font-size:20px}
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:760px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>부가세 관리</span></div>
+  <button class="btn-icon" onclick="location.href='cashflow.html'">💵</button>
+  <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
+</header>
+<nav class="side-nav">
+  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
+  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
+  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item active"><span class="sn-icon">🧾</span>부가세</button>
+</nav>
+
+<main class="main">
+  <div class="card">
+    <div class="card-title">2026년 분기별 부가세 <span style="font-size:11px;color:var(--text3)">재무 반영: 수주·계약·종료 프로젝트</span></div>
+    <div id="qList"><div class="loading-wrap"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="card" id="detailCard" style="display:none">
+    <div class="card-title" id="detailTitle"></div>
+    <div class="pay-formula" id="payFormula"></div>
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">매출 부가세 내역</div>
+    <table class="detail-table" id="salesTable"></table>
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin:14px 0 6px">매입 부가세 내역</div>
+    <table class="detail-table" id="purchaseTable"></table>
+    <div style="margin-top:16px">
+      <div class="fr">
+        <div><label class="fl">실납부액 (원)</label><input class="fi" id="actualPay" inputmode="numeric" oninput="this.value=fc(this.value)"></div>
+        <div><label class="fl">납부일</label><input class="fi" id="paidDate" type="date"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnSavePay" onclick="savePayment()">실납부 저장</button>
+        <button class="btn btn-green" id="btnReflect" onclick="reflectCashflow()">자금수지 반영</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar">
+  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
+  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
+  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
+const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
+const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
+const SCOPES='https://www.googleapis.com/auth/spreadsheets';
+let accessToken=null,tokenClient;
+let vats=[],revs=[],costs=[],prjMap={},selQ=null;
+const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
+  '1F':{name:'1기 확정',months:['2026-04','2026-05','2026-06'],due:'2026-07-25',payYm:'2026-07'},
+  '2P':{name:'2기 예정',months:['2026-07','2026-08','2026-09'],due:'2026-10-25',payYm:'2026-10'},
+  '2F':{name:'2기 확정',months:['2026-10','2026-11','2026-12'],due:'2027-01-25',payYm:'2027-01'}};
+
+function comma(n){return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString();}
+function un(s){return parseInt(String(s).replace(/,/g,''))||0;}
+function fc(v){const n=String(v).replace(/[^\d]/g,'');return n?parseInt(n).toLocaleString():'';}
+function wf(n){return comma(n)+'원';}
+function toast(m,e=false){const t=document.getElementById('toast');t.textContent=m;t.style.background=e?'#DC2626':'#1A202C';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+async function fetchSheet(s,r){const u=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(s+'!'+r)}?key=${API_KEY}`;const x=await fetch(u);if(!x.ok)throw new Error('읽기 '+x.status);return (await x.json()).values||[];}
+function toObj(rows){if(!rows.length)return[];const h=rows[0];return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));}
+async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!accessToken)return false;}
+  const b=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
+  await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
+  const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
+  return r.ok;}
+function initOAuth(){tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:r=>{if(r.access_token){accessToken=r.access_token;toast('로그인 완료 ✓');}}});}
+function signIn(){return new Promise(res=>{tokenClient.requestAccessToken();setTimeout(()=>res(!!accessToken),3000);});}
+
+async function loadAll(){
+  try{
+    const [vtR,rvR,csR,plR,prR]=await Promise.all([
+      fetchSheet('S13_VAT','A1:N20'),fetchSheet('S04_REVENUE','A1:I300'),
+      fetchSheet('S05_COST','A1:K300'),fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S03_PROJECT','A1:K200')]);
+    vats=toObj(vtR).filter(v=>v.vat_id);
+    const pls=toObj(plR),prjs=toObj(prR);
+    // 재무 필터
+    const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    const okPrj=new Set(prjs.filter(p=>okPl.has(p.pipeline_id)).map(p=>p.project_id));
+    prjs.forEach(p=>prjMap[p.project_id]=p.project_name);
+    revs=toObj(rvR).filter(r=>r.revenue_id&&okPrj.has(r.project_id));
+    costs=toObj(csR).filter(c=>c.cost_id&&okPrj.has(c.project_id));
+    renderQuarters();
+  }catch(e){toast('로드 실패: '+e.message,true);}
+}
+function vatOf(r,base){return parseInt(r.vat_amt)||Math.round((parseInt(r[base])||0)*.1);}
+function calcQ(code){
+  const q=QINFO[code];
+  const sRows=revs.filter(r=>q.months.includes(r.year_month));
+  const pRows=costs.filter(c=>q.months.includes(c.year_month));
+  const sVat=sRows.reduce((s,r)=>s+vatOf(r,'tax_invoice_amt'),0);
+  const pVat=pRows.reduce((s,c)=>s+vatOf(c,'amount'),0);
+  return {sVat,pVat,pay:Math.max(0,sVat-pVat),sRows,pRows};
+}
+function renderQuarters(){
+  document.getElementById('qList').innerHTML=Object.entries(QINFO).map(([code,q])=>{
+    const c=calcQ(code);
+    const v=vats.find(x=>x.quarter_code===code)||{};
+    const st=v.status==='납부완료'?'b-done':(c.sVat||c.pVat)?'b-wait':'b-calc';
+    const stTxt=v.status==='납부완료'?'납부완료':(c.sVat||c.pVat)?'납부예정':'집계중';
+    return `<div class="q-card ${selQ===code?'sel':''}" onclick="selectQ('${code}')">
+      <div class="q-head"><span class="q-name">${q.name} <span style="font-weight:400;font-size:11px;color:var(--text3)">(${q.months[0].slice(5)}~${q.months[2].slice(5)}월)</span></span>
+        <span class="badge ${st}">${stTxt}</span></div>
+      <div class="q-nums">
+        <div><div class="lbl">매출 부가세</div><div class="val">${wf(c.sVat)}</div></div>
+        <div><div class="lbl">매입 부가세</div><div class="val">${wf(c.pVat)}</div></div>
+        <div><div class="lbl">납부 예정액</div><div class="val pay">${wf(c.pay)}</div></div>
+      </div>
+      <div class="q-due" style="margin-top:8px">신고·납부 기한 ${q.due}${v.paid_date?' · 납부일 '+v.paid_date:''}${v.cashflow_reflected==='Y'?' · 자금수지 반영 ✓':''}</div>
+    </div>`;}).join('');
+}
+function selectQ(code){
+  selQ=code;renderQuarters();
+  const q=QINFO[code],c=calcQ(code);
+  document.getElementById('detailCard').style.display='block';
+  document.getElementById('detailTitle').textContent=`${q.name} 상세 (${q.months[0]} ~ ${q.months[2]})`;
+  document.getElementById('payFormula').innerHTML=
+    `납부 예정액 = 매출 VAT ${wf(c.sVat)} − 매입 VAT ${wf(c.pVat)} = <b>${wf(c.pay)}</b><br>납부 시 ${q.payYm} 자금수지에 현금 유출로 반영됩니다.`;
+  const sT=document.getElementById('salesTable');
+  sT.innerHTML='<tr><th>월 / 프로젝트</th><th>공급가액</th><th>부가세</th></tr>'+
+    (c.sRows.length?c.sRows.map(r=>`<tr><td>${r.year_month.slice(5)}월 ${prjMap[r.project_id]||r.project_id}</td><td>${wf(r.tax_invoice_amt)}</td><td>${wf(vatOf(r,'tax_invoice_amt'))}</td></tr>`).join('')
+      +`<tr class="sum"><td>소계</td><td></td><td>${wf(c.sVat)}</td></tr>`
+    :'<tr><td colspan="3" style="text-align:center;color:var(--text3)">내역 없음</td></tr>');
+  const pT=document.getElementById('purchaseTable');
+  pT.innerHTML='<tr><th>월 / 프로젝트</th><th>공급가액</th><th>부가세</th></tr>'+
+    (c.pRows.length?c.pRows.map(r=>`<tr><td>${r.year_month.slice(5)}월 ${prjMap[r.project_id]||r.project_id}</td><td>${wf(r.amount)}</td><td>${wf(vatOf(r,'amount'))}</td></tr>`).join('')
+      +`<tr class="sum"><td>소계</td><td></td><td>${wf(c.pVat)}</td></tr>`
+    :'<tr><td colspan="3" style="text-align:center;color:var(--text3)">내역 없음</td></tr>');
+  const v=vats.find(x=>x.quarter_code===code)||{};
+  document.getElementById('actualPay').value=v.actual_payment?comma(v.actual_payment):comma(c.pay);
+  document.getElementById('paidDate').value=v.paid_date||'';
+  document.getElementById('detailCard').scrollIntoView({behavior:'smooth'});
+}
+const H13=['vat_id','year','quarter_code','period_start','period_end','due_date','sales_vat','purchase_vat','estimated_payment','actual_payment','paid_date','cashflow_reflected','status','memo'];
+async function saveS13(){
+  const rows=vats.map(v=>H13.map(h=>v[h]??''));
+  return await clearAndWrite('S13_VAT','A:N',[H13,...rows]);
+}
+function upsertVat(code,patch){
+  const q=QINFO[code];const c=calcQ(code);
+  let v=vats.find(x=>x.quarter_code===code);
+  if(!v){v={vat_id:`VAT-2026-${code}`,year:'2026',quarter_code:code,
+    period_start:q.months[0]+'-01',period_end:q.months[2]+'-30',due_date:q.due,
+    cashflow_reflected:'N',status:'집계중',memo:q.name};vats.push(v);}
+  v.sales_vat=c.sVat;v.purchase_vat=c.pVat;v.estimated_payment=c.pay;
+  Object.assign(v,patch);return v;
+}
+async function savePayment(){
+  if(!selQ){toast('분기를 선택하세요',true);return;}
+  const pay=un(document.getElementById('actualPay').value);
+  const date=document.getElementById('paidDate').value;
+  if(!pay||!date){toast('실납부액과 납부일을 입력하세요',true);return;}
+  const btn=document.getElementById('btnSavePay');btn.disabled=true;
+  upsertVat(selQ,{actual_payment:pay,paid_date:date,status:'납부완료'});
+  const ok=await saveS13();btn.disabled=false;
+  if(ok){toast('✓ 실납부 저장 완료');renderQuarters();}else toast('저장 실패',true);
+}
+async function reflectCashflow(){
+  if(!selQ){toast('분기를 선택하세요',true);return;}
+  const q=QINFO[selQ],c=calcQ(selQ);
+  const v=vats.find(x=>x.quarter_code===selQ);
+  const amt=un(document.getElementById('actualPay').value)||c.pay;
+  if(!amt){toast('납부액이 0원입니다',true);return;}
+  if(!confirm(`${q.payYm}월 자금수지 유출에 ${wf(amt)}을 반영하시겠습니까?`))return;
+  const btn=document.getElementById('btnReflect');btn.disabled=true;
+  try{
+    // S09 해당월 est_balance 차감 방식이 아닌, S02 est_outflow/est_vat 반영
+    const rows=await fetchSheet('S02_CASHFLOW_EST','A1:G24');
+    const header=rows[0];const data=toObj(rows);
+    const t=data.find(r=>r.year_month===q.payYm);
+    if(t){t.est_vat=amt;
+      const dataRows=data.map(r=>header.map(h=>r[h]??''));
+      await clearAndWrite('S02_CASHFLOW_EST','A:G',[header,...dataRows]);}
+    upsertVat(selQ,{cashflow_reflected:'Y'});
+    const ok=await saveS13();
+    btn.disabled=false;
+    if(ok){toast(`✓ ${q.payYm} 자금수지 반영 완료`);renderQuarters();}
+  }catch(e){btn.disabled=false;toast('반영 실패: '+e.message,true);}
+}
+window.addEventListener('load',loadAll);
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>
