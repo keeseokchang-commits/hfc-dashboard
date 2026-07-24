@@ -105,13 +105,13 @@
         <div class="subtotal"><span>인건비 소계</span><span>매출 <b id="st_labor_s">0원</b> / 매입 <b id="st_labor_b">0원</b></span></div></div>
       <div class="comp-panel" id="panel-infra"><div id="infraList"></div>
         <button class="btn-add" onclick="addItem('infra')">+ 항목 추가</button>
-        <div class="subtotal"><span>인프라 소계</span><b id="st_infra">0원</b></div></div>
+        <div class="subtotal"><span>인프라 소계</span><span>매출 <b id="st_infra_s">0원</b> / 매입 <b id="st_infra_b">0원</b></span></div></div>
       <div class="comp-panel" id="panel-sol"><div id="solList"></div>
         <button class="btn-add" onclick="addItem('sol')">+ 항목 추가</button>
-        <div class="subtotal"><span>솔루션 소계</span><b id="st_sol">0원</b></div></div>
+        <div class="subtotal"><span>솔루션 소계</span><span>매출 <b id="st_sol_s">0원</b> / 매입 <b id="st_sol_b">0원</b></span></div></div>
       <div class="comp-panel" id="panel-etc"><div id="etcList"></div>
         <button class="btn-add" onclick="addItem('etc')">+ 항목 추가</button>
-        <div class="subtotal"><span>기타 소계</span><b id="st_etc">0원</b></div></div>
+        <div class="subtotal"><span>기타 소계</span><span>매출 <b id="st_etc_s">0원</b> / 매입 <b id="st_etc_b">0원</b></span></div></div>
     </div>
 
     <div class="card">
@@ -182,8 +182,21 @@ function signIn(){
 }
 function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
-function mmBetween(s,e){if(!s||!e)return 0;const a=new Date(s),b=new Date(e);
-  return Math.max(0,((b-a)/86400000+1)/30.4).toFixed(2);}
+function mmBetween(s,e){
+  // 달력월 기준: 걸친 달마다 (투입일수/그 달 총일수) 합산 → 월초~월말 = 정확히 1.00
+  if(!s||!e) return 0;
+  const a=new Date(s), b=new Date(e);
+  if(isNaN(a)||isNaN(b)||b<a) return 0;
+  let mm=0, cur=new Date(a.getFullYear(),a.getMonth(),1);
+  while(cur<=b){
+    const dim=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
+    const from=(cur.getFullYear()===a.getFullYear()&&cur.getMonth()===a.getMonth())?a.getDate():1;
+    const to=(cur.getFullYear()===b.getFullYear()&&cur.getMonth()===b.getMonth())?b.getDate():dim;
+    mm+=(to-from+1)/dim;
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+  return mm.toFixed(2);
+}
 
 // ── 로드 ──
 async function loadAll(){
@@ -232,7 +245,7 @@ function loadOpp(){
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
     items[k]=saved.filter(e=>e.comp_type===ct).map(e=>({name:e.item_name,qty:parseInt(e.qty)||1,
-      price:parseInt(e.unit_price)||0,memo:e.memo||''}));
+      price:parseInt(e.unit_price)||0,buy:parseInt(e.buy_price)||0,memo:e.memo||''}));
   });
   if(!labor.length&&cur.expected_start)addLabor(false);
   renderLabor();['infra','sol','etc'].forEach(renderItems);
@@ -287,7 +300,7 @@ function autoMM(i){const p=labor[i];p.mm=parseFloat(mmBetween(p.start,p.end))||0
   document.getElementById('mm_'+i).value=p.mm;renderLabor();recalc();}
 
 // ── 인프라·솔루션·기타 ──
-function addItem(k){items[k].push({name:'',qty:1,price:0,memo:''});renderItems(k);recalc();}
+function addItem(k){items[k].push({name:'',qty:1,price:0,buy:0,memo:''});renderItems(k);recalc();}
 function renderItems(k){
   document.getElementById(k+'List').innerHTML=items[k].map((it,i)=>`
     <div class="item-card"><button class="item-del" onclick="items['${k}'].splice(${i},1);renderItems('${k}');recalc()">✕</button>
@@ -296,9 +309,12 @@ function renderItems(k){
         <div><label class="fl">비고</label><input class="fi" value="${it.memo}" oninput="items['${k}'][${i}].memo=this.value"></div>
       </div>
       <div class="fr3">
-        <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=parseInt(this.value)||0;renderItems('${k}');recalc()"></div>
-        <div><label class="fl">단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=fc(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
-        <div><label class="fl">금액</label><input class="fi" readonly value="${comma(it.qty*it.price)}"></div>
+        <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=parseInt(this.value)||0;recalc()"></div>
+        <div><label class="fl">매출 단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=fc(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
+        <div><label class="fl">매입 단가 (원)</label><input class="fi" value="${comma(it.buy||0)}" oninput="this.value=fc(this.value);items['${k}'][${i}].buy=un(this.value);recalc()"></div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--text2)">
+        매출 <b style="color:var(--blue)" id="amt_${k}_s_${i}">${wf(it.qty*it.price)}</b> · 매입 <b style="color:var(--amber)" id="amt_${k}_b_${i}">${wf(it.qty*(it.buy||0))}</b>
       </div>
     </div>`).join('')||'<div class="empty">항목을 추가하세요</div>';
 }
@@ -312,23 +328,28 @@ function compTab(ev,k){
 function recalc(){
   const lS=labor.reduce((s,p)=>s+Math.round(p.sell*p.mm),0);
   const lB=labor.reduce((s,p)=>s+Math.round(p.buy*p.mm),0);
-  const iT=items.infra.reduce((s,x)=>s+x.qty*x.price,0);
-  const sT=items.sol.reduce((s,x)=>s+x.qty*x.price,0);
-  const eT=items.etc.reduce((s,x)=>s+x.qty*x.price,0);
+  const iS=items.infra.reduce((s,x)=>s+x.qty*x.price,0), iB=items.infra.reduce((s,x)=>s+x.qty*(x.buy||0),0);
+  const sS=items.sol.reduce((s,x)=>s+x.qty*x.price,0),  sB=items.sol.reduce((s,x)=>s+x.qty*(x.buy||0),0);
+  const eS=items.etc.reduce((s,x)=>s+x.qty*x.price,0),  eB=items.etc.reduce((s,x)=>s+x.qty*(x.buy||0),0);
   document.getElementById('st_labor_s').textContent=wf(lS);
   document.getElementById('st_labor_b').textContent=wf(lB);
-  document.getElementById('st_infra').textContent=wf(iT);
-  document.getElementById('st_sol').textContent=wf(sT);
-  document.getElementById('st_etc').textContent=wf(eT);
-  const sell=un(cur?.contract_amount)||lS;   // 수주금액 있으면 그 기준, 없으면 인건비 매출 합
-  const cost=lB+iT+sT+eT;
+  document.getElementById('st_infra_s').textContent=wf(iS); document.getElementById('st_infra_b').textContent=wf(iB);
+  document.getElementById('st_sol_s').textContent=wf(sS);   document.getElementById('st_sol_b').textContent=wf(sB);
+  document.getElementById('st_etc_s').textContent=wf(eS);   document.getElementById('st_etc_b').textContent=wf(eB);
+  // 항목별 금액 라이브 갱신
+  ['infra','sol','etc'].forEach(k=>items[k].forEach((it,i)=>{
+    const a=document.getElementById(`amt_${k}_s_${i}`), b=document.getElementById(`amt_${k}_b_${i}`);
+    if(a)a.textContent=wf(it.qty*it.price); if(b)b.textContent=wf(it.qty*(it.buy||0));
+  }));
+  const sell=un(cur?.contract_amount)||(lS+iS+sS+eS); // 수주금액 있으면 그 기준, 없으면 전 구성요소 매출 합
+  const cost=lB+iB+sB+eB;
   const profit=sell-cost;
   const rate=sell?(profit/sell*100).toFixed(1):0;
   document.getElementById('prjSummary').innerHTML=`
     <tr><td>추정 매출 (공급가액)</td><td>${wf(sell)}</td></tr>
     <tr><td style="padding-left:16px;color:var(--text3)">└ VAT 포함</td><td style="color:var(--text3)">${wf(Math.round(sell*1.1))}</td></tr>
     <tr><td>추정 원가 합계</td><td>${wf(cost)}</td></tr>
-    <tr><td style="padding-left:16px;color:var(--text3)">└ 인건비 ${wf(lB)} · 인프라 ${wf(iT)} · 솔루션 ${wf(sT)} · 기타 ${wf(eT)}</td><td></td></tr>
+    <tr><td style="padding-left:16px;color:var(--text3)">└ 인건비 ${wf(lB)} · 인프라 ${wf(iB)} · 솔루션 ${wf(sB)} · 기타 ${wf(eB)}</td><td></td></tr>
     <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>`;
 }
 function renderAllSummary(){
@@ -337,7 +358,8 @@ function renderAllSummary(){
   const pids=new Set(list.map(o=>o.pipeline_id));
   const cost=estimates.filter(e=>pids.has(e.pipeline_id)).reduce((s,e)=>{
     if(e.comp_type==='인건비')return s+Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0));
-    return s+(parseInt(e.amount)||0);},0);
+    const bp=parseInt(e.buy_price)||0;
+    return s+(bp?bp*(parseInt(e.qty)||1):(parseInt(e.amount)||0));},0);
   const profit=sell-cost, rate=sell?(profit/sell*100).toFixed(1):0;
   document.getElementById('allScope').textContent=`[${[...selStatus].join('·')}] ${list.length}건`;
   document.getElementById('allSummary').innerHTML=`
@@ -360,7 +382,7 @@ async function saveEstimate(){
     unit_price:p.sell,buy_price:p.buy,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,memo:'',created_at:today});});
   [['infra','인프라'],['sol','솔루션'],['etc','기타']].forEach(([k,ct])=>{
     items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
-      comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:'',
+      comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:it.buy||0,
       amount:it.qty*it.price,mm:'',start_date:'',end_date:'',memo:it.memo,created_at:today});});});
   const H=['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'];
   const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
