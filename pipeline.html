@@ -235,6 +235,14 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="histModal">
+  <div class="modal">
+    <div class="modal-title"><span id="histTitle">변경 이력</span>
+      <button onclick="document.getElementById('histModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+    <div id="histBody" style="font-size:12px"></div>
+  </div>
+</div>
+
 <nav class="tab-bar">
   <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
   <button class="tab-item active"><span class="tab-icon">📋</span>사업기회</button>
@@ -408,7 +416,8 @@ function renderList(){
       </div>
       <div class="opp-actions">
         ${next?`<button class="btn-transition" onclick="openTransition(${idx},'${next}')">${next}(으)로 전환 →</button>`:''}
-        ${o.status==='수주'||o.status==='계약'?`<button class="btn-edit-opp" onclick="location.href='estimate.html?pid=${o.pipeline_id}'">견적 보기</button>`:''}
+        ${['확정','수주','계약'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='estimate.html?pid=${o.pipeline_id}'">견적 보기</button>`:''}
+        <button class="btn-drop" onclick="showHistory('${o.pipeline_id}')">이력</button>
         <button class="btn-edit-opp" onclick="openEdit(${idx})">수정</button>
         ${!isDead&&o.status!=='계약'?`<button class="btn-drop" onclick="openDrop(${idx})">포기/실주</button>`:''}
       </div>
@@ -593,6 +602,19 @@ async function saveOpp(){
 
   const ok=await saveAll(targetStatus?`${status} 전환 완료 ✓`:'저장 완료 ✓');
   if(!ok){ opps=snapshot; renderFilter(); renderList(); }
+  if(ok&&id){
+    try{
+      const before=snapshot.find(x=>x.pipeline_id===id);
+      const after=opps.find(x=>x.pipeline_id===id);
+      if(before&&after){
+        const fields=[['contract_amount','계약금액'],['expected_start','시작일'],['expected_end','종료일'],['probability','확도'],['status','상태']];
+        const chg=fields.filter(([k])=>String(before[k]||'')!==String(after[k]||''));
+        if(chg.length){
+          const reason=prompt('변경 사유를 입력하세요 (선택, 이력에 기록됩니다):')||'';
+          await logHistory(chg.map(([k,label])=>({pl:id,target:label,old:before[k]||'',newv:after[k]||'',reason,source:'pipeline'})));
+        } }
+    }catch(e){}
+  }
   if(ok && ['수주','계약','종료'].includes(status)){
     const plId=id||opps[opps.length-1].pipeline_id;
     await ensureProject(plId,status);
@@ -635,9 +657,48 @@ async function ensureProject(plId,status){
     const dataRows=uniq.map(x=>header.map(h=>x[h]||''));
     const ok=await clearAndWrite('S03_PROJECT','A:K',[header,...dataRows]);
     if(ok){ toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
-      if(status==='수주' && confirm('청구 스케줄(세금계산서 발행·수금 계획)을 지금 생성하시겠습니까?\n확인 시 데이터 입력 화면으로 이동합니다.')){
-        location.href='input.html?gen='+plId; return; } }
+      if(status==='수주'){
+        let hasEst=false;
+        try{ const er=await fetchSheet('S12_ESTIMATE','A1:O500'); hasEst=toObj(er).some(e=>e.pipeline_id===plId); }catch(e){}
+        const msg=hasEst
+          ?'저장된 견적이 있습니다.\n견적 기반으로 매출·매입 청구 스케줄을 지금 생성하시겠습니까?'
+          :'청구 스케줄(세금계산서 발행·수금 계획)을 지금 생성하시겠습니까?';
+        if(confirm(msg+'\n확인 시 데이터 입력 화면으로 이동합니다.')){
+          location.href='input.html?gen='+plId+(hasEst?'&full=1':''); return; } } }
   }catch(e){ toast('S03 동기화 실패: '+e.message,true); }
+}
+async function logHistory(entries){
+  try{
+    let list=[];
+    try{const rows=await fetchSheet('S14_HISTORY','A1:H999');list=toObj(rows);}catch(e){}
+    const H=['hist_id','changed_at','pipeline_id','target','old_value','new_value','reason','source'];
+    let n=list.reduce((m,h)=>Math.max(m,parseInt((h.hist_id||'').replace(/\D/g,''))||0),0);
+    const now=new Date().toISOString().slice(0,16).replace('T',' ');
+    entries.forEach(e=>{n++;list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:now,pipeline_id:e.pl,target:e.target,old_value:String(e.old??''),new_value:String(e.newv??''),reason:e.reason||'',source:e.source});});
+    const ok=await clearAndWrite('S14_HISTORY','A:H',[H,...dedupe(list,'hist_id').map(h=>H.map(k=>h[k]??''))]);
+    if(!ok)toast('이력 기록 실패 (S14_HISTORY 시트 확인)',true);
+    else toast('변경 이력 기록 ✓');
+  }catch(err){toast('이력 기록 실패: Google Sheets에 S14_HISTORY 시트를 추가하세요',true);}
+}
+async function showHistory(plId){
+  const o=opps.find(x=>x.pipeline_id===plId);
+  document.getElementById('histTitle').textContent=`변경 이력 — ${o?o.opportunity:plId}`;
+  document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">불러오는 중…</div>';
+  document.getElementById('histModal').classList.add('open');
+  try{
+    const rows=await fetchSheet('S14_HISTORY','A1:H999');
+    const list=toObj(rows).filter(h=>h.pipeline_id===plId).sort((a,b)=>(b.changed_at||'').localeCompare(a.changed_at||''));
+    document.getElementById('histBody').innerHTML=list.length?list.map(h=>`
+      <div style="padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <b>${h.target}</b><span style="color:var(--text3);font-size:11px">${h.changed_at} · ${h.source}</span></div>
+        <div>${comma(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${comma(h.new_value)||'(없음)'}</b></div>
+        ${h.reason?`<div style="color:var(--text3);font-size:11px;margin-top:2px">사유: ${h.reason}</div>`:''}
+      </div>`).join('')
+      :'<div style="text-align:center;padding:20px;color:var(--text3)">기록된 변경 이력이 없습니다</div>';
+  }catch(e){
+    document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">S14_HISTORY 시트가 없습니다.<br>Google Sheets에 시트를 추가하세요.</div>';
+  }
 }
 window.addEventListener('load',()=>{ loadOpps(); });
 </script>

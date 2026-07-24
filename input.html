@@ -141,7 +141,9 @@
   <div class="tab-content" id="tab-cost">
     <div class="form-card" style="margin-top:12px">
       <div class="card-title"><span>계획 매입 입력</span>
-        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetCost()">초기화</button></div>
+        <span style="display:flex;gap:6px">
+        <button style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer;font-weight:500" onclick="openGenModal(true)">⚡ 매입 스케줄 생성</button>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetCost()">초기화</button></span></div>
       <input type="hidden" id="cost_id">
       <div class="form-row">
         <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
@@ -165,6 +167,10 @@
       <div class="vat-box">
         <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="cost_vat_disp">0원</span></div>
         <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="cost_total_disp">0원</span></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">계산서 수취 예정일</label><input class="form-input" id="cost_invplan" type="date"></div>
+        <div class="form-group"><label class="form-label">수취일 (완료 시)</label><input class="form-input" id="cost_invdate" type="date"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">지급 예정일</label><input class="form-input" id="cost_date" type="date"></div>
@@ -211,6 +217,17 @@
     <div class="form-group"><label class="form-label">프로젝트</label>
       <select class="form-input" id="genPrj" onchange="buildGen()"><option value="">선택</option></select></div>
     <div id="genInfo" style="font-size:12px;color:#1E40AF;background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:9px 12px;margin-bottom:12px;display:none"></div>
+    <div id="genTargets" style="display:none;margin-bottom:12px;font-size:13px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="genDoRev" checked onchange="buildGen()"> 매출 청구 생성</label>
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="genDoCost" onchange="buildGen()"> 매입 청구 생성 <span id="genCostHint" style="font-size:11px;color:var(--text3)"></span></label>
+      </div>
+      <div id="revBaseWrap" style="display:flex;gap:14px;font-size:12px;color:var(--text2)">
+        <span>매출 기준:</span>
+        <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genRevBase" value="contract" checked onchange="buildGen()"> 계약금액</label>
+        <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genRevBase" value="est" id="revBaseEst" onchange="buildGen()"> 견적 매출 합계</label>
+      </div>
+    </div>
     <div id="msArea" style="display:none;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <label class="form-label" style="margin:0">지급 회차</label>
@@ -227,6 +244,13 @@
         <thead><tr><th>발행예정일</th><th>공급가액</th><th>합계(VAT포함)</th><th>수금예정일</th></tr></thead>
         <tbody id="genPreview"></tbody></table></div>
       <div style="font-size:11px;color:var(--text3);margin-top:6px" id="genTotal"></div>
+    </div>
+    <div id="genCostWrap" style="display:none;margin-top:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">매입 미리보기 <span id="genCostCnt" style="font-weight:400;color:var(--text3)"></span></div>
+      <div style="overflow-x:auto"><table class="gen-table">
+        <thead><tr><th>수취예정일</th><th>항목</th><th>공급가액</th><th>지급예정일</th></tr></thead>
+        <tbody id="genCostPreview"></tbody></table></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px" id="genCostTotal"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn btn-secondary" onclick="closeGenModal()">취소</button>
@@ -250,7 +274,7 @@ const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
 const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
 const SCOPES='https://www.googleapis.com/auth/spreadsheets';
 let accessToken=null,tokenClient;
-let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[];
+let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 
 function comma(n){return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString();}
 function un(s){return parseInt(String(s).replace(/,/g,''))||0;}
@@ -298,9 +322,11 @@ function nextId(list,key,prefix){
 // ── 로드 (재무필터 적용) ──
 async function loadAll(){
   try{
-    const [plR,prR,rvR,csR,fxR]=await Promise.all([
-      fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S03_PROJECT','A1:K200'),
-      fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:K300'),fetchSheet('S06_FIXED_COST','A1:F300')]);
+    const [plR,prR,rvR,csR,fxR,esR]=await Promise.all([
+      fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200'),
+      fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:M300'),fetchSheet('S06_FIXED_COST','A1:F300'),
+      fetchSheet('S12_ESTIMATE','A1:O500').catch(()=>[])]);
+    estAll=toObj(esR).filter(e=>e.estimate_id);
     pipelines=toObj(plR); allPrjs=toObj(prR);
     const pls=pipelines, prjs=allPrjs;
     revenues=dedupe(toObj(rvR),'revenue_id'); costs=dedupe(toObj(csR),'cost_id'); fixed=dedupe(toObj(fxR),'fixed_id');
@@ -331,12 +357,17 @@ function renderLists(){
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
   const cs=costs.filter(c=>c.cost_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
-  document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>`
+  document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
+    const st=c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정'];
+    return `
     <div class="list-item"><div class="li-r1"><div class="li-name">${c.year_month} · ${c.cost_type}</div>
-      <span class="li-amt">${wf(c.amount)}</span></div>
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <span class="li-meta">${c.project_id} ${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}</span>
-      <button class="btn-edit" onclick="editCost('${c.cost_id}')">수정</button></div></div>`).join('')
+      <span class="badge ${st[0]}">${st[1]}</span></div>
+    <div class="li-meta">${c.project_id} ${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+      <span class="li-amt">${wf(c.amount)}</span>
+      <span style="display:flex;gap:6px">
+        ${!c.invoice_date?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markCostInvoiced('${c.cost_id}')">수취 완료</button>`:''}
+        <button class="btn-edit" onclick="editCost('${c.cost_id}')">수정</button></span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
   const fx=fixed.filter(f=>f.fixed_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('fix_cnt').textContent=`(${fx.length}건)`;
@@ -361,7 +392,7 @@ function calcCostVat(){const s=un(document.getElementById('cost_supply').value);
 
 // ── 저장 (S04 9컬럼 / S05 11컬럼 / S06 6컬럼 — 전체 재작성) ──
 const H4=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
-const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt'];
+const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date'];
 const H6=['fixed_id','year_month','category','amount','payment_date','memo'];
 
 async function saveRev(){
@@ -386,12 +417,15 @@ async function saveCost(){
   if(!pj||!ym||!sup){toast('프로젝트·년월·공급가액은 필수입니다',true);return;}
   const btn=document.getElementById('cost_btn');btn.disabled=true;btn.textContent='저장 중…';
   const id=document.getElementById('cost_id').value||nextId(costs,'cost_id','COST');
+  const oldc=costs.find(c=>c.cost_id===id)||{};
   const rec={cost_id:id,project_id:pj,year_month:ym,cost_type:document.getElementById('cost_type').value,
     person_name:document.getElementById('cost_person').value,unit_price:un(document.getElementById('cost_unit').value)||0,
     mm:document.getElementById('cost_mm').value||0,amount:sup,payment_date:document.getElementById('cost_date').value,
-    memo:document.getElementById('cost_memo').value,vat_amt:Math.round(sup*.1)};
+    memo:document.getElementById('cost_memo').value,vat_amt:Math.round(sup*.1),
+    invoice_plan_date:document.getElementById('cost_invplan').value||oldc.invoice_plan_date||'',
+    invoice_date:document.getElementById('cost_invdate').value||oldc.invoice_date||''};
   const next=dedupe([...costs.filter(c=>c.cost_id&&c.cost_id!==id),rec],'cost_id');
-  const ok=await clearAndWrite('S05_COST','A:K',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
+  const ok=await clearAndWrite('S05_COST','A:M',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
   if(ok){costs=next;toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 async function saveFix(){
@@ -420,6 +454,7 @@ function editCost(id){const c=costs.find(x=>x.cost_id===id);if(!c)return;
   document.getElementById('cost_person').value=c.person_name||'';document.getElementById('cost_unit').value=c.unit_price?comma(c.unit_price):'';
   document.getElementById('cost_mm').value=c.mm||'';document.getElementById('cost_supply').value=comma(c.amount);
   document.getElementById('cost_date').value=c.payment_date||'';document.getElementById('cost_memo').value=c.memo||'';
+  document.getElementById('cost_invplan').value=c.invoice_plan_date||'';document.getElementById('cost_invdate').value=c.invoice_date||'';
   calcCostVat();window.scrollTo({top:0,behavior:'smooth'});}
 function editFix(id){const f=fixed.find(x=>x.fixed_id===id);if(!f)return;
   document.getElementById('fix_id').value=id;document.getElementById('fix_ym').value=f.year_month;
@@ -428,7 +463,7 @@ function editFix(id){const f=fixed.find(x=>x.fixed_id===id);if(!f)return;
   window.scrollTo({top:0,behavior:'smooth'});}
 function resetRev(){['rev_id','rev_supply','rev_date','rev_memo','rev_invplan','rev_invdate'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rev_received').value='N';calcRevVat();}
-function resetCost(){['cost_id','cost_person','cost_unit','cost_mm','cost_supply','cost_date','cost_memo'].forEach(i=>document.getElementById(i).value='');calcCostVat();}
+function resetCost(){['cost_id','cost_person','cost_unit','cost_mm','cost_supply','cost_date','cost_memo','cost_invplan','cost_invdate'].forEach(i=>document.getElementById(i).value='');calcCostVat();}
 function resetFix(){['fix_id','fix_amount','fix_date','fix_memo'].forEach(i=>document.getElementById(i).value='');}
 
 // ═══ 청구 스케줄 자동 생성 (v2.3) ═══
@@ -442,12 +477,18 @@ function ymList(s,e){const a=new Date(s),b=new Date(e);const r=[];let c=new Date
     const t=(c.getFullYear()===b.getFullYear()&&c.getMonth()===b.getMonth())?b.getDate():dim;
     r.push({y:c.getFullYear(),m:c.getMonth()+1,w:(t-f+1)/dim});
     c=new Date(c.getFullYear(),c.getMonth()+1,1);} return r;}
-function openGenModal(){
+function openGenModal(withCost){
   const sel=document.getElementById('genPrj');
   sel.innerHTML='<option value="">선택</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_id} ${p.project_name}</option>`).join('');
+  document.getElementById('genDoCost').checked=!!withCost;
   document.getElementById('genModal').classList.add('open');
 }
-function closeGenModal(){document.getElementById('genModal').classList.remove('open');genRows=[];document.getElementById('genPreviewWrap').style.display='none';document.getElementById('msArea').style.display='none';document.getElementById('genInfo').style.display='none';document.getElementById('genSaveBtn').disabled=true;}
+function closeGenModal(){document.getElementById('genModal').classList.remove('open');genRows=[];genCostRows=[];
+  ['genPreviewWrap','genCostWrap','msArea','genInfo','genTargets'].forEach(i=>document.getElementById(i).style.display='none');
+  document.getElementById('genSaveBtn').disabled=true;}
+function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId);}
+function estSellSum(items){return items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);}
+function estBuySum(items){return items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);}
 function buildGen(){
   const pid=document.getElementById('genPrj').value; if(!pid)return;
   const prj=allPrjs.find(p=>p.project_id===pid);
@@ -456,83 +497,166 @@ function buildGen(){
   const biz=genPl.biz_type||'인력공급', pay=genPl.payment_cycle||'익월말';
   const start=genPl.expected_start||prj.start_date, end=genPl.expected_end||prj.end_date;
   const amt=un(genPl.contract_amount||prj.contract_amount);
+  const items=estOf(genPl.pipeline_id);
+  const hasEst=items.length>0, eSell=estSellSum(items), eBuy=estBuySum(items);
+  document.getElementById('genTargets').style.display='block';
+  const doCostEl=document.getElementById('genDoCost');
+  document.getElementById('genCostHint').textContent=hasEst?`(견적 매입 합계 ${comma(eBuy)}원 기반)`:'(견적 없음 — 생성 불가)';
+  if(!hasEst){doCostEl.checked=false;doCostEl.disabled=true;}else doCostEl.disabled=false;
+  document.getElementById('revBaseEst').disabled=!hasEst;
+  const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
+  const revAmt=(revBase==='est'&&hasEst)?eSell:amt;
   const info=document.getElementById('genInfo');
   info.style.display='block';
-  info.innerHTML=`<b>${biz}</b> · 지급조건 <b>${pay}</b> · 기간 ${start||'─'}~${end||'─'} · 계약금액(공급가액) <b>${comma(amt)}원</b>`;
-  if(!start||!end||!amt){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다. 사업기회에서 먼저 입력하세요.';document.getElementById('genPreviewWrap').style.display='none';return;}
-  if(biz==='용역턴키'){document.getElementById('msArea').style.display='block';setupMs();}
-  else{document.getElementById('msArea').style.display='none';
-    const ms=ymList(start,end); const totW=ms.reduce((s,x)=>s+x.w,0);
-    let acc=0;
-    genRows=ms.map((x,i)=>{
-      let sup=(i===ms.length-1)?amt-acc:Math.round(amt*x.w/totW/1000)*1000;
-      acc+=sup;
-      const plan=lastDayStr(x.y,x.m);
-      return {plan,supply:sup,recv:recvDue(plan)};
-    });
-    renderGenPreview();}
+  info.innerHTML=`<b>${biz}</b> · 지급조건 <b>${pay}</b> · 기간 ${start||'─'}~${end||'─'}<br>계약금액 <b>${comma(amt)}원</b>${hasEst?` · 견적 매출 <b>${comma(eSell)}원</b> · 견적 매입 <b>${comma(eBuy)}원</b>`:' · 견적 없음'}`;
+  if(!start||!end||(!revAmt&&!eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';return;}
+  if(biz==='용역턴키'){document.getElementById('msArea').style.display='block';setupMs(revAmt,eBuy,hasEst);}
+  else{
+    document.getElementById('msArea').style.display='none';
+    // 매출: 월할
+    if(document.getElementById('genDoRev').checked&&revAmt){
+      const ms=ymList(start,end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
+      genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?revAmt-acc:Math.round(revAmt*x.w/totW/1000)*1000;acc+=sup;
+        const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
+    } else genRows=[];
+    // 매입: 견적 기반 (인건비 월할 + 비인건비 단건)
+    genCostRows=[];
+    if(document.getElementById('genDoCost').checked&&hasEst){
+      items.filter(e=>e.comp_type==='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
+        const es=e.start_date||start, ee=e.end_date||end;
+        ymList(es,ee).forEach(x=>{
+          const plan=lastDayStr(x.y,x.m);
+          genCostRows.push({plan,name:e.item_name||'인건비',supply:Math.round((parseInt(e.buy_price)||0)*x.w),
+            pay:nextMonthEnd(plan),ctype:'인건비',person:e.item_name||'',unit:parseInt(e.buy_price)||0,mm:x.w.toFixed(2)});
+        });});
+      items.filter(e=>e.comp_type!=='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
+        const sd=new Date(start); const plan=lastDayStr(sd.getFullYear(),sd.getMonth()+1);
+        genCostRows.push({plan,name:e.item_name||e.comp_type,supply:(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0),
+          pay:nextMonthEnd(plan),ctype:'기타원가',person:'',unit:'',mm:''});});
+    }
+    renderGenPreview(); renderGenCostPreview();
+  }
 }
-function setupMs(){
+function setupMs(revAmt,eBuy,hasEst){
   const n=parseInt(document.getElementById('genRounds').value);
   const ratios=n===4?[30,30,20,20]:[30,40,30];
   const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
   const prj=allPrjs.find(p=>p.project_id===document.getElementById('genPrj').value);
   const start=genPl.expected_start||prj.start_date, end=genPl.expected_end||prj.end_date;
   const sd=new Date(start), ed=new Date(end), span=ed-sd;
-  document.getElementById('msRows').innerHTML=labels.map((lb,i)=>{
-    const d=new Date(sd.getTime()+span*(i/(n-1)));
-    const dstr=d.toISOString().slice(0,10);
-    return `<div class="ms-row"><span>${lb}</span>
-      <input type="number" id="msR_${i}" value="${ratios[i]}" oninput="msCalc()">
-      <input type="date" id="msD_${i}" value="${dstr}" onchange="msCalc()"></div>`;}).join('');
+  if(!document.getElementById('msRows').innerHTML.trim()){
+    document.getElementById('msRows').innerHTML=labels.map((lb,i)=>{
+      const d=new Date(sd.getTime()+span*(i/(n-1)));
+      return `<div class="ms-row"><span>${lb}</span>
+        <input type="number" id="msR_${i}" value="${ratios[i]}" oninput="msCalc()">
+        <input type="date" id="msD_${i}" value="${d.toISOString().slice(0,10)}" onchange="msCalc()"></div>`;}).join('');
+  }
   msCalc();
 }
 function msCalc(){
   const n=parseInt(document.getElementById('genRounds').value);
+  // 회차 수 변경 시 행 재구성
+  if(document.querySelectorAll('#msRows .ms-row').length!==n){document.getElementById('msRows').innerHTML='';return setupMs();}
   const prj=allPrjs.find(p=>p.project_id===document.getElementById('genPrj').value);
+  const items=estOf(genPl.pipeline_id); const hasEst=items.length>0;
+  const eSell=estSellSum(items), eBuy=estBuySum(items);
+  const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
   const amt=un(genPl.contract_amount||prj.contract_amount);
+  const revAmt=(revBase==='est'&&hasEst)?eSell:amt;
+  const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
   let sum=0,rs=[];
   for(let i=0;i<n;i++){const r=parseFloat((document.getElementById('msR_'+i)||{}).value)||0;sum+=r;rs.push(r);}
   document.getElementById('msSum').textContent=sum;
   document.getElementById('msSum').style.color=sum===100?'var(--green)':'var(--red)';
-  let acc=0;
-  genRows=rs.map((r,i)=>{
-    let sup=(i===n-1)?amt-acc:Math.round(amt*r/100/1000)*1000; acc+=sup;
+  let acc=0, accC=0;
+  genRows=[]; genCostRows=[];
+  rs.forEach((r,i)=>{
     const plan=(document.getElementById('msD_'+i)||{}).value||'';
-    return {plan,supply:sup,recv:plan?recvDue(plan):''};
+    if(document.getElementById('genDoRev').checked&&revAmt){
+      let sup=(i===n-1)?revAmt-acc:Math.round(revAmt*r/100/1000)*1000; acc+=sup;
+      genRows.push({plan,supply:sup,recv:plan?recvDue(plan):''});}
+    if(document.getElementById('genDoCost').checked&&hasEst&&eBuy){
+      let supC=(i===n-1)?eBuy-accC:Math.round(eBuy*r/100/1000)*1000; accC+=supC;
+      genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):'',ctype:'외주비',person:labels[i],unit:'',mm:''});}
   });
-  renderGenPreview();
+  renderGenPreview(); renderGenCostPreview();
 }
 function renderGenPreview(){
-  document.getElementById('genPreviewWrap').style.display='block';
-  document.getElementById('genCnt').textContent=`(${genRows.length}건)`;
-  document.getElementById('genPreview').innerHTML=genRows.map((g,i)=>`
-    <tr><td><input type="date" value="${g.plan}" onchange="genRows[${i}].plan=this.value;genRows[${i}].recv=recvDue(this.value);renderGenPreview()"></td>
-    <td><input value="${comma(g.supply)}" oninput="this.value=fc(this.value);genRows[${i}].supply=un(this.value);updGenTotal()" style="text-align:right"></td>
-    <td style="text-align:right;font-size:12px;white-space:nowrap">${comma(Math.round(g.supply*1.1))}원</td>
-    <td><input type="date" value="${g.recv}" onchange="genRows[${i}].recv=this.value"></td></tr>`).join('');
-  updGenTotal();
-  document.getElementById('genSaveBtn').disabled=!genRows.length;
+  const on=document.getElementById('genDoRev').checked&&genRows.length;
+  document.getElementById('genPreviewWrap').style.display=on?'block':'none';
+  if(on){
+    document.getElementById('genCnt').textContent=`(${genRows.length}건)`;
+    document.getElementById('genPreview').innerHTML=genRows.map((g,i)=>`
+      <tr><td><input type="date" value="${g.plan}" onchange="genRows[${i}].plan=this.value;genRows[${i}].recv=recvDue(this.value);renderGenPreview()"></td>
+      <td><input value="${comma(g.supply)}" oninput="this.value=fc(this.value);genRows[${i}].supply=un(this.value);updGenTotal()" style="text-align:right"></td>
+      <td style="text-align:right;font-size:12px;white-space:nowrap">${comma(Math.round(g.supply*1.1))}원</td>
+      <td><input type="date" value="${g.recv}" onchange="genRows[${i}].recv=this.value"></td></tr>`).join('');
+    updGenTotal();
+  }
+  document.getElementById('genSaveBtn').disabled=!(genRows.length||genCostRows.length);
+}
+function renderGenCostPreview(){
+  const on=document.getElementById('genDoCost').checked&&genCostRows.length;
+  document.getElementById('genCostWrap').style.display=on?'block':'none';
+  if(on){
+    document.getElementById('genCostCnt').textContent=`(${genCostRows.length}건)`;
+    document.getElementById('genCostPreview').innerHTML=genCostRows.map((g,i)=>`
+      <tr><td><input type="date" value="${g.plan}" onchange="genCostRows[${i}].plan=this.value"></td>
+      <td style="font-size:11px;white-space:nowrap">${g.name}</td>
+      <td><input value="${comma(g.supply)}" oninput="this.value=fc(this.value);genCostRows[${i}].supply=un(this.value);updGenCostTotal()" style="text-align:right"></td>
+      <td><input type="date" value="${g.pay}" onchange="genCostRows[${i}].pay=this.value"></td></tr>`).join('');
+    updGenCostTotal();
+  }
+  document.getElementById('genSaveBtn').disabled=!(genRows.length&&document.getElementById('genDoRev').checked||genCostRows.length&&document.getElementById('genDoCost').checked);
 }
 function updGenTotal(){
   const t=genRows.reduce((s,g)=>s+g.supply,0);
-  document.getElementById('genTotal').innerHTML=`합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
+  document.getElementById('genTotal').innerHTML=`매출 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
+}
+function updGenCostTotal(){
+  const t=genCostRows.reduce((s,g)=>s+g.supply,0);
+  document.getElementById('genCostTotal').innerHTML=`매입 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
 }
 async function saveGen(){
   const pid=document.getElementById('genPrj').value;
-  if(!pid||!genRows.length)return;
-  if(genRows.some(g=>!g.plan||!g.supply)){toast('발행예정일과 금액을 모두 입력하세요',true);return;}
+  const doRev=document.getElementById('genDoRev').checked&&genRows.length;
+  const doCost=document.getElementById('genDoCost').checked&&genCostRows.length;
+  if(!pid||(!doRev&&!doCost))return;
+  if(doRev&&genRows.some(g=>!g.plan||!g.supply)){toast('매출: 발행예정일·금액을 확인하세요',true);return;}
+  if(doCost&&genCostRows.some(g=>!g.plan||!g.supply)){toast('매입: 수취예정일·금액을 확인하세요',true);return;}
   const btn=document.getElementById('genSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
-  let seq=revenues.reduce((m,r)=>{const n=parseInt((r.revenue_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
-  const recs=genRows.map(g=>{seq++;return {revenue_id:`REV-2026-${String(seq).padStart(3,'0')}`,project_id:pid,
-    year_month:g.plan.slice(0,7),tax_invoice_amt:g.supply,cash_recv_amt:Math.round(g.supply*1.1),
-    cash_recv_date:g.recv,is_received:'N',memo:'청구 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
-    invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',recv_actual_date:''};});
-  const next=dedupe([...revenues,...recs],'revenue_id');
-  const ok=await clearAndWrite('S04_REVENUE','A:M',[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
+  let allOk=true, msgs=[];
+  if(doRev){
+    let base=revenues;
+    const existOpen=revenues.filter(r=>r.project_id===pid&&r.is_received!=='Y');
+    if(existOpen.length&&confirm(`이 프로젝트의 기존 미수 청구 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
+      base=revenues.filter(r=>!(r.project_id===pid&&r.is_received!=='Y'));
+    let seq=revenues.reduce((m,r)=>{const n=parseInt((r.revenue_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
+    const recs=genRows.map(g=>{seq++;return {revenue_id:`REV-2026-${String(seq).padStart(3,'0')}`,project_id:pid,
+      year_month:g.plan.slice(0,7),tax_invoice_amt:g.supply,cash_recv_amt:Math.round(g.supply*1.1),
+      cash_recv_date:g.recv,is_received:'N',memo:'청구 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
+      invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',recv_actual_date:''};});
+    const next=dedupe([...base,...recs],'revenue_id');
+    const ok=await clearAndWrite('S04_REVENUE','A:M',[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
+    if(ok){revenues=next;msgs.push(`매출 ${recs.length}건`);}else allOk=false;
+  }
+  if(allOk&&doCost){
+    let base=costs;
+    const existOpen=costs.filter(c=>c.project_id===pid&&!c.invoice_date);
+    if(existOpen.length&&confirm(`이 프로젝트의 기존 미수취 매입 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
+      base=costs.filter(c=>!(c.project_id===pid&&!c.invoice_date));
+    let seq=costs.reduce((m,c)=>{const n=parseInt((c.cost_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
+    const recs=genCostRows.map(g=>{seq++;return {cost_id:`COST-2026-${String(seq).padStart(3,'0')}`,project_id:pid,
+      year_month:g.plan.slice(0,7),cost_type:g.ctype,person_name:g.person||'',unit_price:g.unit||'',mm:g.mm||'',
+      amount:g.supply,payment_date:g.pay,memo:'매입 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
+      invoice_plan_date:g.plan,invoice_date:''};});
+    const next=dedupe([...base,...recs],'cost_id');
+    const ok=await clearAndWrite('S05_COST','A:M',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
+    if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
+  }
   btn.disabled=false;btn.textContent='생성 저장';
-  if(ok){revenues=next;toast(`✓ 청구 스케줄 ${recs.length}건 생성 완료`);closeGenModal();renderLists();}
-  else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);
+  if(allOk){toast(`✓ 스케줄 생성 완료: ${msgs.join(' · ')}`);closeGenModal();renderLists();}
+  else toast('저장 실패 — 남은 대상은 다시 시도하세요',true);
 }
 async function markInvoiced(id){
   const r=revenues.find(x=>x.revenue_id===id); if(!r)return;
@@ -547,11 +671,25 @@ async function markInvoiced(id){
   if(ok){revenues=dedupe(next,'revenue_id');toast('발행 완료 ✓ 수금예정 '+due);renderLists();}
   else toast('저장 실패',true);
 }
+async function markCostInvoiced(id){
+  const c=costs.find(x=>x.cost_id===id); if(!c)return;
+  const today=new Date().toISOString().slice(0,10);
+  if(!confirm(`${c.year_month} · ${c.cost_type} 건을 오늘(${today}) 수취 완료 처리할까요?`))return;
+  const next=costs.map(x=>x.cost_id===id?{...x,invoice_date:today}:x);
+  const ok=await clearAndWrite('S05_COST','A:M',[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
+  if(ok){costs=dedupe(next,'cost_id');toast('수취 완료 ✓');renderLists();}
+  else toast('저장 실패',true);
+}
 window.addEventListener('load',async()=>{
   await loadAll();
-  const gen=new URLSearchParams(location.search).get('gen');
+  const q=new URLSearchParams(location.search);
+  const gen=q.get('gen');
   if(gen){const prj=financePrjs.find(p=>p.pipeline_id===gen);
-    if(prj){openGenModal();document.getElementById('genPrj').value=prj.project_id;buildGen();}}
+    if(prj){
+      openGenModal(q.get('full')==='1');
+      if(q.get('rev')==='0')document.getElementById('genDoRev').checked=false;
+      if(q.get('revbase')==='est')document.getElementById('revBaseEst').checked=true;
+      document.getElementById('genPrj').value=prj.project_id;buildGen();}}
 });
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>

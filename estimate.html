@@ -121,6 +121,8 @@
         <button class="btn btn-secondary" onclick="loadOpp()">다시 불러오기</button>
         <button class="btn btn-primary" id="saveBtn" onclick="saveEstimate()">견적 저장 (S12)</button>
       </div>
+      <button class="btn" id="deployBtn" onclick="deployPlan()" style="width:100%;margin-top:8px;background:var(--green);color:#fff" disabled>🚀 실행 계획으로 전개 (매출·매입 청구)</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:5px;text-align:center">수주·계약 상태에서만 활성화됩니다. 견적을 먼저 저장하세요.</div>
     </div>
   </div>
 
@@ -251,6 +253,7 @@ function loadOpp(){
   renderLabor();['infra','sol','etc'].forEach(renderItems);
   recalc();
   if(saved.length)toast(`저장된 견적 ${saved.length}건 불러옴`);
+  document.getElementById('deployBtn').disabled=!['수주','계약'].includes(cur.status);
 }
 
 // ── 인건비 ──
@@ -350,7 +353,11 @@ function recalc(){
     <tr><td style="padding-left:16px;color:var(--text3)">└ VAT 포함</td><td style="color:var(--text3)">${wf(Math.round(sell*1.1))}</td></tr>
     <tr><td>추정 원가 합계</td><td>${wf(cost)}</td></tr>
     <tr><td style="padding-left:16px;color:var(--text3)">└ 인건비 ${wf(lB)} · 인프라 ${wf(iB)} · 솔루션 ${wf(sB)} · 기타 ${wf(eB)}</td><td></td></tr>
-    <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>`;
+    <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>
+    ${(()=>{const c=un(cur?.contract_amount),es=lS+iS+sS+eS;
+      if(c&&es&&c!==es){const d=es-c;
+        return `<tr><td colspan="2" style="padding-top:8px"><span style="font-size:11px;background:${d>0?'var(--green-lt)':'var(--red-lt)'};color:${d>0?'var(--green)':'var(--red)'};padding:3px 10px;border-radius:6px;font-weight:600">계약금액 대비 견적 매출 ${d>0?'+':''}${wf(d)} 차이</span></td></tr>`;}
+      return '';})()}`;
 }
 function renderAllSummary(){
   const list=opps.filter(o=>selStatus.has(o.status));
@@ -366,7 +373,11 @@ function renderAllSummary(){
     <tr><td>매출 합계 (공급가액)</td><td>${wf(sell)}</td></tr>
     <tr><td style="padding-left:16px;color:var(--text3)">└ VAT 포함</td><td style="color:var(--text3)">${wf(Math.round(sell*1.1))}</td></tr>
     <tr><td>원가 합계 (저장된 견적 기준)</td><td>${wf(cost)}</td></tr>
-    <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>`;
+    <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>
+    ${(()=>{const c=un(cur?.contract_amount),es=lS+iS+sS+eS;
+      if(c&&es&&c!==es){const d=es-c;
+        return `<tr><td colspan="2" style="padding-top:8px"><span style="font-size:11px;background:${d>0?'var(--green-lt)':'var(--red-lt)'};color:${d>0?'var(--green)':'var(--red)'};padding:3px 10px;border-radius:6px;font-weight:600">계약금액 대비 견적 매출 ${d>0?'+':''}${wf(d)} 차이</span></td></tr>`;}
+      return '';})()}`;
 }
 
 // ── S12 저장 ──
@@ -374,6 +385,9 @@ async function saveEstimate(){
   if(!cur){toast('사업기회를 먼저 선택하세요',true);return;}
   const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='저장 중…';
   const today=new Date().toISOString().slice(0,10);
+  const prevItems=estimates.filter(e=>e.pipeline_id===cur.pipeline_id);
+  const prevSell=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
+  const prevBuy=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
   const others=estimates.filter(e=>e.pipeline_id!==cur.pipeline_id);
   let n=estimates.reduce((m,e)=>{const x=parseInt((e.estimate_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,x);},0);
   const rows=[];
@@ -388,8 +402,32 @@ async function saveEstimate(){
   const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
   const ok=await clearAndWrite('S12_ESTIMATE','A:O',[H,...all.map(r=>H.map(h=>r[h]??''))]);
   btn.disabled=false;btn.textContent='견적 저장 (S12)';
-  if(ok){estimates=all;toast('✓ 견적 저장 완료');renderAllSummary();}
+  if(ok){estimates=all;toast('✓ 견적 저장 완료');renderAllSummary();
+    const newItems=all.filter(e=>e.pipeline_id===cur.pipeline_id);
+    const newSell=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
+    const newBuy=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+    const hist=[];
+    if(prevItems.length&&prevSell!==newSell)hist.push({pl:cur.pipeline_id,target:'견적매출합계',old:prevSell,newv:newSell,reason:'견적 수정',source:'estimate'});
+    if(prevItems.length&&prevBuy!==newBuy)hist.push({pl:cur.pipeline_id,target:'견적매입합계',old:prevBuy,newv:newBuy,reason:'견적 수정',source:'estimate'});
+    if(hist.length)await logHistory(hist);}
   else toast('저장 실패',true);
+}
+function deployPlan(){
+  if(!cur)return;
+  const useEst=confirm('매출 청구도 "견적 매출 합계" 기준으로 재생성할까요?\n\n확인 = 견적 매출 기준 재생성\n취소 = 계약금액 기준 유지 (매입만 생성)');
+  location.href='input.html?gen='+cur.pipeline_id+'&full=1'+(useEst?'&revbase=est':'&rev=0');
+}
+async function logHistory(entries){
+  try{
+    let list=[];
+    try{const rows=await fetchSheet('S14_HISTORY','A1:H999');list=toObj(rows);}catch(e){}
+    const H=['hist_id','changed_at','pipeline_id','target','old_value','new_value','reason','source'];
+    let n=list.reduce((m,h)=>Math.max(m,parseInt((h.hist_id||'').replace(/\D/g,''))||0),0);
+    const now=new Date().toISOString().slice(0,16).replace('T',' ');
+    entries.forEach(e=>{n++;list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:now,pipeline_id:e.pl,target:e.target,old_value:String(e.old??''),new_value:String(e.newv??''),reason:e.reason||'',source:e.source});});
+    const ok=await clearAndWrite('S14_HISTORY','A:H',[H,...dedupe(list,'hist_id').map(h=>H.map(k=>h[k]??''))]);
+    if(!ok)toast('이력 기록 실패 (S14_HISTORY 시트 확인)',true);
+  }catch(err){toast('이력 기록 실패: S14_HISTORY 시트를 추가하세요',true);}
 }
 window.addEventListener('load',loadAll);
 </script>
