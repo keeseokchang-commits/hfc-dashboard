@@ -164,6 +164,8 @@
   <div class="card" id="agingCard" style="display:none">
     <div class="card-title" style="color:var(--red)">⏰ 미수금 Aging <span style="font-size:11px;color:var(--text3);font-weight:400">수금예정일 경과 · 30일 초과 적색</span></div>
     <div id="agingList"></div>
+    <div id="payAgingTitle" style="display:none;font-size:12px;font-weight:600;color:var(--amber);margin-top:12px">💸 미지급 (수취완료·지급예정 경과)</div>
+    <div id="payAgingList"></div>
   </div>
 
   <!-- 추정 재계산 -->
@@ -758,7 +760,7 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],pipelinesAll=[],prjAll=[],unmatchedDep=[];
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[];
 async function loadSheets(){
   try{
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows]=await Promise.all([
@@ -768,7 +770,7 @@ async function loadSheets(){
       fetchSheet('S01_PIPELINE','A1:L300'),
       fetchSheet('S03_PROJECT','A1:K200'),
       fetchSheet('S04_REVENUE','A1:M300'),
-      fetchSheet('S05_COST','A1:K300'),
+      fetchSheet('S05_COST','A1:O300'),
       fetchSheet('S06_FIXED_COST','A1:F300'),
       fetchSheet('S13_VAT','A1:N20'),
     ]);
@@ -779,9 +781,11 @@ async function loadSheets(){
     pipelinesAll=toObj(plRows); prjAll=toObj(prRows);
     const okPl=new Set(pipelinesAll.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
     const okPrj=new Set(prjAll.filter(p=>okPl.has(p.pipeline_id)).map(p=>p.project_id));
+    okPrjSet=okPrj;
     s04All=dedupe(toObj(rvRows).filter(r=>r.revenue_id),'revenue_id');
     planRev=s04All.filter(r=>okPrj.has(r.project_id));
-    planCost=toObj(csRows).filter(c=>c.cost_id&&okPrj.has(c.project_id));
+    s05All=dedupe(toObj(csRows).filter(c=>c.cost_id),'cost_id');
+    planCost=s05All.filter(c=>okPrj.has(c.project_id));
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
     const actRows=await fetchSheet('S08_CASHFLOW_ACT','A1:O24');
@@ -827,6 +831,10 @@ function renderVatBanner(){
 // ═══ 통장 대사 엔진 (v2.3 §5) ═══
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
+const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
+async function saveS05(next){
+  return await clearAndWrite('S05_COST','A:O',[H5C,...dedupe(next,'cost_id').map(c=>H5C.map(h=>c[h]??''))]);
+}
 async function saveS04(next){
   return await clearAndWrite('S04_REVENUE','A:M',[H4C,...dedupe(next,'revenue_id').map(r=>H4C.map(h=>r[h]??''))]);
 }
@@ -856,14 +864,41 @@ async function reconcile(){
     if(ok){s04All=dedupe(next,'revenue_id');toast(`🔗 대사 완료: ${matches.length}건 자동 수금확인`);}
     else toast('대사 결과 저장 실패',true);
   }
-  renderRecon(matches.length);
+  // ── 매입 지급 대사 (승인 범위: 재무 프로젝트 + 세금계산서 수취완료 건만 · 후보 1건일 때만 자동) ──
+  const outs=parsedTxns.filter(t=>t.cat==='매입지급'&&t.outAmt>0);
+  const eligible=()=>s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
+  unmatchedOut=[]; const cMatches=[];
+  const usedC=new Set();
+  outs.forEach(t=>{
+    const cands=eligible().filter(c=>!usedC.has(c.cost_id)
+      &&Math.abs(Math.round((parseInt(c.amount)||0)*1.1)-t.outAmt)<=1000
+      &&c.payment_date&&Math.abs(dDiff(c.payment_date,t.date))<=45);
+    if(cands.length===1){usedC.add(cands[0].cost_id);cMatches.push([t,cands[0]]);}
+    else unmatchedOut.push(t);
+  });
+  if(cMatches.length){
+    const next=s05All.map(c=>{const m=cMatches.find(x=>x[1].cost_id===c.cost_id);
+      return m?{...c,pay_actual_date:m[0].date,matched_txn_id:m[0].txnId||''}:c;});
+    const ok=await saveS05(next);
+    if(ok){s05All=dedupe(next,'cost_id');toast(`💸 지급 대사: ${cMatches.length}건 자동 확인`);}
+    else toast('지급 대사 저장 실패',true);
+  }
+  renderRecon(matches.length,cMatches.length);
   renderAging();
 }
-function renderRecon(autoCnt){
+async function manualMatchCost(i){
+  const t=unmatchedOut[i]; const cid=document.getElementById('mc_'+i).value;
+  if(!cid){toast('매입 건을 선택하세요',true);return;}
+  const next=s05All.map(c=>c.cost_id===cid?{...c,pay_actual_date:t.date,matched_txn_id:t.txnId||''}:c);
+  const ok=await saveS05(next);
+  if(ok){s05All=dedupe(next,'cost_id');unmatchedOut.splice(i,1);toast('지급 수동 매칭 ✓');renderRecon();renderAging();}
+  else toast('저장 실패',true);
+}
+function renderRecon(autoCnt,costCnt){
   const card=document.getElementById('reconCard');
   const openRows=s04All.filter(r=>r.is_received!=='Y');
   card.style.display='block';
-  document.getElementById('reconSummary').textContent=`자동 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건`;
+  document.getElementById('reconSummary').textContent=`수금 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건 | 지급 매칭 ${costCnt||0}건 · 미매칭 출금 ${unmatchedOut.length}건`;
   document.getElementById('reconUnmatched').innerHTML=unmatchedDep.length?unmatchedDep.map((t,i)=>`
     <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
       <span style="flex:1;min-width:150px">${t.date} <b>${(t.inAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
@@ -873,6 +908,16 @@ function renderRecon(autoCnt){
       </select>
       <button onclick="manualMatch(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer">매칭</button>
     </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">미매칭 입금이 없습니다.</div>';
+  const eligC=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
+  document.getElementById('reconUnmatched').innerHTML+=unmatchedOut.length?('<div style="font-size:12px;font-weight:600;color:var(--amber);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미매칭 출금 (매입지급 분류)</div>'+unmatchedOut.map((t,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
+      <span style="flex:1;min-width:150px">${t.date} <b>${(t.outAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
+      <select id="mc_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
+        <option value="">수취완료 매입 건 선택…</option>
+        ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((parseInt(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
+      </select>
+      <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
+    </div>`).join('')):'';
 }
 async function manualMatch(i){
   const t=unmatchedDep[i]; const revId=document.getElementById('mm_'+i).value;
@@ -887,8 +932,18 @@ function renderAging(){
   const list=s04All.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today)
     .map(r=>({...r,dd:dDiff(r.cash_recv_date,today)})).sort((a,b)=>b.dd-a.dd);
   const card=document.getElementById('agingCard');
-  if(!list.length){card.style.display='none';return;}
+  const hasPay=s05All.some(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<today);
+  if(!list.length&&!hasPay){card.style.display='none';return;}
   card.style.display='block';
+  const payList=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<today)
+    .map(c=>({...c,dd:dDiff(c.payment_date,today)})).sort((a,b)=>b.dd-a.dd);
+  document.getElementById('payAgingTitle').style.display=payList.length?'block':'none';
+  document.getElementById('payAgingList').innerHTML=payList.map(c=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span>${c.project_id} · ${c.year_month} ${c.cost_type}<br><span style="color:var(--text3)">지급예정 ${c.payment_date}</span></span>
+      <span style="text-align:right"><b>${Math.round((parseInt(c.amount)||0)*1.1).toLocaleString()}원</b><br>
+      <span style="color:var(--amber);font-weight:700">D+${c.dd}</span></span></div>`).join('');
+  if(!list.length&&payList.length){card.style.display='block';}
   document.getElementById('agingList').innerHTML=list.map(r=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span>${r.project_id} · ${r.year_month}<br><span style="color:var(--text3)">수금예정 ${r.cash_recv_date}</span></span>

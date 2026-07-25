@@ -328,7 +328,7 @@ async function loadAll(){
   try{
     const [plR,prR,rvR,csR,fxR,esR]=await Promise.all([
       fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200'),
-      fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:M300'),fetchSheet('S06_FIXED_COST','A1:F300'),
+      fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:O300'),fetchSheet('S06_FIXED_COST','A1:F300'),
       fetchSheet('S12_ESTIMATE','A1:O500').catch(()=>[])]);
     estAll=toObj(esR).filter(e=>e.estimate_id);
     pipelines=toObj(plR); allPrjs=toObj(prR);
@@ -368,11 +368,11 @@ function renderLists(){
   const cs=costs.filter(c=>c.cost_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
   document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
-    const st=c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정'];
+    const st=c.pay_actual_date?['badge-on','지급완료']:(c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정']);
     return `
     <div class="list-item"><div class="li-r1"><div class="li-name" style="cursor:pointer;color:var(--blue)" onclick="location.href='project.html?pid=${c.project_id}'">${c.year_month} · ${prjLabel(c.project_id)}</div>
       <span class="badge ${st[0]}">${st[1]}</span></div>
-    <div class="li-meta">${c.project_id} · ${c.cost_type}${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}</div>
+    <div class="li-meta">${c.project_id} · ${c.cost_type}${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}${c.pay_actual_date?' · 실지급 '+c.pay_actual_date:''}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
       <span class="li-amt">${wf(c.amount)}</span>
       <span style="display:flex;gap:6px">
@@ -402,7 +402,7 @@ function calcCostVat(){const s=un(document.getElementById('cost_supply').value);
 
 // ── 저장 (S04 9컬럼 / S05 11컬럼 / S06 6컬럼 — 전체 재작성) ──
 const H4=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
-const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date'];
+const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
 const H6=['fixed_id','year_month','category','amount','payment_date','memo'];
 
 async function saveRev(){
@@ -433,9 +433,10 @@ async function saveCost(){
     mm:document.getElementById('cost_mm').value||0,amount:sup,payment_date:document.getElementById('cost_date').value,
     memo:document.getElementById('cost_memo').value,vat_amt:Math.round(sup*.1),
     invoice_plan_date:document.getElementById('cost_invplan').value||oldc.invoice_plan_date||'',
-    invoice_date:document.getElementById('cost_invdate').value||oldc.invoice_date||''};
+    invoice_date:document.getElementById('cost_invdate').value||oldc.invoice_date||'',
+    matched_txn_id:oldc.matched_txn_id||'',pay_actual_date:oldc.pay_actual_date||''};
   const next=dedupe([...costs.filter(c=>c.cost_id&&c.cost_id!==id),rec],'cost_id');
-  const ok=await clearAndWrite('S05_COST','A:M',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
+  const ok=await clearAndWrite('S05_COST','A:O',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
   if(ok){costs=next;toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 async function saveFix(){
@@ -779,9 +780,9 @@ async function saveGen(){
     const recs=genCostRows.map(g=>{seq++;return {cost_id:`COST-2026-${String(seq).padStart(3,'0')}`,project_id:c.pid,
       year_month:g.plan.slice(0,7),cost_type:'외주비',person_name:'',unit_price:'',mm:'',
       amount:g.supply,payment_date:g.pay,memo:'매입 스케줄 자동생성(월합산)',vat_amt:Math.round(g.supply*.1),
-      invoice_plan_date:g.plan,invoice_date:''};});
+      invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',pay_actual_date:''};});
     const next=dedupe([...base,...recs],'cost_id');
-    const ok=await clearAndWrite('S05_COST','A:M',[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
+    const ok=await clearAndWrite('S05_COST','A:O',[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
     if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
   }
   btn.disabled=false;btn.textContent='생성 저장';
@@ -806,7 +807,7 @@ async function markCostInvoiced(id){
   const today=new Date().toISOString().slice(0,10);
   if(!confirm(`${c.year_month} · ${c.cost_type} 건을 오늘(${today}) 수취 완료 처리할까요?`))return;
   const next=costs.map(x=>x.cost_id===id?{...x,invoice_date:today}:x);
-  const ok=await clearAndWrite('S05_COST','A:M',[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
+  const ok=await clearAndWrite('S05_COST','A:O',[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
   if(ok){costs=dedupe(next,'cost_id');toast('수취 완료 ✓');renderLists();}
   else toast('저장 실패',true);
 }

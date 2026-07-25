@@ -124,7 +124,7 @@
     <div class="card"><div class="card-title">💰 손익 요약 (계획 기준)</div><div class="kv" id="dProfit"></div><div id="dEstNote" style="font-size:11px;color:var(--text3);margin-top:8px"></div></div>
     <div class="card"><div class="card-title">🪙 수금 현황</div><div class="kv" id="dRecv"></div><div id="dOverdue" style="margin-top:8px"></div></div>
     <div class="card"><div class="card-title">📤 매출 청구 스케줄</div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>발행예정</th><th>발행일</th><th>공급가액</th><th>VAT포함</th><th>수금예정</th><th>상태</th><th>실입금</th></tr></thead><tbody id="dRevBody"></tbody></table></div></div>
-    <div class="card"><div class="card-title">📥 매입 청구 스케줄 <span style="font-size:11px;color:var(--text3);font-weight:400">실지급 확인(통장 대사)은 v3 지원 예정</span></div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>수취예정</th><th>수취일</th><th>공급가액</th><th>합계(VAT포함)</th><th>지급예정</th><th>상태</th><th>실지급</th></tr></thead><tbody id="dCostBody"></tbody></table></div></div>
+    <div class="card"><div class="card-title">📥 매입 청구 스케줄 <span style="font-size:11px;color:var(--text3);font-weight:400">지급 대사: 수취완료 건 기준 자동 확인</span></div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>수취예정</th><th>수취일</th><th>공급가액</th><th>합계(VAT포함)</th><th>지급예정</th><th>상태</th><th>실지급</th></tr></thead><tbody id="dCostBody"></tbody></table></div></div>
     <div style="display:flex;gap:8px;margin-bottom:20px">
       <button class="link-btn" id="btnEst">📊 견적 보기</button>
       <button class="link-btn" id="btnGen">⚡ 스케줄 생성</button>
@@ -170,7 +170,7 @@ async function loadAll(){
  try{
   const [plR,prR,rvR,csR,esR]=await Promise.all([
     fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200'),
-    fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:M300'),
+    fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:O300'),
     fetchSheet('S12_ESTIMATE','A1:O500').catch(()=>[])]);
   pipelines=toObj(plR);
   const okPl=new Set(pipelines.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
@@ -275,10 +275,10 @@ function openDetail(pid){
   document.getElementById('dCostBody').innerHTML=cs.length?cs.map(c=>{
     const amt=parseInt(c.amount)||0;
     const vatTot=amt+(parseInt(c.vat_amt)||Math.round(amt*.1));
-    const st=c.invoice_date?['수취완료','var(--green)']:['수취예정','var(--amber)'];
+    const st=c.pay_actual_date?['지급완료','var(--green)']:(c.invoice_date?['수취완료','var(--blue)']:['수취예정','var(--amber)']);
     return `<tr><td>${c.year_month}</td><td>${c.invoice_plan_date||'─'}</td><td>${c.invoice_date||'─'}</td>
       <td style="text-align:right">${comma(amt)}</td><td style="text-align:right">${comma(vatTot)}</td>
-      <td>${c.payment_date||'─'}</td><td style="color:${st[1]};font-weight:600">${st[0]}</td><td>─</td></tr>`;}).join('')
+      <td>${c.payment_date||'─'}</td><td style="color:${st[1]};font-weight:600">${st[0]}</td><td>${c.pay_actual_date||'─'}</td></tr>`;}).join('')
     :'<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:14px 0">매입 스케줄 없음</td></tr>';
   document.getElementById('btnEst').onclick=()=>location.href='estimate.html?pid='+curPrj.pipeline_id;
   document.getElementById('btnGen').onclick=()=>location.href='input.html?gen='+curPrj.pipeline_id+'&full=1';
