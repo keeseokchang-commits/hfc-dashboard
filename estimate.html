@@ -255,7 +255,8 @@ function loadOpp(){
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
     items[k]=saved.filter(e=>e.comp_type===ct).map(e=>({name:e.item_name,qty:parseInt(e.qty)||1,
-      price:parseInt(e.unit_price)||0,buy:parseInt(e.buy_price)||0,memo:e.memo||''}));
+      price:parseInt(e.unit_price)||0,buy:parseInt(e.buy_price)||0,memo:e.memo||'',
+      start:e.start_date||'',end:e.end_date||''}));
   });
   if(!labor.length&&cur.expected_start)addLabor(false);
   renderLabor();['infra','sol','etc'].forEach(renderItems);
@@ -311,7 +312,7 @@ function autoMM(i){const p=labor[i];p.mm=parseFloat(mmBetween(p.start,p.end))||0
   document.getElementById('mm_'+i).value=p.mm;renderLabor();recalc();}
 
 // ── 인프라·솔루션·기타 ──
-function addItem(k){items[k].push({name:'',qty:1,price:0,buy:0,memo:''});renderItems(k);recalc();}
+function addItem(k){items[k].push({name:'',qty:1,price:0,buy:0,memo:'',start:'',end:''});renderItems(k);recalc();}
 function renderItems(k){
   document.getElementById(k+'List').innerHTML=items[k].map((it,i)=>`
     <div class="item-card"><button class="item-del" onclick="items['${k}'].splice(${i},1);renderItems('${k}');recalc()">✕</button>
@@ -323,6 +324,10 @@ function renderItems(k){
         <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=parseInt(this.value)||0;recalc()"></div>
         <div><label class="fl">매출 단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=fc(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
         <div><label class="fl">매입 단가 (원)</label><input class="fi" value="${comma(it.buy||0)}" oninput="this.value=fc(this.value);items['${k}'][${i}].buy=un(this.value);recalc()"></div>
+      </div>
+      <div class="fr">
+        <div><label class="fl">시작일 (선택 — 기간 입력 시 월할 분배)</label><input class="fi" type="date" value="${it.start||''}" onchange="items['${k}'][${i}].start=this.value"></div>
+        <div><label class="fl">종료일 (선택)</label><input class="fi" type="date" value="${it.end||''}" onchange="items['${k}'][${i}].end=this.value"></div>
       </div>
       <div style="text-align:right;font-size:12px;color:var(--text2)">
         매출 <b style="color:var(--blue)" id="amt_${k}_s_${i}">${wf(it.qty*it.price)}</b> · 매입 <b style="color:var(--amber)" id="amt_${k}_b_${i}">${wf(it.qty*(it.buy||0))}</b>
@@ -405,7 +410,7 @@ async function saveEstimate(){
   [['infra','인프라'],['sol','솔루션'],['etc','기타']].forEach(([k,ct])=>{
     items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
       comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:it.buy||0,
-      amount:it.qty*it.price,mm:'',start_date:'',end_date:'',memo:it.memo,created_at:today});});});
+      amount:it.qty*it.price,mm:'',start_date:it.start||'',end_date:it.end||'',memo:it.memo,created_at:today});});});
   const H=['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'];
   const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
   const ok=await clearAndWrite('S12_ESTIMATE','A:O',[H,...all.map(r=>H.map(h=>r[h]??''))]);

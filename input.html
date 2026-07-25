@@ -491,6 +491,43 @@ function closeGenModal(){document.getElementById('genModal').classList.remove('o
 function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId);}
 function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);}
 function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);}
+function monthlyProfile(items,priceField,defStart,defEnd){
+  // 각 견적 항목의 기간으로 월별 금액 합산 (v2.4 보정: 항목 기간 기반)
+  const byM={};
+  items.forEach(e=>{
+    const p=parseInt(e[priceField])||0; if(!p)return;
+    if(e.comp_type==='인건비'){
+      ymList(e.start_date||defStart,e.end_date||defEnd).forEach(x=>{
+        const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+Math.round(p*x.w);});
+    } else {
+      const total=(parseInt(e.qty)||1)*p;
+      if(e.start_date&&e.end_date){
+        const ms=ymList(e.start_date,e.end_date); const tw=ms.reduce((s,x)=>s+x.w,0); let acc=0;
+        ms.forEach((x,i)=>{const k=`${x.y}-${pad2(x.m)}`;
+          const v=(i===ms.length-1)?total-acc:Math.round(total*x.w/tw); acc+=v;
+          byM[k]=(byM[k]||0)+v;});
+      } else {
+        const sd=new Date(e.start_date||defStart);
+        const k=`${sd.getFullYear()}-${pad2(sd.getMonth()+1)}`;
+        byM[k]=(byM[k]||0)+total;
+      }
+    }
+  });
+  return byM;
+}
+function profileToRows(byM,scaleTo){
+  // scaleTo 지정 시 프로파일 비율 유지하며 총액을 scaleTo로 스케일 (마지막 행 잔액 보정)
+  const keys=Object.keys(byM).sort();
+  const tot=keys.reduce((s,k)=>s+byM[k],0);
+  let acc=0;
+  return keys.map((k,i)=>{
+    const [y,m]=k.split('-').map(Number);
+    let v=byM[k];
+    if(scaleTo){ v=(i===keys.length-1)?scaleTo-acc:Math.round(scaleTo*byM[k]/tot); acc+=v; }
+    const plan=lastDayStr(y,m);
+    return {plan,supply:v,recv:recvDue(plan),pay:nextMonthEnd(plan),name:k+' 합산'};
+  });
+}
 function genCtx(){
   const pid=document.getElementById('genPrj').value; if(!pid)return null;
   const prj=allPrjs.find(p=>p.project_id===pid); if(!prj)return null;
@@ -522,27 +559,27 @@ function buildGen(){
     ensureMsRows(c); msCalc();
   } else {
     document.getElementById('msArea').style.display='none';
-    // ── 매출: 월할 ──
+    const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
+    // ── 매출: 견적 항목 기간 기반 월별 합산 (v2.4 보정) ──
     genRows=[];
     if(document.getElementById('genDoRev').checked&&c.revAmt){
-      const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
-      genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.revAmt-acc:Math.round(c.revAmt*x.w/totW/1000)*1000;acc+=sup;
-        const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
+      if(c.hasEst){
+        const sellByM=monthlyProfile(c.items,'unit_price',c.start,c.end);
+        // 견적 기준=프로파일 그대로 / 계약금액 기준=프로파일 패턴 유지+계약금액 스케일
+        genRows=profileToRows(sellByM, revBase==='est'?null:c.amt)
+          .map(r=>({plan:r.plan,supply:r.supply,recv:r.recv}));
+      } else {
+        const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
+        genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.revAmt-acc:Math.round(c.revAmt*x.w/totW/1000)*1000;acc+=sup;
+          const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
+      }
     }
-    // ── 매입: 월 합산 1행 (매출과 동일 패턴) ──
+    // ── 매입: 견적 항목 기간 기반 월별 합산 ──
     genCostRows=[];
     if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
-      const byM={};
-      c.items.filter(e=>e.comp_type==='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
-        ymList(e.start_date||c.start,e.end_date||c.end).forEach(x=>{
-          const k=`${x.y}-${pad2(x.m)}`;
-          byM[k]=(byM[k]||0)+Math.round((parseInt(e.buy_price)||0)*x.w);});});
-      c.items.filter(e=>e.comp_type!=='인건비'&&(parseInt(e.buy_price)||0)>0).forEach(e=>{
-        const sd=new Date(c.start); const k=`${sd.getFullYear()}-${pad2(sd.getMonth()+1)}`;
-        byM[k]=(byM[k]||0)+(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0);});
-      genCostRows=Object.keys(byM).sort().map(k=>{
-        const [y,m]=k.split('-').map(Number); const plan=lastDayStr(y,m);
-        return {plan,name:k+' 매입 합산',supply:byM[k],pay:nextMonthEnd(plan)};});
+      const buyByM=monthlyProfile(c.items,'buy_price',c.start,c.end);
+      genCostRows=profileToRows(buyByM,null)
+        .map(r=>({plan:r.plan,name:r.name.replace('합산','매입 합산'),supply:r.supply,pay:r.pay}));
     }
     renderGenPreview(); renderGenCostPreview();
   }
