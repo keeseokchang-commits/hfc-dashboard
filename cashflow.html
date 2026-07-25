@@ -145,7 +145,7 @@
 
   <!-- 계획 vs 실적 비교 -->
   <div class="card">
-    <div class="card-title">월별 계획 vs 실적 <span style="font-size:11px;color:var(--text3)">※ 모든 금액 VAT 포함 기준 · 재무반영 프로젝트만</span></div>
+    <div class="card-title">월별 계획 vs 실적 <span style="font-size:11px;color:var(--text3)">※ 모든 금액 VAT 포함 · 수금예정일/지급예정일 기준(현금주의) · 재무반영 프로젝트만</span></div>
     <div style="overflow-x:auto">
       <table class="cf-table">
         <thead><tr><th>월</th><th>계획입금</th><th>실입금</th><th>계획출금</th><th>실출금</th></tr></thead>
@@ -297,13 +297,8 @@ let cfChartObj = null;
 
 // ── 유틸 ──────────────────────────────────────────────────────
 function won(n, short=true){
-  const v=parseInt(n)||0;
-  if(short){
-    if(Math.abs(v)>=100000000) return (v/100000000).toFixed(2)+'억';
-    if(Math.abs(v)>=10000) return Math.round(v/10000)+'만';
-    return v.toLocaleString()+'원';
-  }
-  return v.toLocaleString()+'원';
+  // 지침: cashflow 화면 금액은 전부 원 단위 천단위 콤마로 통일
+  return (parseInt(n)||0).toLocaleString()+'원';
 }
 function pct(n){ return (parseFloat(n)||0).toFixed(1)+'%'; }
 function toast(msg,err=false){
@@ -576,13 +571,21 @@ function showBreakdown(ym, m){
 function renderAll(){ renderKPI(); renderTable(); renderChart(); }
 
 function renderKPI(){
-  const ym=thisMonth();
+  // 자금수지 마감 기준: 은행 CSV는 익월 초 업로드 → 실잔액이 존재하는 최근 월(마감월) 기준, 없으면 전월
+  let baseYm=null;
+  actData.forEach(a=>{ if(a.year_month&&(parseInt(a.act_balance)||0)&&(!baseYm||a.year_month>baseYm)) baseYm=a.year_month; });
+  if(!baseYm){ const d=new Date(); d.setMonth(d.getMonth()-1); baseYm=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+  const ym=baseYm, mLabel=parseInt(ym.slice(5,7))+'월 말';
+  const labels=document.querySelectorAll('#kpiGrid .kpi-label');
+  labels[0].textContent=mLabel+' 추정 잔액'; labels[1].textContent=mLabel+' 실잔액';
+  labels[2].textContent='차이 ('+mLabel+')'; labels[3].textContent='정합도 ('+mLabel+')';
   const est=estData.find(e=>e.year_month===ym);
   const act=actData.find(a=>a.year_month===ym);
   const dash=dashData.find(d=>d.year_month===ym);
   const estBal=parseInt(est?.est_balance)||0;
   const actBal=act?parseInt(act.act_balance)||0:null;
-  const acc=dash?.accuracy_pct?parseFloat(dash.accuracy_pct):null;
+  let acc=dash?.accuracy_pct?parseFloat(dash.accuracy_pct):null;
+  if(acc===null&&actBal!==null&&estBal) acc=Math.max(0,100-Math.abs(actBal-estBal)/Math.max(Math.abs(actBal),1)*100);
 
   document.getElementById('kpiEst').textContent=won(estBal);
   document.getElementById('kpiAct').textContent=actBal!==null?won(actBal):'─';
@@ -598,7 +601,7 @@ function renderKPI(){
     accEl.textContent=pct(acc);
     accEl.style.color=acc>=80?'var(--green)':acc>=60?'var(--amber)':'var(--red)';
     accSub.textContent=acc>=80?'양호':acc>=60?'주의':'이탈';
-  } else { accEl.textContent='─'; accSub.textContent='CSV 미업로드'; }
+  } else { accEl.textContent='─'; accSub.textContent=mLabel+' CSV 미업로드'; }
 }
 
 function renderTable(){
@@ -631,8 +634,8 @@ function renderChart(){
   const yr=document.getElementById('yearSel').value;
   const labels=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
-  const estVals=months.map(m=>{ const e=estData.find(x=>x.year_month===`${yr}-${m}`); return e?parseInt(e.est_balance)/10000:null; });
-  const actVals=months.map(m=>{ const a=actData.find(x=>x.year_month===`${yr}-${m}`); return a?parseInt(a.act_balance)/10000:null; });
+  const estVals=months.map(m=>{ const e=estData.find(x=>x.year_month===`${yr}-${m}`); return e?parseInt(e.est_balance):null; });
+  const actVals=months.map(m=>{ const a=actData.find(x=>x.year_month===`${yr}-${m}`); return a?parseInt(a.act_balance):null; });
   if(cfChartObj) cfChartObj.destroy();
   cfChartObj=new Chart(document.getElementById('cfChart'),{
     type:'line',
@@ -643,7 +646,7 @@ function renderChart(){
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
       scales:{
-        y:{ticks:{callback:v=>v+'만',font:{size:10}},grid:{color:'rgba(0,0,0,.05)'}},
+        y:{ticks:{callback:v=>v.toLocaleString()+'원',font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}},
         x:{ticks:{font:{size:10}},grid:{display:false}}
       }}
   });
@@ -795,8 +798,8 @@ function renderPlanAct(){
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
   document.getElementById('planActBody').innerHTML=months.map(m=>{
     const ym=`${yr}-${m}`;
-    const pIn=planRev.filter(r=>r.year_month===ym).reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-    const pOutC=planCost.filter(c=>c.year_month===ym).reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0);
+    const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0);
     const pOutF=planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(parseInt(f.amount)||0),0);
     const pOut=pOutC+pOutF;
     const act=actData.find(a=>a.year_month===ym);
