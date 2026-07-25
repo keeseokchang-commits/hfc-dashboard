@@ -385,11 +385,7 @@ function renderAllSummary(){
     <tr><td>매출 합계 (공급가액)</td><td>${wf(sell)}</td></tr>
     <tr><td style="padding-left:16px;color:var(--text3)">└ VAT 포함</td><td style="color:var(--text3)">${wf(Math.round(sell*1.1))}</td></tr>
     <tr><td>원가 합계 (저장된 견적 기준)</td><td>${wf(cost)}</td></tr>
-    <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>
-    ${(()=>{const c=un(cur?.contract_amount),es=lS+iS+sS+eS;
-      if(c&&es&&c!==es){const d=es-c;
-        return `<tr><td colspan="2" style="padding-top:8px"><span style="font-size:11px;background:${d>0?'var(--green-lt)':'var(--red-lt)'};color:${d>0?'var(--green)':'var(--red)'};padding:3px 10px;border-radius:6px;font-weight:600">계약금액 대비 견적 매출 ${d>0?'+':''}${wf(d)} 차이</span></td></tr>`;}
-      return '';})()}`;
+    <tr class="hl"><td>추정 이익 (이익률 ${rate}%)</td><td>${wf(profit)}</td></tr>`;
 }
 
 // ── S12 저장 ──
