@@ -186,20 +186,31 @@ function signIn(){
 }
 function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 
+function addMonthsKeepDay(d,k){
+  const y=d.getFullYear(),m=d.getMonth()+k,day=d.getDate();
+  const nd=new Date(y,m,day);
+  if(nd.getDate()!==day) return new Date(y,m+1,0); // 월말 보정 (1/31+1개월→2/28)
+  return nd;
+}
 function mmBetween(s,e){
-  // 달력월 기준: 걸친 달마다 (투입일수/그 달 총일수) 합산 → 월초~월말 = 정확히 1.00
+  // SI 관례(2026-07-25 승인): d일 투입 ~ (d-1)일 철수 = 정확히 1개월.
+  // 총MM = 대응 개월수 k + 잔여일/잔여월 총일수(소수 2자리)
   if(!s||!e) return 0;
   const a=new Date(s), b=new Date(e);
   if(isNaN(a)||isNaN(b)||b<a) return 0;
-  let mm=0, cur=new Date(a.getFullYear(),a.getMonth(),1);
-  while(cur<=b){
-    const dim=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
-    const from=(cur.getFullYear()===a.getFullYear()&&cur.getMonth()===a.getMonth())?a.getDate():1;
-    const to=(cur.getFullYear()===b.getFullYear()&&cur.getMonth()===b.getMonth())?b.getDate():dim;
-    mm+=(to-from+1)/dim;
-    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  let k=0;
+  while(k<240){
+    const cycEnd=new Date(addMonthsKeepDay(a,k+1).getTime()-86400000);
+    if(cycEnd<=b) k++; else break;
   }
-  return mm.toFixed(2);
+  const anchor=addMonthsKeepDay(a,k);
+  let frac=0;
+  if(anchor<=b){
+    const dim=new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate();
+    const days=Math.round((b-anchor)/86400000)+1;
+    frac=Math.round(days/dim*100)/100;
+  }
+  return (k+frac).toFixed(2);
 }
 
 // ── 로드 ──
