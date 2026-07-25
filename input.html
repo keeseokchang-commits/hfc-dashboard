@@ -525,17 +525,24 @@ function monthlyProfile(items,priceField,defStart,defEnd){
 }
 function cut100(v){return Math.floor(v/100)*100;}
 function profileToRows(byM,totalExact){
-  // 라운딩 표준: 각 월 백원단위 절사, 총액과의 차액은 마지막 월에 산입 → 합계=totalExact 정확 일치
+  // 라운딩 표준: 각 월 백원단위 절사, 차액은 마지막 월 산입 → 합계=totalExact 정확 일치
+  // 총액=원시합(견적 기준)이면 스케일 없이 원시값 절사 → 완전월은 단가 그대로 유지
   const keys=Object.keys(byM).sort();
   const raw=keys.reduce((s,k)=>s+byM[k],0)||1;
+  const scaled=Math.abs(totalExact-raw)>=1;  // 계약금액 기준 등 총액이 다를 때만 비례 스케일
   let acc=0;
   return keys.map((k,i)=>{
     const [y,m]=k.split('-').map(Number);
-    const v=(i===keys.length-1)?(totalExact-acc):cut100(totalExact*byM[k]/raw);
+    const base=scaled?(totalExact*byM[k]/raw):byM[k];
+    const v=(i===keys.length-1)?(totalExact-acc):cut100(base);
     acc+=v;
     const plan=lastDayStr(y,m);
     return {plan,supply:v,recv:recvDue(plan),pay:nextMonthEnd(plan),name:k+' 합산'};
   });
+}
+function profileTotal(items,field,ds,de){
+  const b=monthlyProfile(items,field,ds,de);
+  return Math.round(Object.keys(b).reduce((s,k)=>s+b[k],0));
 }
 function genCtx(){
   const pid=document.getElementById('genPrj').value; if(!pid)return null;
@@ -543,7 +550,10 @@ function genCtx(){
   genPl=pipelines.find(p=>p.pipeline_id===prj.pipeline_id); if(!genPl)return null;
   const items=estOf(genPl.pipeline_id);
   const hasEst=items.length>0;
-  const eSell=estSellSum(items), eBuy=estBuySum(items);
+  const st0=genPl.expected_start||prj.start_date, en0=genPl.expected_end||prj.end_date;
+  // 기준총액 = 항목 기간 기반 정밀 합 (mm 반올림 오차 배제 → 완전월=단가 그대로)
+  const eSell=hasEst?profileTotal(items,'unit_price',st0,en0):0;
+  const eBuy=hasEst?profileTotal(items,'buy_price',st0,en0):0;
   const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
   const amt=un(genPl.contract_amount||prj.contract_amount);
   return {pid,prj,biz:genPl.biz_type||'인력공급',pay:genPl.payment_cycle||'익월말',
