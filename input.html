@@ -87,6 +87,7 @@
   <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
   <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
   <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
+  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
   <button class="side-nav-item active"><span class="sn-icon">✏️</span>데이터 입력</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
 </nav>
@@ -217,7 +218,7 @@
       <button onclick="closeGenModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">사업수행형태·지급조건 기반으로 발행·수금 계획을 자동 생성합니다. 금액·일자는 수정 가능합니다.</div>
     <div class="form-group"><label class="form-label">프로젝트</label>
-      <select class="form-input" id="genPrj" onchange="buildGen()"><option value="">선택</option></select></div>
+      <select class="form-input" id="genPrj" onchange="onGenPrjChange()"><option value="">선택</option></select></div>
     <div id="genInfo" style="font-size:12px;color:#1E40AF;background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:9px 12px;margin-bottom:12px;display:none"></div>
     <div id="genTargets" style="display:none;margin-bottom:12px;font-size:13px">
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
@@ -550,6 +551,17 @@ function genCtx(){
     start:genPl.expected_start||prj.start_date,end:genPl.expected_end||prj.end_date,
     amt,items,hasEst,eSell,eBuy,revAmt:(revBase==='est'&&hasEst)?eSell:amt};
 }
+function onGenPrjChange(){
+  // 견적이 있으면 기본 = 견적 매출(단가×월 그대로), 없으면 계약금액
+  const pid=document.getElementById('genPrj').value;
+  const prj=allPrjs.find(p=>p.project_id===pid);
+  const pl=prj?pipelines.find(p=>p.pipeline_id===prj.pipeline_id):null;
+  const hasEst=pl?estOf(pl.pipeline_id).length>0:false;
+  document.getElementById('revBaseEst').checked=hasEst;
+  document.querySelector('input[name=genRevBase][value=contract]').checked=!hasEst;
+  buildGen();
+}
+let genScaleNote='';
 function buildGen(){
  try{
   const c=genCtx(); if(!c)return;
@@ -563,6 +575,9 @@ function buildGen(){
   info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>`;
   if(!c.start||!c.end||(!c.revAmt&&!c.eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
     genRows=[];genCostRows=[];renderGenPreview();renderGenCostPreview();return;}
+  const rb=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
+  genScaleNote=(rb==='contract'&&c.hasEst&&c.amt&&c.eSell&&c.amt!==c.eSell)
+    ?` <span style="color:var(--amber)">⚠ 계약금액 스케일 ×${(c.amt/c.eSell).toFixed(3)} 적용 — 월 금액이 견적 단가와 다르게 표시됩니다</span>`:'';
   if(c.biz==='용역턴키'){
     document.getElementById('msArea').style.display='block';
     ensureMsRows(c); msCalc();
@@ -669,7 +684,7 @@ function chgCostPlan(i,v){genCostRows[i].plan=v;genCostRows[i].pay=nextMonthEnd(
 function updCost(i,el){el.value=fc(el.value);genCostRows[i].supply=un(el.value);updGenCostTotal();}
 function updGenTotal(){
   const t=genRows.reduce((s,g)=>s+g.supply,0);
-  document.getElementById('genTotal').innerHTML=`매출 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
+  document.getElementById('genTotal').innerHTML=`매출 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`+genScaleNote;
 }
 function updGenCostTotal(){
   const t=genCostRows.reduce((s,g)=>s+g.supply,0);
@@ -751,8 +766,10 @@ window.addEventListener('load',async()=>{
     if(prj){
       openGenModal(q.get('full')==='1');
       if(q.get('rev')==='0')document.getElementById('genDoRev').checked=false;
-      if(q.get('revbase')==='est')document.getElementById('revBaseEst').checked=true;
-      document.getElementById('genPrj').value=prj.project_id;buildGen();}}
+      document.getElementById('genPrj').value=prj.project_id;
+      if(q.get('revbase')==='est'){document.getElementById('revBaseEst').checked=true;buildGen();}
+      else if(q.get('revbase')==='contract'){document.querySelector('input[name=genRevBase][value=contract]').checked=true;buildGen();}
+      else onGenPrjChange();}}
 });
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>

@@ -99,7 +99,16 @@
 </head>
 <body>
 <header class="header"><span>📁 프로젝트 조회</span><span id="hdrRight" style="font-size:11px;color:var(--text3)"></span></header>
-<main class="content" style="padding-bottom:90px">
+<nav class="side-nav">
+  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
+  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
+  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
+  <button class="side-nav-item active"><span class="sn-icon">📁</span>프로젝트</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+</nav>
+
+<main class="main" style="padding-bottom:90px">
 
   <!-- 목록 뷰 -->
   <div id="listView">
