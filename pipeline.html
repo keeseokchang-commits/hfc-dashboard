@@ -417,6 +417,7 @@ function renderList(){
       <div class="opp-actions">
         ${next?`<button class="btn-transition" onclick="openTransition(${idx},'${next}')">${next}(으)로 전환 →</button>`:''}
         ${['확정','수주','계약'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='estimate.html?pid=${o.pipeline_id}'">견적 보기</button>`:''}
+        ${['수주','계약'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='input.html?gen=${o.pipeline_id}&full=1'">청구 스케줄</button>`:''}
         <button class="btn-drop" onclick="showHistory('${o.pipeline_id}')">이력</button>
         <button class="btn-edit-opp" onclick="openEdit(${idx})">수정</button>
         ${!isDead&&o.status!=='계약'?`<button class="btn-drop" onclick="openDrop(${idx})">포기/실주</button>`:''}

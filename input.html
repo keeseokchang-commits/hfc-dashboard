@@ -133,7 +133,8 @@
       <div class="btn-row"><button class="btn btn-secondary" onclick="resetRev()">취소</button>
         <button class="btn btn-primary" id="rev_btn" onclick="saveRev()">저장하기</button></div>
     </div>
-    <div class="list-card"><div class="card-title">계획 매출 내역 <span id="rev_cnt" style="font-size:11px;color:var(--text3)"></span></div>
+    <div class="list-card"><div class="card-title"><span>계획 매출 내역 <span id="rev_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+      <select id="revPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
       <div id="rev_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
 
@@ -179,7 +180,8 @@
       <div class="btn-row"><button class="btn btn-secondary" onclick="resetCost()">취소</button>
         <button class="btn btn-primary" id="cost_btn" onclick="saveCost()">저장하기</button></div>
     </div>
-    <div class="list-card"><div class="card-title">계획 매입 내역 <span id="cost_cnt" style="font-size:11px;color:var(--text3)"></span></div>
+    <div class="list-card"><div class="card-title"><span>계획 매입 내역 <span id="cost_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+      <select id="costPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
       <div id="cost_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
 
@@ -339,6 +341,12 @@ async function loadAll(){
     renderLists();
   }catch(e){toast('로드 실패: '+e.message,true);}
 }
+function prjLabel(pid){const p=allPrjs.find(x=>x.project_id===pid);return p?(p.project_name||pid):pid;}
+function fillPrjFilters(){
+  const opts='<option value="">전체 프로젝트</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_name||p.project_id}</option>`).join('');
+  ['revPrjFilter','costPrjFilter'].forEach(id=>{const el=document.getElementById(id);const v=el.value;el.innerHTML=opts;
+    if([...el.options].some(o=>o.value===v))el.value=v;});
+}
 function renderLists(){
   const okIds=new Set(financePrjs.map(p=>p.project_id));
   const rv=revenues.filter(r=>r.revenue_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
@@ -346,9 +354,9 @@ function renderLists(){
   document.getElementById('rev_list').innerHTML=rv.length?rv.map(r=>{
     const st=r.is_received==='Y'?['badge-on','입금완료']:(r.invoice_date?['badge-on','발행완료·수금대기']:['badge-hold','발행예정']);
     return `
-    <div class="list-item"><div class="li-r1"><div class="li-name">${r.year_month} · ${r.project_id}</div>
+    <div class="list-item"><div class="li-r1"><div class="li-name">${r.year_month} · ${prjLabel(r.project_id)}</div>
       <span class="badge ${st[0]}">${st[1]}</span></div>
-    <div class="li-meta">공급 ${wf(r.tax_invoice_amt)} + VAT ${wf(r.vat_amt||Math.round((parseInt(r.tax_invoice_amt)||0)*.1))}${r.invoice_plan_date?' · 발행예정 '+r.invoice_plan_date:''}${r.invoice_date?' · 발행 '+r.invoice_date:''}${r.recv_actual_date?' · 입금 '+r.recv_actual_date:''}</div>
+    <div class="li-meta">${r.project_id} · 공급 ${wf(r.tax_invoice_amt)} + VAT ${wf(r.vat_amt||Math.round((parseInt(r.tax_invoice_amt)||0)*.1))}${r.invoice_plan_date?' · 발행예정 '+r.invoice_plan_date:''}${r.invoice_date?' · 발행 '+r.invoice_date:''}${r.recv_actual_date?' · 입금 '+r.recv_actual_date:''}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
       <span class="li-amt">합계 ${wf(r.cash_recv_amt)} <span style="font-size:10px;color:var(--text3)">(예정 ${r.cash_recv_date||'─'})</span></span>
       <span style="display:flex;gap:6px">
@@ -360,9 +368,9 @@ function renderLists(){
   document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
     const st=c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정'];
     return `
-    <div class="list-item"><div class="li-r1"><div class="li-name">${c.year_month} · ${c.cost_type}</div>
+    <div class="list-item"><div class="li-r1"><div class="li-name">${c.year_month} · ${prjLabel(c.project_id)}</div>
       <span class="badge ${st[0]}">${st[1]}</span></div>
-    <div class="li-meta">${c.project_id} ${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}</div>
+    <div class="li-meta">${c.project_id} · ${c.cost_type}${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
       <span class="li-amt">${wf(c.amount)}</span>
       <span style="display:flex;gap:6px">
@@ -551,7 +559,7 @@ function buildGen(){
   document.getElementById('revBaseEst').disabled=!c.hasEst;
   const info=document.getElementById('genInfo');
   info.style.display='block';
-  info.innerHTML=`<b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>`;
+  info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>`;
   if(!c.start||!c.end||(!c.revAmt&&!c.eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
     genRows=[];genCostRows=[];renderGenPreview();renderGenCostPreview();return;}
   if(c.biz==='용역턴키'){
