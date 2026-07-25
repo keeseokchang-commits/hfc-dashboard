@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HFC 프로젝트 조회</title>
+<style>
+  :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .tab-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+  .tab-nav::-webkit-scrollbar{display:none}
+  .tab-btn{flex-shrink:0;padding:12px 18px;font-size:13px;font-weight:500;color:var(--text3);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  .tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+  .main{padding:14px 14px 80px}
+  .form-card,.list-card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+  .form-group{margin-bottom:12px}
+  .form-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;display:block}
+  .form-label .req{color:var(--red);font-size:11px}
+  .form-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;background:var(--surface)}
+  .form-input:focus{border-color:var(--blue)}
+  .form-input[readonly]{background:var(--surface2);color:var(--text2)}
+  select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234A5568' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .vat-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px}
+  .vat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px}
+  .vat-row .vl{color:var(--text2)}.vat-row .vv{font-weight:600}
+  .vat-row.total .vv{color:var(--blue);font-size:15px}
+  .vat-note{font-size:11px;color:var(--text3);margin-top:4px}
+  .btn-row{display:flex;gap:8px;margin-top:14px}
+  .btn{padding:11px 20px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none;flex:1}
+  .btn-primary{background:var(--blue);color:#fff}.btn-primary:disabled{background:var(--text3)}
+  .btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .list-item{padding:10px 0;border-bottom:1px solid var(--border)}
+  .list-item:last-child{border-bottom:none}
+  .li-r1{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+  .li-name{font-size:13px;font-weight:600;flex:1;word-break:keep-all}
+  .li-meta{font-size:11px;color:var(--text3)}
+  .li-amt{font-size:12px;font-weight:600;color:var(--blue)}
+  .badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+  .badge-on{background:var(--blue-lt);color:var(--blue)}.badge-hold{background:var(--amber-lt);color:var(--amber)}
+  .btn-edit{font-size:11px;color:var(--blue);border:1px solid var(--blue-lt);background:var(--blue-lt);border-radius:6px;padding:3px 8px;cursor:pointer}
+  .tab-content{display:none}.tab-content.active{display:block}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .info-note{background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;font-size:12px;color:#1E40AF;margin-bottom:12px;line-height:1.5}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:90dvh;overflow-y:auto;padding:20px 16px 32px}
+  .gen-table{width:100%;border-collapse:collapse;font-size:12px}
+  .gen-table th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+  .gen-table td{padding:5px 3px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .gen-table input{width:100%;padding:6px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;background:var(--surface)}
+  .ms-row{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:6px;align-items:center;font-size:12px}
+  .ms-row input{padding:7px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;width:100%}
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}.tab-item .tab-icon{font-size:20px}
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:680px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+</style>
+<style>
+  .chip-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{padding:6px 13px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:12px;color:var(--text2);cursor:pointer}
+  .chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .prj-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .prj-card:active{transform:scale(.995)}
+  .gauge{height:7px;background:var(--border);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+  .gauge>div{height:100%;background:var(--green);border-radius:4px}
+  .dtable{width:100%;border-collapse:collapse;font-size:12px}
+  .dtable th{font-size:11px;color:var(--text3);padding:7px 6px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+  .dtable td{padding:7px 6px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kv .box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .kv .box .l{font-size:11px;color:var(--text3)}
+  .kv .box .v{font-size:15px;font-weight:700;margin-top:3px}
+  .link-btn{padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12px;color:var(--text2);cursor:pointer;flex:1}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:90dvh;overflow-y:auto;padding:20px 16px 32px}
+</style>
+</head>
+<body>
+<header class="header"><span>📁 프로젝트 조회</span><span id="hdrRight" style="font-size:11px;color:var(--text3)"></span></header>
+<main class="content" style="padding-bottom:90px">
+
+  <!-- 목록 뷰 -->
+  <div id="listView">
+    <div class="chip-bar" id="chips"></div>
+    <div id="prjList"><div class="empty-state" style="text-align:center;color:var(--text3);padding:30px 0;font-size:13px">불러오는 중…</div></div>
+  </div>
+
+  <!-- 상세 뷰 -->
+  <div id="detailView" style="display:none">
+    <button onclick="backToList()" style="background:none;border:none;color:var(--blue);font-size:13px;cursor:pointer;padding:0;margin-bottom:10px">← 목록으로</button>
+    <div class="card" id="dHeader"></div>
+    <div class="card"><div class="card-title">💰 손익 요약 (계획 기준)</div><div class="kv" id="dProfit"></div><div id="dEstNote" style="font-size:11px;color:var(--text3);margin-top:8px"></div></div>
+    <div class="card"><div class="card-title">🪙 수금 현황</div><div class="kv" id="dRecv"></div><div id="dOverdue" style="margin-top:8px"></div></div>
+    <div class="card"><div class="card-title">📤 매출 청구 스케줄</div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>발행예정</th><th>발행일</th><th>공급가액</th><th>VAT포함</th><th>수금예정</th><th>상태</th><th>실입금</th></tr></thead><tbody id="dRevBody"></tbody></table></div></div>
+    <div class="card"><div class="card-title">📥 매입 스케줄</div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>수취예정</th><th>수취일</th><th>금액(공급가)</th><th>지급예정</th></tr></thead><tbody id="dCostBody"></tbody></table></div></div>
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="link-btn" id="btnEst">📊 견적 보기</button>
+      <button class="link-btn" id="btnGen">⚡ 스케줄 생성</button>
+      <button class="link-btn" onclick="showHist()">🕘 변경 이력</button>
+    </div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="histModal"><div class="modal">
+  <div style="font-size:15px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between">변경 이력
+    <button onclick="document.getElementById('histModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+  <div id="histBody" style="font-size:12px"></div>
+</div></div>
+
+<nav class="tab-bar">
+  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
+  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
+  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
+  <button class="tab-item active"><span class="tab-icon">📁</span>프로젝트</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const SHEET_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
+const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
+async function fetchSheet(name,range){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name+'!'+range)}?key=${API_KEY}`);
+  if(!r.ok)throw new Error(name+' 로드 실패');
+  return (await r.json()).values||[];
+}
+function toObj(rows){if(!rows||rows.length<2)return[];const h=rows[0];return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]??'');return o;});}
+function dedupe(list,key){const m=new Map();(list||[]).forEach(r=>{if(r&&r[key])m.set(r[key],r);});return [...m.values()];}
+function comma(n){return (parseInt(n)||0).toLocaleString('ko-KR');}
+function wf(n){return comma(n)+'원';}
+function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',3000);}
+
+const SC={'수주':['#ECFDF5','#059669'],'계약':['#F0FDFA','#0D9488'],'종료':['#F1F5F9','#64748B']};
+let pipelines=[],prjs=[],s04=[],s05=[],est=[],curFilter='전체',curPrj=null,curPl=null;
+
+async function loadAll(){
+ try{
+  const [plR,prR,rvR,csR,esR]=await Promise.all([
+    fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200'),
+    fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:M300'),
+    fetchSheet('S12_ESTIMATE','A1:O500').catch(()=>[])]);
+  pipelines=toObj(plR);
+  const okPl=new Set(pipelines.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+  prjs=dedupe(toObj(prR).filter(p=>okPl.has(p.pipeline_id)),'project_id');
+  s04=dedupe(toObj(rvR).filter(r=>r.revenue_id),'revenue_id');
+  s05=dedupe(toObj(csR).filter(c=>c.cost_id),'cost_id');
+  est=toObj(esR).filter(e=>e.estimate_id);
+  document.getElementById('hdrRight').textContent=`재무 대상 ${prjs.length}개`;
+  renderChips(); 
+  const q=new URLSearchParams(location.search).get('pid');
+  if(q){
+    const t=prjs.find(p=>p.project_id===q||p.pipeline_id===q);
+    if(t){openDetail(t.project_id);return;}
+    toast('해당 프로젝트('+q+')를 찾을 수 없습니다',true);
+  }
+  renderList();
+ }catch(e){toast('로드 실패: '+e.message,true);}
+}
+function renderChips(){
+  const sts=['전체','수주','계약','종료'];
+  document.getElementById('chips').innerHTML=sts.map(s=>{
+    const n=s==='전체'?prjs.length:prjs.filter(p=>plOf(p)?.status===s).length;
+    return `<button class="chip ${curFilter===s?'on':''}" onclick="curFilter='${s}';renderChips();renderList()">${s} ${n}</button>`;}).join('');
+}
+function plOf(p){return pipelines.find(x=>x.pipeline_id===p.pipeline_id);}
+function revOf(pid){return s04.filter(r=>r.project_id===pid);}
+function costOf(pid){return s05.filter(c=>c.project_id===pid);}
+function renderList(){
+  const list=prjs.filter(p=>curFilter==='전체'||plOf(p)?.status===curFilter);
+  document.getElementById('prjList').innerHTML=list.length?list.map(p=>{
+    const pl=plOf(p)||{};
+    const rv=revOf(p.project_id);
+    const tot=rv.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+    const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+    const today=new Date().toISOString().slice(0,10);
+    const od=rv.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today).length;
+    const pct=tot?Math.round(done/tot*100):0;
+    const [bg,fg]=SC[pl.status]||['#EEE','#666'];
+    return `<div class="prj-card" onclick="openDetail('${p.project_id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:14px">${p.project_name||p.project_id}</b>
+        <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${bg};color:${fg};font-weight:600">${pl.status||'-'}</span></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${p.client||''} · ${p.start_date||''}~${p.end_date||''} · ${pl.biz_type||''}</div>
+      <div class="gauge"><div style="width:${pct}%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2)">
+        <span>계약 <b>${comma(p.contract_amount)}원</b></span>
+        <span>수금률 <b style="color:var(--green)">${pct}%</b>${od?` · <b style="color:var(--red)">미수 ${od}건</b>`:''}</span></div>
+    </div>`;}).join(''):'<div style="text-align:center;color:var(--text3);padding:30px 0;font-size:13px">해당 상태의 프로젝트가 없습니다</div>';
+}
+function backToList(){document.getElementById('detailView').style.display='none';document.getElementById('listView').style.display='block';
+  history.replaceState(null,'',location.pathname);renderChips();renderList();}
+function openDetail(pid){
+  curPrj=prjs.find(p=>p.project_id===pid); if(!curPrj)return;
+  curPl=plOf(curPrj)||{};
+  document.getElementById('listView').style.display='none';
+  document.getElementById('detailView').style.display='block';
+  history.replaceState(null,'','?pid='+pid);
+  const [bg,fg]=SC[curPl.status]||['#EEE','#666'];
+  document.getElementById('dHeader').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:16px">${curPrj.project_name||pid}</b>
+      <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${bg};color:${fg};font-weight:600">${curPl.status||'-'}</span></div>
+    <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.7">
+      ${curPrj.client||''}${curPrj.end_client?' → '+curPrj.end_client:''}<br>
+      ${curPl.biz_type||'─'} · 지급조건 ${curPl.payment_cycle||'─'} · ${curPrj.start_date}~${curPrj.end_date}<br>
+      <span style="color:var(--text3)">${pid} · 사업기회 ${curPrj.pipeline_id||'─'}</span></div>`;
+  const rv=revOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
+  const cs=costOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
+  const revSum=rv.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0);
+  const costSum=cs.reduce((s,c)=>s+(parseInt(c.amount)||0),0);
+  const profit=revSum-costSum, margin=revSum?Math.round(profit/revSum*1000)/10:0;
+  document.getElementById('dProfit').innerHTML=`
+    <div class="box"><div class="l">계약금액</div><div class="v">${comma(curPrj.contract_amount)}원</div></div>
+    <div class="box"><div class="l">계획 매출 합 (공급가)</div><div class="v" style="color:var(--blue)">${wf(revSum)}</div></div>
+    <div class="box"><div class="l">계획 매입 합 (공급가)</div><div class="v" style="color:var(--amber)">${wf(costSum)}</div></div>
+    <div class="box"><div class="l">추정 이익 (이익률 ${margin}%)</div><div class="v" style="color:${profit>=0?'var(--green)':'var(--red)'}">${wf(profit)}</div></div>`;
+  const items=est.filter(e=>e.pipeline_id===curPrj.pipeline_id);
+  if(items.length){
+    const eS=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
+    const eB=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+    document.getElementById('dEstNote').textContent=`견적: 매출 ${comma(eS)}원 · 매입 ${comma(eB)}원 (${items.length}개 항목)`;
+  } else document.getElementById('dEstNote').textContent='저장된 견적 없음';
+  const today=new Date().toISOString().slice(0,10);
+  const totV=rv.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+  const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+  const open=rv.filter(r=>r.is_received!=='Y');
+  const openAmt=open.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+  const od=open.filter(r=>r.cash_recv_date&&r.cash_recv_date<today);
+  document.getElementById('dRecv').innerHTML=`
+    <div class="box"><div class="l">수금 완료 (VAT포함)</div><div class="v" style="color:var(--green)">${wf(done)}</div></div>
+    <div class="box"><div class="l">미수 잔액</div><div class="v" style="color:${openAmt?'var(--red)':'var(--text)'}">${wf(openAmt)}</div></div>`;
+  document.getElementById('dOverdue').innerHTML=od.length?od.map(r=>{
+    const dd=Math.round((new Date(today)-new Date(r.cash_recv_date))/86400000);
+    return `<div style="font-size:12px;color:var(--red);padding:3px 0">⏰ ${r.year_month} ${wf(r.cash_recv_amt)} — 예정 ${r.cash_recv_date} (D+${dd})</div>`;}).join('')
+    :`<div style="font-size:12px;color:var(--text3)">수금예정일 경과 건 없음</div>`;
+  document.getElementById('dRevBody').innerHTML=rv.length?rv.map(r=>{
+    const st=r.is_received==='Y'?['입금완료','var(--green)']:(r.invoice_date?['발행완료','var(--blue)']:['발행예정','var(--amber)']);
+    return `<tr><td>${r.year_month}</td><td>${r.invoice_plan_date||'─'}</td><td>${r.invoice_date||'─'}</td>
+      <td style="text-align:right">${comma(r.tax_invoice_amt)}</td><td style="text-align:right">${comma(r.cash_recv_amt)}</td>
+      <td>${r.cash_recv_date||'─'}</td><td style="color:${st[1]};font-weight:600">${st[0]}</td><td>${r.recv_actual_date||'─'}</td></tr>`;}).join('')
+    :'<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:14px 0">청구 스케줄 없음 — [⚡ 스케줄 생성]으로 만드세요</td></tr>';
+  document.getElementById('dCostBody').innerHTML=cs.length?cs.map(c=>`
+    <tr><td>${c.year_month}</td><td>${c.invoice_plan_date||'─'}</td><td>${c.invoice_date||'─'}</td>
+      <td style="text-align:right">${comma(c.amount)}</td><td>${c.payment_date||'─'}</td></tr>`).join('')
+    :'<tr><td colspan="5" style="color:var(--text3);text-align:center;padding:14px 0">매입 스케줄 없음</td></tr>';
+  document.getElementById('btnEst').onclick=()=>location.href='estimate.html?pid='+curPrj.pipeline_id;
+  document.getElementById('btnGen').onclick=()=>location.href='input.html?gen='+curPrj.pipeline_id+'&full=1';
+}
+async function showHist(){
+  document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">불러오는 중…</div>';
+  document.getElementById('histModal').classList.add('open');
+  try{
+    const rows=await fetchSheet('S14_HISTORY','A1:H999');
+    const list=toObj(rows).filter(h=>h.pipeline_id===curPrj.pipeline_id).sort((a,b)=>(b.changed_at||'').localeCompare(a.changed_at||''));
+    document.getElementById('histBody').innerHTML=list.length?list.map(h=>`
+      <div style="padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between"><b>${h.target}</b><span style="color:var(--text3);font-size:11px">${h.changed_at}</span></div>
+        <div>${comma(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${comma(h.new_value)||'(없음)'}</b></div>
+        ${h.reason?`<div style="color:var(--text3);font-size:11px">사유: ${h.reason}</div>`:''}</div>`).join('')
+      :'<div style="text-align:center;padding:20px;color:var(--text3)">기록된 변경 이력이 없습니다</div>';
+  }catch(e){document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">S14_HISTORY 시트가 없습니다</div>';}
+}
+window.addEventListener('load',loadAll);
+</script>
+</body>
+</html>

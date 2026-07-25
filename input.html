@@ -265,6 +265,7 @@
   <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
   <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
+  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
   <button class="tab-item active"><span class="tab-icon">✏️</span>입력</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
@@ -354,7 +355,7 @@ function renderLists(){
   document.getElementById('rev_list').innerHTML=rv.length?rv.map(r=>{
     const st=r.is_received==='Y'?['badge-on','입금완료']:(r.invoice_date?['badge-on','발행완료·수금대기']:['badge-hold','발행예정']);
     return `
-    <div class="list-item"><div class="li-r1"><div class="li-name">${r.year_month} · ${prjLabel(r.project_id)}</div>
+    <div class="list-item"><div class="li-r1"><div class="li-name" style="cursor:pointer;color:var(--blue)" onclick="location.href='project.html?pid=${r.project_id}'">${r.year_month} · ${prjLabel(r.project_id)}</div>
       <span class="badge ${st[0]}">${st[1]}</span></div>
     <div class="li-meta">${r.project_id} · 공급 ${wf(r.tax_invoice_amt)} + VAT ${wf(r.vat_amt||Math.round((parseInt(r.tax_invoice_amt)||0)*.1))}${r.invoice_plan_date?' · 발행예정 '+r.invoice_plan_date:''}${r.invoice_date?' · 발행 '+r.invoice_date:''}${r.recv_actual_date?' · 입금 '+r.recv_actual_date:''}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
@@ -368,7 +369,7 @@ function renderLists(){
   document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
     const st=c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정'];
     return `
-    <div class="list-item"><div class="li-r1"><div class="li-name">${c.year_month} · ${prjLabel(c.project_id)}</div>
+    <div class="list-item"><div class="li-r1"><div class="li-name" style="cursor:pointer;color:var(--blue)" onclick="location.href='project.html?pid=${c.project_id}'">${c.year_month} · ${prjLabel(c.project_id)}</div>
       <span class="badge ${st[0]}">${st[1]}</span></div>
     <div class="li-meta">${c.project_id} · ${c.cost_type}${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
