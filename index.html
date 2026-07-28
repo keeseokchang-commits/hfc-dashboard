@@ -389,7 +389,7 @@ async function render() {
     const [projRows, revRows, costRows, fixRows, dashRows, estRows, plRows, vtRows] = await Promise.all([
       fetchSheet('S03_PROJECT',      'A1:K200'),
       fetchSheet('S04_REVENUE',      'A1:M300'),
-      fetchSheet('S05_COST',         'A1:K300'),
+      fetchSheet('S05_COST',         'A1:O300'),
       fetchSheet('S06_FIXED_COST',   'A1:F300'),
       fetchSheet('S09_DASHBOARD',    'A1:H24'),
       fetchSheet('S02_CASHFLOW_EST', 'A1:G24'),
