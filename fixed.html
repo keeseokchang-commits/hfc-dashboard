@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HFC 고정비 계획</title>
+<style>
+  :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .tab-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+  .tab-nav::-webkit-scrollbar{display:none}
+  .tab-btn{flex-shrink:0;padding:12px 18px;font-size:13px;font-weight:500;color:var(--text3);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  .tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+  .main{padding:14px 14px 80px}
+  .form-card,.list-card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+  .form-group{margin-bottom:12px}
+  .form-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;display:block}
+  .form-label .req{color:var(--red);font-size:11px}
+  .form-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;background:var(--surface)}
+  .form-input:focus{border-color:var(--blue)}
+  .form-input[readonly]{background:var(--surface2);color:var(--text2)}
+  select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234A5568' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .vat-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px}
+  .vat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px}
+  .vat-row .vl{color:var(--text2)}.vat-row .vv{font-weight:600}
+  .vat-row.total .vv{color:var(--blue);font-size:15px}
+  .vat-note{font-size:11px;color:var(--text3);margin-top:4px}
+  .btn-row{display:flex;gap:8px;margin-top:14px}
+  .btn{padding:11px 20px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none;flex:1}
+  .btn-primary{background:var(--blue);color:#fff}.btn-primary:disabled{background:var(--text3)}
+  .btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .list-item{padding:10px 0;border-bottom:1px solid var(--border)}
+  .list-item:last-child{border-bottom:none}
+  .li-r1{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+  .li-name{font-size:13px;font-weight:600;flex:1;word-break:keep-all}
+  .li-meta{font-size:11px;color:var(--text3)}
+  .li-amt{font-size:12px;font-weight:600;color:var(--blue)}
+  .badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+  .badge-on{background:var(--blue-lt);color:var(--blue)}.badge-hold{background:var(--amber-lt);color:var(--amber)}
+  .btn-edit{font-size:11px;color:var(--blue);border:1px solid var(--blue-lt);background:var(--blue-lt);border-radius:6px;padding:3px 8px;cursor:pointer}
+  .tab-content{display:none}.tab-content.active{display:block}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .info-note{background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;font-size:12px;color:#1E40AF;margin-bottom:12px;line-height:1.5}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:90dvh;overflow-y:auto;padding:20px 16px 32px}
+  .gen-table{width:100%;border-collapse:collapse;font-size:12px}
+  .gen-table th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+  .gen-table td{padding:5px 3px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .gen-table input{width:100%;padding:6px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;background:var(--surface)}
+  .ms-row{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:6px;align-items:center;font-size:12px}
+  .ms-row input{padding:7px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;width:100%}
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}.tab-item .tab-icon{font-size:20px}
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:680px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+</style>
+<style>.dtable{width:100%;border-collapse:collapse;font-size:12px}.dtable th{font-size:11px;color:var(--text3);padding:7px 6px;border-bottom:2px solid var(--border);text-align:left}.dtable td{padding:7px 6px;border-bottom:1px solid var(--border)}</style>
+</head><body>
+<header class="app-header"><div class="app-logo">🏢 고정비 계획<span id="authState" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></header>
+<nav class="side-nav">
+  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
+  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
+  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
+  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
+  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
+</nav>
+<main class="main">
+  <div style="margin-bottom:10px;display:flex;gap:14px"><a href="input.html" style="font-size:12px;color:var(--blue);text-decoration:none">🧾 세금계산서 관리 →</a><a href="settings.html" style="font-size:12px;color:var(--blue);text-decoration:none">⚙️ 고정비 항목 관리(설정) →</a></div>
+  <div class="list-card"><div class="card-title"><span>월별 고정비 계획 <span id="fxCnt" style="font-size:11px;color:var(--text3)"></span></span>
+    <span style="display:flex;gap:6px"><select id="fxYear" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 연도</option></select>
+    <button onclick="openFxModal()" style="font-size:12px;padding:6px 12px;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer">+ 고정비 추가</button></span></div>
+    <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>항목</th><th>금액</th><th>지급예정일</th><th>메모</th><th></th></tr></thead><tbody id="fxBody"></tbody></table></div>
+  </div>
+</main>
+<div class="modal-overlay" id="fxModal"><div class="modal">
+  <div class="modal-title">고정비 추가 <button onclick="document.getElementById('fxModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+  <div class="form-row"><label class="form-label">항목 <small style="color:var(--text3)">(설정에서 관리)</small></label>
+    <input class="form-input" id="fx_cat" list="fxCatDL" placeholder="예: 임차료"><datalist id="fxCatDL"></datalist></div>
+  <div class="form-row"><label class="form-label">월 금액 (원)</label><input class="form-input" id="fx_amt" oninput="this.value=fcv(this.value)" style="text-align:right"></div>
+  <div class="form-row"><label class="form-label">지급일 (매월 n일)</label><input class="form-input" type="number" id="fx_day" min="1" max="31" value="25"></div>
+  <div class="form-row"><label class="form-label">적용 기간 <small style="color:var(--text3)">(반복: 시작월~종료월, 단건은 동일 월)</small></label>
+    <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm"><input class="form-input" type="month" id="fx_em"></div></div>
+  <div class="form-row"><label class="form-label">메모</label><input class="form-input" id="fx_memo"></div>
+  <button onclick="saveFx()" id="fxSaveBtn" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px">저장 (기간 내 월별 생성)</button>
+</div></div>
+<nav class="tab-bar">
+  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
+  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
+  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
+  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
+  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
+</nav>
+<div class="toast" id="toast"></div>
+<script>
+
+const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
+const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
+const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
+const SCOPES='https://www.googleapis.com/auth/spreadsheets';
+let accessToken=null,tokenClient;
+
+var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
+var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
+let fixedAll=[],s10All=[];
+async function loadAll(){
+ try{
+  const [fxR,stR]=await Promise.all([fetchSheet('S06_FIXED_COST','A1:F300'),fetchSheet('S10_SETTINGS','A1:E200').catch(()=>[])]);
+  fixedAll=dedupe(toObj(fxR).filter(x=>x.fixed_id),'fixed_id');
+  s10All=toObj(stR);
+  const items=s10All.filter(r=>r.category==='fixed_item').map(r=>r.key);
+  document.getElementById('fxCatDL').innerHTML=(items.length?items:['임차료','급여','4대보험','통신비','세무기장료']).map(k=>`<option value="${k}">`).join('');
+  const yrs=[...new Set(fixedAll.map(x=>(x.year_month||'').slice(0,4)).filter(Boolean))].sort();
+  document.getElementById('fxYear').innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
+  renderFx();
+ }catch(e){toast('로드 실패: '+e.message,true);}
+}
+function renderFx(){
+  const y=document.getElementById('fxYear').value;
+  const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
+  document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(parseInt(x.amount)||0),0))}원)`;
+  document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
+    <tr><td>${x.year_month}</td><td>${x.category}</td><td style="text-align:right">${comma(x.amount)}원</td>
+    <td>${x.payment_date||'─'}</td><td style="color:var(--text3)">${x.memo||''}</td>
+    <td><button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
+    :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
+}
+function openFxModal(){const t=new Date().toISOString().slice(0,7);document.getElementById('fx_sm').value=t;document.getElementById('fx_em').value=t;document.getElementById('fxModal').classList.add('open');}
+async function writeFx(next){
+  const H=['fixed_id','year_month','category','amount','payment_date','memo'];
+  const ok=await clearAndWrite('S06_FIXED_COST','A:F',[H,...dedupe(next,'fixed_id').map(x=>H.map(h=>x[h]??''))]);
+  if(ok){fixedAll=dedupe(next,'fixed_id');renderFx();}
+  return ok;
+}
+async function saveFx(){
+  const cat=document.getElementById('fx_cat').value.trim(), amt=unv(document.getElementById('fx_amt').value);
+  const day=parseInt(document.getElementById('fx_day').value)||25;
+  const sm=document.getElementById('fx_sm').value, em=document.getElementById('fx_em').value||sm;
+  if(!cat||!amt||!sm){toast('항목·금액·기간을 입력하세요',true);return;}
+  let seq=fixedAll.reduce((m,x)=>Math.max(m,parseInt((x.fixed_id||'').replace(/\D/g,'').slice(-3))||0),0);
+  const rows=[]; let c=new Date(sm+'-01');
+  const end=new Date(em+'-01');
+  while(c<=end&&rows.length<36){
+    const ym=`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}`;
+    const dim=new Date(c.getFullYear(),c.getMonth()+1,0).getDate();
+    seq++;rows.push({fixed_id:`FIX-${c.getFullYear()}-${String(seq).padStart(3,'0')}`,year_month:ym,category:cat,amount:amt,
+      payment_date:`${ym}-${String(Math.min(day,dim)).padStart(2,'0')}`,memo:document.getElementById('fx_memo').value||(rows.length||em!==sm?'반복 고정비':'')});
+    c=new Date(c.getFullYear(),c.getMonth()+1,1);
+  }
+  const btn=document.getElementById('fxSaveBtn');btn.disabled=true;
+  const ok=await writeFx([...fixedAll,...rows]);
+  btn.disabled=false;
+  if(ok){toast(`✓ 고정비 ${rows.length}건 생성`);document.getElementById('fxModal').classList.remove('open');}
+  else toast('저장 실패',true);
+}
+async function delFx(id){
+  if(!confirm('이 고정비 계획을 삭제할까요?'))return;
+  const ok=await writeFx(fixedAll.filter(x=>x.fixed_id!==id));
+  toast(ok?'삭제 ✓':'삭제 실패',!ok);
+}
+window.addEventListener('load',loadAll);
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body></html>

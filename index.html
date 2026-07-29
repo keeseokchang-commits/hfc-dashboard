@@ -250,8 +250,10 @@
   <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span> 사업기회</button>
   <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span> 견적</button>
     <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span> 데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span> 세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span> 자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
 </nav>
 
 <!-- 메인 -->
@@ -278,7 +280,7 @@
   <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
 
@@ -483,7 +485,9 @@ async function render() {
     renderNotif();
 
     // ── 자금수지 비교 데이터 ──
-    const thisMon = `${yr}-${String(todayDate.getMonth()+1).padStart(2,'0')}`;
+        // v1.2(#2): 마감월 기준 — 실잔액이 존재하는 최근 월, 없으면 전월
+    let thisMon=null; dashboard.forEach(d=>{if(d.year_month&&d.act_balance&&(!thisMon||d.year_month>thisMon))thisMon=d.year_month;});
+    if(!thisMon)thisMon=prevYmStr;
     const dashRow  = dashboard.find(d => d.year_month === thisMon) || {};
     const estRow   = estimates.find(e => e.year_month === thisMon) || {};
     const estBal   = parseInt(estRow.est_balance)  || 0;
@@ -522,13 +526,15 @@ async function render() {
         <span style="font-size:15px">${done?'✅':(warn?'⚠️':'☐')}</span><span style="flex:1">${txt}</span><span style="color:var(--text3);font-size:11px">›</span></a>`;
     let closeItems='';
     closeItems+=ci(csvDone,`${parseInt(prevYmStr.slice(5))}월 통장 CSV 업로드${csvDone?' 완료':' 필요'}`,'cashflow.html',!csvDone);
+    const payDue=costs.filter(c=>c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<todayStr2);
+    closeItems+=ci(payDue.length===0,payDue.length?`미지급금 <b>${payDue.length}건</b> (${wonFull(payDue.reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0))}) — 지급예정 경과`:'미지급금 없음 (누계)','cashflow.html',payDue.length>0);
     closeItems+=ci(invDue.length===0,invDue.length?`이번 달 발행할 세금계산서 <b>${invDue.length}건</b> (${wonFull(invDue.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0))})`:'이번 달 발행할 세금계산서 없음','input.html',invDue.length>0);
-    closeItems+=ci(agingCnt===0,agingCnt?`미수금 <b>${agingCnt}건</b> — 수금예정일 경과`:'미수금 없음','cashflow.html',agingCnt>0);
+    closeItems+=ci(agingCnt===0,agingCnt?`미수금 <b>${agingCnt}건</b> — 수금예정일 경과`:'미수금 없음 (누계)','cashflow.html',agingCnt>0);
     if(vatSoon&&vatD!==null&&vatD<=30) closeItems+=ci(false,`부가세 ${vatSoon.memo||vatSoon.quarter_code} 납부 D-${vatD} (${wonFull(vatSoon.estimated_payment)})`,'vat.html',true);
-    closeItems+=ci(!recalcNeeded,recalcNeeded?'추정 자금수지 재계산 권고 (실적 업로드 이후 미실행)':'추정 자금수지 최신','cashflow.html',recalcNeeded);
+    closeItems+=ci(!recalcNeeded,recalcNeeded?'추정 자금수지 재계산 권고 (실적 업로드 이후 미실행)':`추정 자금수지 최신 (${s02U?s02U.slice(0,10):'미실행'} 재계산)`,'cashflow.html',recalcNeeded);
     const closeHtml=`
       <div style="background:var(--surface);border-radius:12px;padding:14px 16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:4px">🗓️ ${parseInt(thisYmStr.slice(5))}월 마감 체크리스트</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">🗓️ ${parseInt(prevYmStr.slice(5))}월 마감 체크리스트</div>
         ${closeItems}
       </div>`;
 
@@ -551,7 +557,7 @@ async function render() {
         <div class="kpi-card amber">
           <div class="kpi-label">기말 현금 (추정)</div>
           <div class="kpi-value">${won(cashBalance)}</div>
-          <div class="kpi-sub">최근 기준</div>
+          <div class="kpi-sub">${s02U?s02U.slice(0,10)+" 추정":"추정 미실행"}</div>
         </div>
         <div class="kpi-card ${accuracy === null ? '' : accuracy >= 80 ? 'green' : ''}">
           <div class="kpi-label">정합도</div>
@@ -569,7 +575,7 @@ async function render() {
       </div>
 
       <div class="card">
-        <div class="card-title">이번 달 자금수지 <span style="font-size:11px;color:var(--text3)">${thisMon}</span></div>
+        <div class="card-title">자금수지 <span style="font-size:11px;color:var(--text3)">마감월 ${thisMon} 기준</span></div>
         <div class="cf-row">
           <span class="cf-label">추정 잔액</span>
           <span class="cf-value">${won(estBal)}</span>
@@ -595,13 +601,13 @@ async function render() {
       <div class="card">
         <div class="card-title">
           프로젝트 현황
-          <a href="pipeline.html" style="font-size:12px;color:var(--blue);text-decoration:none">사업기회·간트 →</a>
+          <a href="project.html" style="font-size:12px;color:var(--blue);text-decoration:none">프로젝트 상세 →</a>
         </div>
         ${activeProjects.length ? activeProjects.map(p => {
           const pg = progress(p.start_date, p.end_date);
           const statusClass = ['수주','계약'].includes(p.status) ? 'on' : p.status === '종료' ? 'hold' : 'plan';
           return `
-          <div class="prj-item">
+          <div class="prj-item" style="cursor:pointer" onclick="location.href='project.html?pid='+encodeURIComponent('${p.project_id}')">
             <div class="prj-row1">
               <div class="prj-name">${p.project_name}</div>
               <span class="badge-status ${statusClass}">${p.status}</span>

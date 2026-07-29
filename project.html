@@ -105,8 +105,10 @@
   <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
   <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
   <button class="side-nav-item active"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
 </nav>
 
 <main class="main">
@@ -144,7 +146,7 @@
   <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item active"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -236,7 +238,7 @@ function openDetail(pid){
     <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.7">
       ${curPrj.client||''}${curPrj.end_client?' → '+curPrj.end_client:''}<br>
       ${curPl.biz_type||'─'} · 지급조건 ${curPl.payment_cycle||'─'} · ${curPrj.start_date}~${curPrj.end_date}<br>
-      <span style="color:var(--text3)">${pid} · 사업기회 ${curPrj.pipeline_id||'─'}</span></div>`;
+      <span style="color:var(--text3)">${pid} · 사업기회 <a href="pipeline.html?pid=${curPrj.pipeline_id}" style="color:var(--blue);text-decoration:none">${curPrj.pipeline_id||'─'} ↗</a></span></div>`;
   const rv=revOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
   const cs=costOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
   const revSum=rv.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0);

@@ -132,8 +132,10 @@
   <button class="side-nav-item active"><span class="sn-icon">📋</span>사업기회</button>
   <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
   <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
 </nav>
 
 <main class="main">
@@ -249,7 +251,7 @@
   <button class="tab-item active"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -359,28 +361,30 @@ function setView(m){
 }
 function renderGantt(list){
   const el=document.getElementById('oppList');
-  const yr=new Date().getFullYear();
   const items=list.filter(o=>o.expected_start&&o.expected_end&&!['포기','실주'].includes(o.status));
   if(!items.length){ el.innerHTML='<div class="empty-state">기간이 입력된 사업기회가 없습니다</div>'; return; }
   const colors={'기회':'#7C3AED','확정':'#2563EB','수주':'#059669','계약':'#0891B2','종료':'#94A3B8'};
-  const now=new Date();
-  const todayPct=((now.getMonth()+now.getDate()/31)/12*100).toFixed(1);
-  const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const idx=d=>d.getFullYear()*12+d.getMonth();
+  let mn=Infinity,mx=-Infinity;
+  items.forEach(o=>{mn=Math.min(mn,idx(new Date(o.expected_start)));mx=Math.max(mx,idx(new Date(o.expected_end)));});
+  const n=Math.min(mx-mn+1,48);
+  const cols=`180px repeat(${n},1fr)`;
+  const heads=[];
+  for(let k=0;k<n;k++){const y=Math.floor((mn+k)/12),m=(mn+k)%12+1;
+    heads.push(`<span style="${m===1?'border-left:2px solid var(--border)':''}">${(m===1||k===0)?String(y).slice(2)+'.':''}${m}월</span>`);}
+  const now=new Date(); const tIdx=idx(now)+now.getDate()/31-mn;
   const rows=items.map(o=>{
-    const s=new Date(o.expected_start), e=new Date(o.expected_end);
-    let sm=(s.getFullYear()-yr)*12+s.getMonth()+s.getDate()/31;
-    let em=(e.getFullYear()-yr)*12+e.getMonth()+e.getDate()/31;
-    sm=Math.max(0,Math.min(12,sm)); em=Math.max(0,Math.min(12,em));
-    if(em<=sm) return '';
-    const left=(sm/12*100).toFixed(1), width=((em-sm)/12*100).toFixed(1);
-    return `<div class="gantt-row">
-      <div class="gantt-label">${o.opportunity}<small>${o.status} · ${wonFull(o.contract_amount||0)}</small></div>
+    const sD=new Date(o.expected_start),eD=new Date(o.expected_end);
+    let sm=Math.max(0,idx(sD)+(sD.getDate()-1)/31-mn);
+    let em=Math.min(n,idx(eD)+eD.getDate()/31-mn);
+    const left=(sm/n*100).toFixed(1), width=(Math.max(em-sm,0.15)/n*100).toFixed(1);
+    return `<div class="gantt-row" style="grid-template-columns:${cols}">
+      <div class="gantt-label">${o.opportunity}<small>${o.status} · ${wonFull(o.contract_amount||0)} · ${o.expected_start}~${o.expected_end}</small></div>
       <div class="gantt-track"><div class="gantt-bar" style="left:${left}%;width:${width}%;background:${colors[o.status]||'#94A3B8'}"></div>
-      ${now.getFullYear()===yr?`<div class="gantt-today" style="left:${todayPct}%"></div>`:''}</div>
-    </div>`;
-  }).join('');
-  el.innerHTML=`<div class="gantt-wrap"><div class="gantt-grid">
-    <div class="gantt-months"><span style="text-align:left">${yr}년</span>${months.map(m=>`<span>${m}</span>`).join('')}</div>
+      ${tIdx>=0&&tIdx<=n?`<div class="gantt-today" style="left:${(tIdx/n*100).toFixed(1)}%"></div>`:''}</div>
+    </div>`;}).join('');
+  el.innerHTML=`<div class="gantt-wrap"><div class="gantt-grid" style="min-width:${Math.max(720,180+n*46)}px">
+    <div class="gantt-months" style="grid-template-columns:${cols}"><span style="text-align:left">기간</span>${heads.join('')}</div>
     ${rows}</div>
     <div style="font-size:10px;color:var(--text3);margin-top:8px">■ <span style="color:#7C3AED">기회</span> · <span style="color:#2563EB">확정</span> · <span style="color:#059669">수주</span> · <span style="color:#0891B2">계약</span> · <span style="color:#94A3B8">종료</span> · 빨간 선 = 오늘</div>
   </div>`;
@@ -419,8 +423,8 @@ function renderList(){
       <div class="opp-actions">
         ${next?`<button class="btn-transition" onclick="openTransition(${idx},'${next}')">${next}(으)로 전환 →</button>`:''}
         ${['확정','수주','계약'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='estimate.html?pid=${o.pipeline_id}'">견적 보기</button>`:''}
-        ${['수주','계약'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='input.html?gen=${o.pipeline_id}&full=1'">청구 스케줄</button>`:''}
-        ${['수주','계약','종료'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='project.html?pid=${o.pipeline_id}'">프로젝트</button>`:''}
+        ${['확정','수주','계약'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='input.html?gen=${o.pipeline_id}&full=1'">청구 스케줄</button>`:''}
+        ${['확정','수주','계약','종료'].includes(o.status)?`<button class="btn-edit-opp" onclick="location.href='project.html?pid=${o.pipeline_id}'">프로젝트</button>`:''}
         <button class="btn-drop" onclick="showHistory('${o.pipeline_id}')">이력</button>
         <button class="btn-edit-opp" onclick="openEdit(${idx})">수정</button>
         ${!isDead&&o.status!=='계약'?`<button class="btn-drop" onclick="openDrop(${idx})">포기/실주</button>`:''}
@@ -619,7 +623,7 @@ async function saveOpp(){
         } }
     }catch(e){}
   }
-  if(ok && ['수주','계약','종료'].includes(status)){
+  if(ok && ['확정','수주','계약','종료'].includes(status)){  // v1.2(#7): 확정 단계부터 프로젝트 생성
     const plId=id||opps[opps.length-1].pipeline_id;
     await ensureProject(plId,status);
   }
@@ -654,7 +658,7 @@ async function ensureProject(plId,status){
       const maxN=prjs.reduce((m,x)=>{const n=parseInt((x.project_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
       p={project_id:`PRJ-2026-${String(maxN+1).padStart(3,'0')}`,project_name:o.opportunity,client:o.client,
         end_client:o.end_client,contract_amount:o.contract_amount,start_date:o.expected_start,end_date:o.expected_end,
-        status,payment_terms:o.payment_cycle,pipeline_id:plId,memo:'수주 전환 자동생성'};
+        status,payment_terms:o.payment_cycle,pipeline_id:plId,memo:'단계 전환 자동생성'};
       prjs.push(p);
     }
     const uniq=dedupe(prjs,'project_id');
@@ -705,6 +709,11 @@ async function showHistory(plId){
   }
 }
 window.addEventListener('load',()=>{ loadOpps(); });
+window.addEventListener('load',()=>{setTimeout(()=>{
+  const _pid=new URLSearchParams(location.search).get('pid');
+  if(_pid){const el=document.getElementById('card_'+_pid);
+    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.outline='3px solid var(--blue)';el.style.borderRadius='12px';
+      setTimeout(()=>el.style.outline='',4000);}}},700);});
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>HFC 데이터 입력</title>
+<title>HFC 세금계산서 관리</title>
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -79,7 +79,7 @@
 </head>
 <body>
 <header class="app-header">
-  <div class="app-logo">HFC 경영관리 <span>데이터 입력</span></div>
+  <div class="app-logo">HFC 경영관리 <span>세금계산서 관리</span></div>
   <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
   <button class="btn-icon" onclick="location.href='settings.html'">⚙️</button>
 </header>
@@ -88,16 +88,18 @@
   <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
   <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
   <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item active"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item active"><span class="sn-icon">🧾</span>세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
 </nav>
 
 <main class="main">
-  <div class="info-note">💡 입력 대상은 <b>수주·계약·종료</b> 상태의 사업기회에 연결된 프로젝트만 표시됩니다 (재무 반영 기준).</div>
+  <div style="margin-bottom:10px"><a href="fixed.html" style="font-size:12px;color:var(--blue);text-decoration:none">🏢 고정비 계획 화면으로 →</a></div>
+  <div class="info-note">💡 대상은 <b>확정</b> 이후 단계 프로젝트입니다. 재무 실적 집계는 수주부터 반영됩니다. 기존: <b>수주·계약·종료</b> 상태의 사업기회에 연결된 프로젝트만 표시됩니다 (재무 반영 기준).</div>
   <div class="tab-nav">
     <button class="tab-btn active" onclick="switchTab(event,'rev')">💰 계획 매출</button>
     <button class="tab-btn" onclick="switchTab(event,'cost')">🧾 계획 매입</button>
-    <button class="tab-btn" onclick="switchTab(event,'fix')">🏢 고정비</button>
   </div>
 
   <!-- 계획 매출 -->
@@ -135,6 +137,7 @@
         <button class="btn btn-primary" id="rev_btn" onclick="saveRev()">저장하기</button></div>
     </div>
     <div class="list-card"><div class="card-title"><span>계획 매출 내역 <span id="rev_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+      <select id="revYearFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 연도</option></select>
       <select id="revPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
       <div id="rev_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
@@ -182,12 +185,13 @@
         <button class="btn btn-primary" id="cost_btn" onclick="saveCost()">저장하기</button></div>
     </div>
     <div class="list-card"><div class="card-title"><span>계획 매입 내역 <span id="cost_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+      <select id="costYearFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 연도</option></select>
       <select id="costPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
       <div id="cost_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
 
   <!-- 고정비 -->
-  <div class="tab-content" id="tab-fix">
+  <div class="tab-content" id="tab-fix" style="display:none">
     <div class="form-card" style="margin-top:12px">
       <div class="card-title"><span>고정비 입력</span>
         <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetFix()">초기화</button></div>
@@ -267,7 +271,7 @@
   <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item active"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item active"><span class="tab-icon">🧾</span>세금계산서</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -345,6 +349,10 @@ async function loadAll(){
 }
 function prjLabel(pid){const p=allPrjs.find(x=>x.project_id===pid);return p?(p.project_name||pid):pid;}
 function fillPrjFilters(){
+  const yrs=[...new Set([...revenues,...costs].map(r=>(r.year_month||'').slice(0,4)).filter(Boolean))].sort();
+  ['revYearFilter','costYearFilter'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;
+    el.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
+    if([...el.options].some(o=>o.value===v))el.value=v;});
   const opts='<option value="">전체 프로젝트</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_name||p.project_id}</option>`).join('');
   ['revPrjFilter','costPrjFilter'].forEach(id=>{const el=document.getElementById(id);const v=el.value;el.innerHTML=opts;
     if([...el.options].some(o=>o.value===v))el.value=v;});
@@ -700,7 +708,7 @@ function renderGenPreview(){
   const on=document.getElementById('genDoRev').checked&&genRows.length;
   document.getElementById('genPreviewWrap').style.display=on?'block':'none';
   if(on){
-    document.getElementById('genCnt').textContent=`(${genRows.length}건)`;
+    document.getElementById('genCnt').textContent=`(${genRows.length}건 · 월 합산)`;
     document.getElementById('genPreview').innerHTML=genRows.map((g,i)=>`
       <tr><td><input type="date" value="${g.plan}" onchange="chgRevPlan(${i},this.value)"></td>
       <td><input value="${comma(g.supply)}" oninput="updRev(${i},this)" style="text-align:right"></td>

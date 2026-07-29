@@ -121,8 +121,10 @@
   <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
   <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
   <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
   <button class="side-nav-item active"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
 </nav>
 
 <main class="main">
@@ -164,7 +166,7 @@
   <div class="card" id="agingCard" style="display:none">
     <div class="card-title" style="color:var(--red)">⏰ 미수금 Aging <span style="font-size:11px;color:var(--text3);font-weight:400">수금예정일 경과 · 30일 초과 적색</span></div>
     <div id="agingList"></div>
-    <div id="payAgingTitle" style="display:none;font-size:12px;font-weight:600;color:var(--amber);margin-top:12px">💸 미지급 (수취완료·지급예정 경과)</div>
+    <div id="payAgingTitle" style="display:none;font-size:12px;font-weight:600;color:var(--amber);margin-top:12px">💸 미지급금 Aging <span style="font-size:11px;color:var(--text3);font-weight:400">수취완료·지급예정 경과</span></div>
     <div id="payAgingList"></div>
   </div>
 
@@ -172,7 +174,7 @@
   <div class="card">
     <div class="card-title">🔮 추정 자금수지 재계산
       <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;font-weight:400"><input type="checkbox" id="probToggle" checked> 확도가중 포함</label></div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.5">확정 수금예정(미수 건) + 기회·확정 사업기회 확도가중 + 지급예정·고정비·VAT 납부월을 반영해 S02를 재작성합니다. <span id="recalcInfo" style="color:var(--blue)"></span></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.5">확정~종료 수금예정(미수 건, 100%) + 기회 단계 확도가중 + 지급예정·고정비·VAT 납부월을 반영해 S02를 재작성합니다. <span id="recalcInfo" style="color:var(--blue)"></span></div>
     <button id="recalcBtn" onclick="recalcEstimate()" style="width:100%;padding:11px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:500;cursor:pointer">추정 재계산 실행</button>
   </div>
 
@@ -275,12 +277,19 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="txModal"><div class="modal">
+  <div class="modal-title"><span>📄 CSV 거래 내역</span><button onclick="document.getElementById('txModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <select id="txMonth" onchange="renderTx()" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)"></select>
+    <select id="txType" onchange="renderTx()" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)"></select></div>
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text3)"><th style="text-align:left;padding:5px">일자</th><th style="text-align:left">적요</th><th>입금</th><th>출금</th><th>유형</th><th>대사</th></tr></thead><tbody id="txBody"></tbody></table></div>
+</div></div>
 <nav class="tab-bar">
   <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
   <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
   <button class="tab-item active"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -481,6 +490,13 @@ function processBankRows(rows){
 // ── 분류 엔진 ─────────────────────────────────────────────────
 function kws(key,def){ return (settings[key]||def||'').split(',').map(k=>k.trim()).filter(Boolean); }
 function classify(desc,recv,branch,inAmt,outAmt){
+  // v1.2(#13,#15): 설정 코드 마스터 우선 적용
+  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.value)){
+    if((r.value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.key;
+  }
+  for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.key)){
+    if((branch||'').includes(b.key)) return b.value||'기타비용';
+  }
   const d=desc, rv=recv, br=branch;
   // v2.2 §4: S10 설정만 참조 (하드코딩 없음)
   if(inAmt>0){
@@ -536,6 +552,7 @@ function aggregateMonthly(txns){
   parsedMonthly=monthly;
   actData=Object.entries(monthly).map(([ym,v])=>({year_month:ym,...v})).sort((a,b)=>a.year_month.localeCompare(b.year_month));
   renderAll();
+  rebuildRecon();
   if(unclassified.length>0){
     document.getElementById('unclassCard').style.display='block';
     document.getElementById('unclassCount').textContent=unclassified.length+'건';
@@ -683,18 +700,17 @@ function openDetailModal(ym){
 }
 function closeDetailModal(){ document.getElementById('detailModal').classList.remove('open'); }
 
+function txnTypeNames(){
+  const c=s10All.filter(r=>r.category==='txn_type'&&r.key).map(r=>r.key);
+  return c.length?c:['매출입금','매입지급','고정비','급여','세금','법인카드','AI사용료','기타비용','기타입금'];
+}
 function openUnclassModal(){
   document.getElementById('unclassList').innerHTML=unclassified.map((t,i)=>`
     <div class="unclass-item">
       <div class="unclass-desc">${t.date} ${t.desc||t.recv}</div>
       <div class="unclass-amt">${won(t.outAmt,false)}</div>
       <select class="cat-select" id="ucat_${i}">
-        <option value="매입지급">매입지급</option>
-        <option value="고정비">고정비</option>
-        <option value="세금">세금</option>
-        <option value="법인카드">법인카드</option>
-        <option value="AI사용료">AI사용료</option>
-        <option value="기타비용" selected>기타비용</option>
+        ${txnTypeNames().map(n=>`<option value="${n}" ${n===(t.cat||'기타비용')?'selected':''}>${n}</option>`).join('')}
       </select>
     </div>`).join('');
   document.getElementById('unclassModal').classList.add('open');
@@ -760,10 +776,10 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[];
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],detailAll=[],s10All=[];
 async function loadSheets(){
   try{
-    const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows]=await Promise.all([
+    const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR]=await Promise.all([
       fetchSheet('S02_CASHFLOW_EST','A1:G24'),
       fetchSheet('S09_DASHBOARD','A1:H24'),
       fetchSheet('S10_SETTINGS','A1:E30'),
@@ -773,9 +789,11 @@ async function loadSheets(){
       fetchSheet('S05_COST','A1:O300'),
       fetchSheet('S06_FIXED_COST','A1:F300'),
       fetchSheet('S13_VAT','A1:N20'),
+      fetchSheet('S08_DETAIL','A1:J2000').catch(()=>[]),
     ]);
     estData=toObj(estRows);
     dashData=toObj(dashRows);
+    s10All=toObj(s10Rows);
     toObj(s10Rows).forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
     // 재무 반영 필터 (v2.2 §3)
     pipelinesAll=toObj(plRows); prjAll=toObj(prRows);
@@ -786,6 +804,8 @@ async function loadSheets(){
     planRev=s04All.filter(r=>okPrj.has(r.project_id));
     s05All=dedupe(toObj(csRows).filter(c=>c.cost_id),'cost_id');
     planCost=s05All.filter(c=>okPrj.has(c.project_id));
+    detailAll=toObj(dtR).filter(t=>t.txn_id);
+    setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
     const actRows=await fetchSheet('S08_CASHFLOW_ACT','A1:O24');
@@ -886,6 +906,52 @@ async function reconcile(){
   renderRecon(matches.length,cMatches.length);
   renderAging();
 }
+function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 화면 상시 재구성
+  if(!detailAll.length) return;
+  const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
+  const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
+  unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(parseInt(t.inflow_amt)||0)>0)
+    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:parseInt(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
+  unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(parseInt(t.outflow_amt)||0)>0)
+    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:parseInt(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
+  renderRecon();
+  const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
+}
+function _cands(list,amt,date){return list.filter(x=>x.a&&Math.abs(x.a-amt)<=1000&&x.d&&Math.abs(dDiff(x.d,date))<=45).slice(0,2);}
+function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id).map(r=>({id:r.revenue_id,a:parseInt(r.cash_recv_amt)||0,d:r.cash_recv_date}));
+  return _cands(open,t.inAmt,t.date).map(c=>`<button onclick="quickPick('mr_${i}','${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt);color:var(--blue);cursor:pointer">👍 ${won(c.a)}</button>`).join(' ');}
+function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date).map(c=>({id:c.cost_id,a:Math.round((parseInt(c.amount)||0)*1.1),d:c.payment_date}));
+  return _cands(open,t.outAmt,t.date).map(c=>`<button onclick="quickPick('mc_${i}','${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber-lt);color:var(--amber);cursor:pointer">👍 ${won(c.a)}</button>`).join(' ');}
+function quickPick(sel,val){const el=document.getElementById(sel);if(el)el.value=val;}
+async function saveReclass(){
+  let n=0;
+  document.querySelectorAll('[id^=rc_]').forEach(el=>{const t=detailAll.find(x=>x.txn_id===el.dataset.tid);
+    if(t&&el.value&&el.value!==t.category){t.category=el.value;n++;}});
+  if(!n){toast('변경된 분류가 없습니다');return;}
+  const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
+  const ok=await clearAndWrite('S08_DETAIL','A:J',[H,...detailAll.map(t=>H.map(h=>t[h]??''))]);
+  toast(ok?`분류 재지정 ${n}건 저장 ✓`:'저장 실패',!ok);
+  if(ok) rebuildRecon();
+}
+function openTxModal(){
+  const yms=[...new Set(detailAll.map(t=>t.year_month).filter(Boolean))].sort();
+  document.getElementById('txMonth').innerHTML='<option value="">전체 월</option>'+yms.map(y=>`<option>${y}</option>`).join('');
+  document.getElementById('txType').innerHTML='<option value="">전체 유형</option>'+txnTypeNames().map(n=>`<option>${n}</option>`).join('');
+  renderTx(); document.getElementById('txModal').classList.add('open');
+}
+function renderTx(){
+  const m=document.getElementById('txMonth').value, ty=document.getElementById('txType').value;
+  const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
+  const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
+  const list=detailAll.filter(t=>(!m||t.year_month===m)&&(!ty||t.category===ty));
+  document.getElementById('txBody').innerHTML=list.length?list.map(t=>{
+    const st=mR.has(t.txn_id)?'수금매칭':(mC.has(t.txn_id)?'지급매칭':'');
+    return `<tr><td>${t.txn_date}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${t.description||t.recv||''}</td>
+    <td style="text-align:right;color:var(--green)">${(parseInt(t.inflow_amt)||0)?won(t.inflow_amt):''}</td>
+    <td style="text-align:right;color:var(--red)">${(parseInt(t.outflow_amt)||0)?won(t.outflow_amt):''}</td>
+    <td>${t.category||'미분류'}</td><td style="color:var(--blue);font-size:11px">${st}</td></tr>`;}).join('')
+   :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>';
+}
 async function manualMatchCost(i){
   const t=unmatchedOut[i]; const cid=document.getElementById('mc_'+i).value;
   if(!cid){toast('매입 건을 선택하세요',true);return;}
@@ -906,7 +972,7 @@ function renderRecon(autoCnt,costCnt){
         <option value="">청구 건 선택…</option>
         ${openRows.map(r=>`<option value="${r.revenue_id}">${r.year_month} ${r.project_id} ${(parseInt(r.cash_recv_amt)||0).toLocaleString()}원</option>`).join('')}
       </select>
-      <button onclick="manualMatch(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer">매칭</button>
+      ${revCands(t,i)} <button onclick="manualMatch(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer">매칭</button>
     </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">미매칭 입금이 없습니다.</div>';
   const eligC=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
   document.getElementById('reconUnmatched').innerHTML+=unmatchedOut.length?('<div style="font-size:12px;font-weight:600;color:var(--amber);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미매칭 출금 (매입지급 분류)</div>'+unmatchedOut.map((t,i)=>`
@@ -916,8 +982,16 @@ function renderRecon(autoCnt,costCnt){
         <option value="">수취완료 매입 건 선택…</option>
         ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((parseInt(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
       </select>
-      <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
+      ${costCands(t,i)} <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
     </div>`).join('')):'';
+  // v1.2(#13): 미분류·기타 재지정 (상시)
+  const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);
+  document.getElementById('reconUnmatched').innerHTML+=rl.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미분류·기타 거래 재지정 <button onclick="saveReclass()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer;margin-left:6px">재지정 저장</button> <button onclick="openTxModal()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer">📄 CSV 거래 내역</button></div>'+rl.map(t=>`
+    <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="flex:1;min-width:140px">${t.txn_date} ${t.description||t.recv||''} <b>${won(parseInt(t.inflow_amt)||parseInt(t.outflow_amt)||0)}</b></span>
+      <select id="rc_${t.txn_id}" data-tid="${t.txn_id}" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface)">
+        ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
+      </select></div>`).join('')):('<div style="margin-top:10px"><button onclick="openTxModal()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer">📄 CSV 거래 내역 조회</button></div>');
 }
 async function manualMatch(i){
   const t=unmatchedDep[i]; const revId=document.getElementById('mm_'+i).value;
@@ -933,7 +1007,7 @@ function renderAging(){
     .map(r=>({...r,dd:dDiff(r.cash_recv_date,today)})).sort((a,b)=>b.dd-a.dd);
   const card=document.getElementById('agingCard');
   const hasPay=s05All.some(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<today);
-  if(!list.length&&!hasPay){card.style.display='none';return;}
+  
   card.style.display='block';
   const payList=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<today)
     .map(c=>({...c,dd:dDiff(c.payment_date,today)})).sort((a,b)=>b.dd-a.dd);
@@ -949,6 +1023,7 @@ function renderAging(){
       <span>${r.project_id} · ${r.year_month}<br><span style="color:var(--text3)">수금예정 ${r.cash_recv_date}</span></span>
       <span style="text-align:right"><b>${(parseInt(r.cash_recv_amt)||0).toLocaleString()}원</b><br>
       <span style="color:${r.dd>30?'var(--red)':'var(--amber)'};font-weight:700">D+${r.dd}</span></span></div>`).join('');
+  if(!list.length)document.getElementById('agingList').innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">경과 미수 해당 없음 ✓</div>';
 }
 
 // ═══ 추정 자금수지 재계산 엔진 (v2.3 §6) ═══
@@ -963,8 +1038,11 @@ async function recalcEstimate(){
     let bal=baseYm?actBy[baseYm]:0;
     const weighted=document.getElementById('probToggle').checked;
     const today=new Date().toISOString().slice(0,10);
-    const wRows=weighted?pipelinesAll.filter(p=>['기회','확정'].includes(p.status)&&un2(p.contract_amount)&&p.expected_start&&p.expected_end):[];
-    const okPl2=new Set(pipelinesAll.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    // v1.2(#12): 기본=확정~종료 100% / 토글 ON 추가=기회×확도
+    const confNoSch=pipelinesAll.filter(p=>p.status==='확정'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end
+      &&!prjAll.some(x=>x.pipeline_id===p.pipeline_id&&s04All.some(r=>r.project_id===x.project_id))).map(p=>({...p,probability:100}));
+    const wRows=[...(weighted?pipelinesAll.filter(p=>p.status==='기회'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end):[]),...confNoSch];
+    const okPl2=new Set(pipelinesAll.filter(p=>['확정','수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
     const okPrj2=new Set(prjAll.filter(p=>okPl2.has(p.pipeline_id)).map(p=>p.project_id));
     const rows=[];
     months.forEach(m=>{

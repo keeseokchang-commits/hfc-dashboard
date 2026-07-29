@@ -78,8 +78,10 @@
   <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
   <button class="side-nav-item active"><span class="sn-icon">📊</span>견적</button>
   <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">✏️</span>데이터 입력</button>
+  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
+  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
   <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
+  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
 </nav>
 
 <main class="main">
@@ -97,7 +99,7 @@
         <button class="ct-btn" onclick="compTab(event,'sol')">💿 솔루션</button>
         <button class="ct-btn" onclick="compTab(event,'etc')">📦 기타비용</button>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px" id="rateSetWrap">
         <span style="font-size:12px;color:var(--text2)">단가 세트</span>
         <select class="fi" style="max-width:200px" id="rateSetSel" onchange="renderLabor()"></select>
       </div>
@@ -139,7 +141,7 @@
   <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
   <button class="tab-item active"><span class="tab-icon">📊</span>견적</button>
   <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">✏️</span>입력</button>
+  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
   <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -348,6 +350,7 @@ function renderItems(k){
     </div>`).join('')||'<div class="empty">항목을 추가하세요</div>';
 }
 function compTab(ev,k){
+  document.getElementById('rateSetWrap').style.display=(k==='labor')?'flex':'none';
   document.querySelectorAll('.comp-panel').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.ct-btn').forEach(e=>e.classList.remove('active'));
   document.getElementById('panel-'+k).classList.add('active');ev.target.classList.add('active');
