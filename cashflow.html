@@ -158,7 +158,7 @@
 
   <!-- 통장 대사 -->
   <div class="card" id="reconCard" style="display:none">
-    <div class="card-title">🔗 통장 대사 (매출입금 ↔ 청구 건) <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
+    <div class="card-title">🔗 통장 대사 <button onclick="openTxModal()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer">📄 CSV 거래 내역</button> <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
     <div id="reconUnmatched"></div>
   </div>
 
@@ -782,8 +782,8 @@ async function loadSheets(){
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR]=await Promise.all([
       fetchSheet('S02_CASHFLOW_EST','A1:G24'),
       fetchSheet('S09_DASHBOARD','A1:H24'),
-      fetchSheet('S10_SETTINGS','A1:E30'),
-      fetchSheet('S01_PIPELINE','A1:L300'),
+      fetchSheet('S10_SETTINGS','A1:E300'),
+      fetchSheet('S01_PIPELINE','A1:M300'),
       fetchSheet('S03_PROJECT','A1:K200'),
       fetchSheet('S04_REVENUE','A1:M300'),
       fetchSheet('S05_COST','A1:O300'),
@@ -917,7 +917,10 @@ function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 �
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
 }
-function _cands(list,amt,date){return list.filter(x=>x.a&&Math.abs(x.a-amt)<=1000&&x.d&&Math.abs(dDiff(x.d,date))<=45).slice(0,2);}
+function _cands(list,amt,date){
+  const hit=list.filter(x=>x.a&&Math.abs(x.a-amt)<=1000&&x.d&&Math.abs(dDiff(x.d,date))<=45).slice(0,2);
+  return hit.length?hit:list.filter(x=>x.a&&Math.abs(x.a-amt)<=1000).slice(0,1);
+}
 function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id).map(r=>({id:r.revenue_id,a:parseInt(r.cash_recv_amt)||0,d:r.cash_recv_date}));
   return _cands(open,t.inAmt,t.date).map(c=>`<button onclick="quickPick('mr_${i}','${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt);color:var(--blue);cursor:pointer">👍 ${won(c.a)}</button>`).join(' ');}
 function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date).map(c=>({id:c.cost_id,a:Math.round((parseInt(c.amount)||0)*1.1),d:c.payment_date}));

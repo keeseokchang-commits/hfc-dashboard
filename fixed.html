@@ -73,7 +73,8 @@
   }
   @media(max-width:767px){.side-nav{display:none}}
 </style>
-<style>.dtable{width:100%;border-collapse:collapse;font-size:12px}.dtable th{font-size:11px;color:var(--text3);padding:7px 6px;border-bottom:2px solid var(--border);text-align:left}.dtable td{padding:7px 6px;border-bottom:1px solid var(--border)}</style>
+<style>.modal-title{font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.dtable{width:100%;border-collapse:collapse;font-size:12px}.dtable th{font-size:11px;color:var(--text3);padding:7px 6px;border-bottom:2px solid var(--border);text-align:left}.dtable td{padding:7px 6px;border-bottom:1px solid var(--border)}</style>
 </head><body>
 <header class="app-header"><div class="app-logo">🏢 고정비 계획<span id="authState" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></header>
 <nav class="side-nav">
@@ -115,19 +116,44 @@
 </nav>
 <div class="toast" id="toast"></div>
 <script>
-
 const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
 const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
 const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
 const SCOPES='https://www.googleapis.com/auth/spreadsheets';
 let accessToken=null,tokenClient;
-
+function toast(m,e=false){const t=document.getElementById('toast');t.textContent=m;t.style.background=e?'#DC2626':'#1A202C';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function toObj(rows){if(!rows.length)return[];const h=rows[0];return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));}
+function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
+function comma(n){return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString();}
+async function fetchSheet(s,r){const u=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(s+'!'+r)}?key=${API_KEY}`;const x=await fetch(u);if(!x.ok)throw new Error('읽기 오류 '+x.status);return (await x.json()).values||[];}
+function initOAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:(resp)=>{
+      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
+      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
+    }
+  });
+}
+function signIn(){
+  return new Promise(res=>{
+    pendingAuth=res;
+    try{ tokenClient.requestAccessToken(); }
+    catch(e){ pendingAuth=null; res(false); return; }
+    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
+  });
+}
+async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!accessToken)return false;}
+  const b=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
+  await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
+  const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
+  return r.ok;}
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
 let fixedAll=[],s10All=[];
 async function loadAll(){
  try{
-  const [fxR,stR]=await Promise.all([fetchSheet('S06_FIXED_COST','A1:F300'),fetchSheet('S10_SETTINGS','A1:E200').catch(()=>[])]);
+  const [fxR,stR]=await Promise.all([fetchSheet('S06_FIXED_COST','A1:F300'),fetchSheet('S10_SETTINGS','A1:E300').catch(()=>[])]);
   fixedAll=dedupe(toObj(fxR).filter(x=>x.fixed_id),'fixed_id');
   s10All=toObj(stR);
   const items=s10All.filter(r=>r.category==='fixed_item').map(r=>r.key);

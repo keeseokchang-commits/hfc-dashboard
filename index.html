@@ -395,7 +395,7 @@ async function render() {
       fetchSheet('S06_FIXED_COST',   'A1:F300'),
       fetchSheet('S09_DASHBOARD',    'A1:H24'),
       fetchSheet('S02_CASHFLOW_EST', 'A1:G24'),
-      fetchSheet('S01_PIPELINE',     'A1:L300'),
+      fetchSheet('S01_PIPELINE',     'A1:M300'),
       fetchSheet('S13_VAT',          'A1:N20'),
     ]);
 
@@ -513,6 +513,7 @@ async function render() {
     const prevYmStr=`${pm.y}-${String(pm.m).padStart(2,'0')}`;
     const todayStr2=nowD.toISOString().slice(0,10);
     const invDue=revenues.filter(r=>(r.invoice_plan_date||'').startsWith(thisYmStr)&&!r.invoice_date&&r.is_received!=='Y');
+    const costDue=costs.filter(c=>(c.invoice_plan_date||'').startsWith(thisYmStr)&&!c.invoice_date);
     const agingCnt=revenues.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<todayStr2).length;
     const csvDone=dashboard.some(d=>d.year_month===prevYmStr&&d.act_balance);
     const vatSoonAll=vatList.filter(v=>v.status!=='납부완료'&&(parseInt(v.estimated_payment)||0)>0&&v.due_date>=todayStr2).sort((a,b)=>a.due_date.localeCompare(b.due_date));
@@ -528,7 +529,6 @@ async function render() {
     closeItems+=ci(csvDone,`${parseInt(prevYmStr.slice(5))}월 통장 CSV 업로드${csvDone?' 완료':' 필요'}`,'cashflow.html',!csvDone);
     const payDue=costs.filter(c=>c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<todayStr2);
     closeItems+=ci(payDue.length===0,payDue.length?`미지급금 <b>${payDue.length}건</b> (${wonFull(payDue.reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0))}) — 지급예정 경과`:'미지급금 없음 (누계)','cashflow.html',payDue.length>0);
-    closeItems+=ci(invDue.length===0,invDue.length?`이번 달 발행할 세금계산서 <b>${invDue.length}건</b> (${wonFull(invDue.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0))})`:'이번 달 발행할 세금계산서 없음','input.html',invDue.length>0);
     closeItems+=ci(agingCnt===0,agingCnt?`미수금 <b>${agingCnt}건</b> — 수금예정일 경과`:'미수금 없음 (누계)','cashflow.html',agingCnt>0);
     if(vatSoon&&vatD!==null&&vatD<=30) closeItems+=ci(false,`부가세 ${vatSoon.memo||vatSoon.quarter_code} 납부 D-${vatD} (${wonFull(vatSoon.estimated_payment)})`,'vat.html',true);
     closeItems+=ci(!recalcNeeded,recalcNeeded?'추정 자금수지 재계산 권고 (실적 업로드 이후 미실행)':`추정 자금수지 최신 (${s02U?s02U.slice(0,10):'미실행'} 재계산)`,'cashflow.html',recalcNeeded);
@@ -536,6 +536,9 @@ async function render() {
       <div style="background:var(--surface);border-radius:12px;padding:14px 16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px">
         <div style="font-size:13px;font-weight:600;margin-bottom:4px">🗓️ ${parseInt(prevYmStr.slice(5))}월 마감 체크리스트</div>
         ${closeItems}
+          <div style="font-size:12px;font-weight:600;margin:10px 0 4px;color:var(--text2)">🗓 ${parseInt(thisYmStr.slice(5))}월 할 일</div>
+          ${ci(invDue.length===0,invDue.length?`발행할 매출 세금계산서 <b>${invDue.length}건</b> (${wonFull(invDue.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0))})`:'발행할 매출 세금계산서 없음','input.html',invDue.length>0)}
+          ${ci(costDue.length===0,costDue.length?`수취할 매입 세금계산서 <b>${costDue.length}건</b> (${wonFull(costDue.reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0))})`:'수취할 매입 세금계산서 없음','input.html',costDue.length>0)}
       </div>`;
 
     // ── HTML 렌더 ──

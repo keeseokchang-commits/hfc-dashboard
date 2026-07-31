@@ -153,55 +153,10 @@
   </div>
 
   <!-- ── CSV 키워드 ── -->
-  <div class="card">
-    <div class="card-title">🏷️ CSV 거래 유형 키워드</div>
-    <div class="card-sub">하나은행 거래내역 업로드 시 적요·의뢰인 텍스트로 유형을 분류합니다. 쉼표로 구분해 입력하세요.</div>
-    <div id="kwSection">
-      <div class="kw-row">
-        <div class="kw-label"><span class="kw-badge kw-green">매출 입금</span></div>
-        <input class="kw-input" id="kw_revenue_inflow" placeholder="예: 이노라인,비플레이스">
-        <div class="kw-hint">거래처명이 적요 또는 의뢰인에 포함되면 매출 입금으로 분류</div>
-      </div>
-      <div class="kw-row">
-        <div class="kw-label"><span class="kw-badge kw-amber">매입 지급</span></div>
-        <input class="kw-input" id="kw_cost_outflow" placeholder="예: 오벳소프트,외주비">
-      </div>
-      <div class="kw-row">
-        <div class="kw-label"><span class="kw-badge kw-blue">고정비</span></div>
-        <input class="kw-input" id="kw_fixed_outflow" placeholder="예: 급여,임차료,4대보험,세무">
-      </div>
-      <div class="kw-row">
-        <div class="kw-label"><span class="kw-badge kw-red">세금</span></div>
-        <input class="kw-input" id="kw_tax_outflow" placeholder="예: 부가세,법인세,원천세">
-      </div>
-      <div class="kw-row">
-        <div class="kw-label"><span class="kw-badge kw-blue">자본 납입</span></div>
-        <input class="kw-input" id="kw_capital_inflow" placeholder="예: 장기석">
-        <div class="kw-hint">매출이 아닌 자본금·가수금 입금 (자금수지 별도 표시)</div>
-      </div>
-      <div style="margin-top:14px;display:flex;justify-content:flex-end">
-        <button class="btn btn-primary" onclick="saveKeywords()">키워드 저장</button>
-      </div>
-    </div>
-  </div>
+  
 
   <!-- ── 거래점 분류 규칙 ── -->
-  <div class="card">
-    <div class="card-title">🏦 거래점 분류 규칙</div>
-    <div class="card-sub">거래점(Branch) 값 기준 자동 분류. 법인카드·AI 사용료 등을 거래점으로 묶습니다.</div>
-    <div class="kw-row">
-      <div class="kw-label"><span class="kw-badge kw-amber">법인카드 사용</span></div>
-      <input class="kw-input" id="kw_card_branch" placeholder="예: 하나은행0026,하나은행0996">
-    </div>
-    <div class="kw-row">
-      <div class="kw-label"><span class="kw-badge kw-blue">AI 사용료</span></div>
-      <input class="kw-input" id="kw_ai_branch" placeholder="예: 하나금융센터,하나증권금융센터">
-      <div class="kw-hint">거래점명에 이 텍스트가 포함되면 AI 사용료로 분류 (세금 키워드가 우선)</div>
-    </div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end">
-      <button class="btn btn-primary" onclick="saveBranchRules()">분류 규칙 저장</button>
-    </div>
-  </div>
+  
 
   <!-- ── 알림 파라미터 ── -->
   <div class="card">
@@ -470,10 +425,10 @@ async function deleteSet(){
 // ── S10 설정 (키워드·파라미터) ─────────────────────────────────
 async function loadSettings(){
   try{
-    const rows=await fetchSheet('S10_SETTINGS','A1:E30');
+    const rows=await fetchSheet('S10_SETTINGS','A1:E300');
     toObj(rows).forEach(r=>{ if(r.setting_key) settingsMap[r.setting_key]=r.setting_value; });
     // 키워드 채우기
-    ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow','kw_card_branch','kw_ai_branch'].forEach(k=>{
+    ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow','kw_card_branch','kw_ai_branch'].forEach(k=>{ const _e=document.getElementById(k); if(!_e) return;
       const el=document.getElementById(k);
       if(el&&settingsMap[k]) el.value=settingsMap[k];
     });

@@ -166,7 +166,7 @@ async function loadAll(){
   try{
     const [vtR,rvR,csR,plR,prR]=await Promise.all([
       fetchSheet('S13_VAT','A1:N20'),fetchSheet('S04_REVENUE','A1:M300'),
-      fetchSheet('S05_COST','A1:O300'),fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S03_PROJECT','A1:K200')]);
+      fetchSheet('S05_COST','A1:O300'),fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200')]);
     vats=dedupe(toObj(vtR).filter(v=>v.vat_id),'vat_id');
     const pls=toObj(plR),prjs=toObj(prR);
     // 재무 필터

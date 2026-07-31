@@ -219,7 +219,7 @@ function mmBetween(s,e){
 async function loadAll(){
   try{
     const [plR,rtR,esR]=await Promise.all([
-      fetchSheet('S01_PIPELINE','A1:L300'),fetchSheet('S11_GRADE_RATE','A1:H100'),fetchSheet('S12_ESTIMATE','A1:O500')]);
+      fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S11_GRADE_RATE','A1:H100'),fetchSheet('S12_ESTIMATE','A1:O500')]);
     opps=toObj(plR).filter(o=>o.pipeline_id);
     rates=toObj(rtR).filter(r=>r.set_id);
     estimates=dedupe(toObj(esR).filter(e=>e.estimate_id),'estimate_id');
