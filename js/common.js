@@ -23,9 +23,16 @@ function signIn(){
 }
 async function fetchSheet(sheet,range){
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
-  const res=await fetch(url);
-  if(!res.ok) throw new Error(sheet+' 읽기 오류 '+res.status);
-  return (await res.json()).values||[];
+  // v2.0.2: 429(쿼터)·5xx 일시 오류 자동 재시도 — 0.8s→1.6s→3.2s 백오프
+  for(let i=0;i<4;i++){
+    const res=await fetch(url);
+    if(res.ok) return (await res.json()).values||[];
+    if(res.status===429||res.status>=500){
+      if(i<3){ await new Promise(r=>setTimeout(r,800*Math.pow(2,i))); continue; }
+      throw new Error(sheet+' 읽기 오류 '+res.status+' — API 호출 한도. 잠시 후 다시 시도하세요');
+    }
+    throw new Error(sheet+' 읽기 오류 '+res.status);
+  }
 }
 async function clearAndWrite(sheet,range,rows){
   if(!accessToken){ await signIn(); if(!accessToken) return false; }
