@@ -7,7 +7,7 @@ const R={ // 읽기 [시트명, 범위]
   S05:['S05_COST','A1:O300'],
   S06:['S06_FIXED_COST','A1:F300'],
   S08:['S08_CASHFLOW_ACT','A1:O24'],
-  S08:['S08_DETAIL','A1:J2000'],
+  S08_DETAIL:['S08_DETAIL','A1:J2000'],
   S09:['S09_DASHBOARD','A1:H24'],
   S10:['S10_SETTINGS','A1:E300'],
   S11:['S11_GRADE_RATE','A1:H100'],
@@ -15,7 +15,7 @@ const R={ // 읽기 [시트명, 범위]
   S13:['S13_VAT','A1:N20'],
   S14:['S14_HISTORY','A1:H999'],
 };
-const W={ // 쓰기
+const W={ // 쓰기 [시트명, 범위]
   S01:['S01_PIPELINE','A:M'],
   S02:['S02_CASHFLOW_EST','A:G'],
   S03:['S03_PROJECT','A:K'],
@@ -23,7 +23,7 @@ const W={ // 쓰기
   S05:['S05_COST','A:O'],
   S06:['S06_FIXED_COST','A:F'],
   S08:['S08_CASHFLOW_ACT','A:O'],
-  S08:['S08_DETAIL','A:J'],
+  S08_DETAIL:['S08_DETAIL','A:J'],
   S09:['S09_DASHBOARD','A:H'],
   S10:['S10_SETTINGS','A:E'],
   S11:['S11_GRADE_RATE','A:H'],
