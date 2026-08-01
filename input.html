@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.3">
+<link rel="stylesheet" href="css/common.css?v=2.3.1">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -273,10 +273,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.3"></script>
-<script src="js/common.js?v=2.3"></script>
-<script src="js/calc.js?v=2.3"></script>
-<script src="js/nav.js?v=2.3"></script>
+<script src="js/schema.js?v=2.3.1"></script>
+<script src="js/common.js?v=2.3.1"></script>
+<script src="js/calc.js?v=2.3.1"></script>
+<script src="js/nav.js?v=2.3.1"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 
@@ -316,7 +316,8 @@ async function loadAll(){
 }
 function prjLabel(pid){const p=allPrjs.find(x=>x.project_id===pid);return p?(p.project_name||pid):pid;}
 function fillPrjFilters(){
-  const yrs=[...new Set([...revenues,...costs].map(r=>(r.year_month||'').slice(0,4)).filter(Boolean))].sort();
+  const _ok=new Set(financePrjs.map(p=>p.project_id));
+  const yrs=[...new Set([...revenues,...costs].filter(r=>_ok.has(r.project_id)).map(r=>(r.year_month||'').slice(0,4)).filter(Boolean))].sort();
   ['revYearFilter','costYearFilter'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;
     el.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
     if([...el.options].some(o=>o.value===v))el.value=v;});
@@ -332,7 +333,7 @@ function renderLists(){
   const cy=gv('costYearFilter'), cf=gv('costPrjFilter'), cst=gv('costStFilter');
   const revSt=r=>r.is_received==='Y'?'입금완료':(r.invoice_date?'발행완료':'발행대기');
   const costSt=c=>c.pay_actual_date?'지급완료':(c.invoice_date?'수취완료':'수취대기');
-  const rv=revenues.filter(r=>r.revenue_id&&(!ry||(r.year_month||'').startsWith(ry))&&(!rf||r.project_id===rf)&&(!rst||revSt(r)===rst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  const rv=revenues.filter(r=>r.revenue_id&&okIds.has(r.project_id)&&(!ry||(r.year_month||'').startsWith(ry))&&(!rf||r.project_id===rf)&&(!rst||revSt(r)===rst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('rev_cnt').textContent=`(${rv.length}건)`;
   document.getElementById('rev_list').innerHTML=rv.length?rv.map(r=>{
     const st=r.is_received==='Y'?['badge-on','입금완료']:(r.invoice_date?['badge-on','발행완료·수금대기']:['badge-hold','발행예정']);
@@ -346,7 +347,7 @@ function renderLists(){
         ${!r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markInvoiced('${r.revenue_id}')">발행 완료</button>`:''}
         <button class="btn-edit" onclick="editRev('${r.revenue_id}')">수정</button></span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
-  const cs=costs.filter(c=>c.cost_id&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
   document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
     const st=c.pay_actual_date?['badge-on','지급완료']:(c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정']);
