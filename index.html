@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 경영관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4">
+<link rel="stylesheet" href="css/common.css?v=2.4.1">
 <style>
   :root {
     --bg:        #F2F4F7;
@@ -271,10 +271,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4"></script>
-<script src="js/common.js?v=2.4"></script>
-<script src="js/calc.js?v=2.4"></script>
-<script src="js/nav.js?v=2.4"></script>
+<script src="js/schema.js?v=2.4.1"></script>
+<script src="js/common.js?v=2.4.1"></script>
+<script src="js/calc.js?v=2.4.1"></script>
+<script src="js/nav.js?v=2.4.1"></script>
 <script>
 // ── 설정 ──────────────────────────────────────────────────────
 
@@ -483,8 +483,16 @@ async function render() {
     // ── 월 마감 체크리스트 (v2.3 §7) ──
     const nowD=new Date();
     const thisYmStr=`${nowD.getFullYear()}-${String(nowD.getMonth()+1).padStart(2,'0')}`;
-    const invDue=revenues.filter(r=>(r.invoice_plan_date||'').startsWith(thisYmStr)&&!r.invoice_date&&r.is_received!=='Y');
-    const costDue=costs.filter(c=>(c.invoice_plan_date||'').startsWith(thisYmStr)&&!c.invoice_date);
+    const invDue=revenues.filter(r=>r.invoice_plan_date&&r.invoice_plan_date.slice(0,7)<=thisYmStr&&!r.invoice_date&&r.is_received!=='Y');
+    const costDue=costs.filter(c=>c.invoice_plan_date&&c.invoice_plan_date.slice(0,7)<=thisYmStr&&!c.invoice_date);
+    // v2.4.1: 세금계산서 합계(공급+VAT) — S04 공급가=tax_invoice_amt, S05 공급가=amount, vat_amt 폴백 10%
+    const revTot=r=>{const su=parseInt(r.tax_invoice_amt)||0;return su+(parseInt(r.vat_amt)||Math.round(su*0.1));};
+    const costTot=c=>{const su=parseInt(c.amount)||0;return su+(parseInt(c.vat_amt)||Math.round(su*0.1));};
+    const carryR=invDue.filter(r=>r.invoice_plan_date.slice(0,7)<thisYmStr).length;
+    const carryC=costDue.filter(c=>c.invoice_plan_date.slice(0,7)<thisYmStr).length;
+    const dueLine=(o,su,tot,plan,carry)=>`<div style="font-size:11px;color:var(--text3);padding:2px 0 2px 22px">${carry?'<span style=\'color:var(--amber)\'>[이월]</span> ':''}${o} · 공급 ${wonFull(su)} + VAT = <b>${wonFull(tot)}</b> · 예정 ${plan}</div>`;
+    const revDetail=invDue.map(r=>dueLine(`${r.year_month} ${r.project_id}`,parseInt(r.tax_invoice_amt)||0,revTot(r),r.invoice_plan_date,r.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
+    const costDetail=costDue.map(c=>dueLine(`${c.year_month} ${c.project_id}`,parseInt(c.amount)||0,costTot(c),c.invoice_plan_date,c.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
     const agingList=revenues.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<todayStr2);
     const agingCnt=agingList.length;
     const agingAmt=agingList.reduce((t,r)=>t+(parseInt(r.cash_recv_amt)||0),0);
@@ -500,8 +508,9 @@ async function render() {
         <span style="font-size:15px">${done?'✅':(warn?'⚠️':'☐')}</span><span style="flex:1">${txt}</span><span style="color:var(--text3);font-size:11px">›</span></a>`;
     let closeItems='';
     closeItems+=ci(csvDone,`${parseInt(prevYmStr.slice(5))}월 통장 CSV 업로드${csvDone?' 완료':' 필요'}`,'cashflow.html',!csvDone);
+    const costTot2=c=>{const su=parseInt(c.amount)||0;return su+(parseInt(c.vat_amt)||Math.round(su*0.1));};
     const payDue=costs.filter(c=>c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<todayStr2);
-    closeItems+=ci(payDue.length===0,payDue.length?`미지급금 <b>${payDue.length}건</b> (${wonFull(payDue.reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0))} · VAT 포함) — 지급예정 경과`:'미지급금 없음 (누계)','cashflow.html',payDue.length>0);
+    closeItems+=ci(payDue.length===0,payDue.length?`미지급금 <b>${payDue.length}건</b> (${wonFull(payDue.reduce((t,c)=>t+costTot2(c),0))} · VAT 포함) — 지급예정 경과`:'미지급금 없음 (누계)','cashflow.html',payDue.length>0);
     closeItems+=ci(agingCnt===0,agingCnt?`미수금 <b>${agingCnt}건</b> (${wonFull(agingAmt)} · VAT 포함) — 수금예정일 경과`:'미수금 없음 (누계)','cashflow.html',agingCnt>0);
     if(vatSoon&&vatD!==null&&vatD<=30) closeItems+=ci(false,`부가세 ${vatSoon.memo||vatSoon.quarter_code} 납부 D-${vatD} (${wonFull(vatSoon.estimated_payment)})`,'vat.html',true);
     closeItems+=ci(!recalcNeeded,recalcNeeded?'추정 자금수지 재계산 권고 (실적 업로드 이후 미실행)':`추정 자금수지 최신 (${s02U?s02U.slice(0,10):'미실행'} 재계산)`,'cashflow.html',recalcNeeded);
@@ -510,8 +519,10 @@ async function render() {
         <div style="font-size:13px;font-weight:600;margin-bottom:4px">🗓️ ${parseInt(prevYmStr.slice(5))}월 마감 체크리스트</div>
         ${closeItems}
           <div style="font-size:12px;font-weight:600;margin:10px 0 4px;color:var(--text2)">🗓 ${parseInt(thisYmStr.slice(5))}월 할 일</div>
-          ${ci(invDue.length===0,invDue.length?`발행할 매출 세금계산서 <b>${invDue.length}건</b> (${wonFull(invDue.reduce((s,r)=>s+Math.round((parseInt(r.amount)||0)*1.1),0))} · VAT 포함)`:'발행할 매출 세금계산서 없음','input.html',invDue.length>0)}
-          ${ci(costDue.length===0,costDue.length?`수취할 매입 세금계산서 <b>${costDue.length}건</b> (${wonFull(costDue.reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0))} · VAT 포함)`:'수취할 매입 세금계산서 없음','input.html',costDue.length>0)}
+          ${ci(invDue.length===0,invDue.length?`발행할 매출 세금계산서 <b>${invDue.length}건</b>${carryR?` <span style="color:var(--amber)">(이월 ${carryR}건 포함)</span>`:''} (${wonFull(invDue.reduce((t,r)=>t+revTot(r),0))} · VAT 포함)`:'발행할 매출 세금계산서 없음','input.html',invDue.length>0)}
+          ${revDetail}
+          ${ci(costDue.length===0,costDue.length?`수취할 매입 세금계산서 <b>${costDue.length}건</b>${carryC?` <span style="color:var(--amber)">(이월 ${carryC}건 포함)</span>`:''} (${wonFull(costDue.reduce((t,c)=>t+costTot(c),0))} · VAT 포함)`:'수취할 매입 세금계산서 없음','input.html',costDue.length>0)}
+          ${costDetail}
       </div>`;
 
     // ── HTML 렌더 ──
