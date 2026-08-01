@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.1">
+<link rel="stylesheet" href="css/common.css?v=2.2">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -150,7 +150,7 @@
 
   <!-- 통장 대사 -->
   <div class="card" id="reconCard" style="display:none">
-    <div class="card-title">🔗 통장 대사 <button onclick="openTxModal()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer">📄 CSV 거래 내역</button> <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
+    <div class="card-title">🔗 통장 대사 <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
     <div id="reconUnmatched"></div>
   </div>
 
@@ -274,15 +274,19 @@
   <div style="display:flex;gap:8px;margin-bottom:10px">
     <select id="txMonth" onchange="renderTx()" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)"></select>
     <select id="txType" onchange="renderTx()" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)"></select></div>
+  <div style="display:flex;gap:6px;margin-bottom:10px">
+    <button id="txBtnD" onclick="setTxMode('detail')" style="flex:1;padding:6px;border-radius:7px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-size:12px;cursor:pointer">건별 내역</button>
+    <button id="txBtnS" onclick="setTxMode('sum')" style="flex:1;padding:6px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">유형별 집계</button>
+  </div>
   <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text3)"><th style="text-align:left;padding:5px">일자</th><th style="text-align:left">적요</th><th>입금</th><th>출금</th><th>유형</th><th>대사</th></tr></thead><tbody id="txBody"></tbody></table></div>
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.1"></script>
-<script src="js/common.js?v=2.1"></script>
-<script src="js/calc.js?v=2.1"></script>
-<script src="js/nav.js?v=2.1"></script>
+<script src="js/schema.js?v=2.2"></script>
+<script src="js/common.js?v=2.2"></script>
+<script src="js/calc.js?v=2.2"></script>
+<script src="js/nav.js?v=2.2"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -882,11 +886,35 @@ function openTxModal(){
   document.getElementById('txType').innerHTML='<option value="">전체 유형</option>'+txnTypeNames().map(n=>`<option>${n}</option>`).join('');
   renderTx(); document.getElementById('txModal').classList.add('open');
 }
+let txMode='detail';
+function setTxMode(m){
+  txMode=m;
+  const on=(el,y)=>{el.style.background=y?'var(--blue)':'var(--surface)';el.style.color=y?'#fff':'var(--text2)';el.style.borderColor=y?'var(--blue)':'var(--border)';};
+  on(document.getElementById('txBtnD'),m==='detail'); on(document.getElementById('txBtnS'),m==='sum');
+  renderTx();
+}
 function renderTx(){
   const m=document.getElementById('txMonth').value, ty=document.getElementById('txType').value;
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
   const list=detailAll.filter(t=>(!m||t.year_month===m)&&(!ty||t.category===ty));
+  if(txMode==='sum'){ // v2.2: 유형별 집계 (월 필터 적용)
+    const agg={};
+    list.forEach(t=>{const c=t.category||'미분류'; const a=agg[c]=agg[c]||{n:0,i:0,o:0};
+      a.n++; a.i+=parseInt(t.inflow_amt)||0; a.o+=parseInt(t.outflow_amt)||0;});
+    const rows=Object.entries(agg).sort((x,y)=>(y[1].o+y[1].i)-(x[1].o+x[1].i));
+    const ti=rows.reduce((s,[,a])=>s+a.i,0), to=rows.reduce((s,[,a])=>s+a.o,0), tn=rows.reduce((s,[,a])=>s+a.n,0);
+    document.getElementById('txBody').innerHTML=(rows.length?rows.map(([c,a])=>`
+      <tr><td colspan="2" style="padding:6px 5px"><b>${c}</b></td>
+      <td style="text-align:right;color:var(--green)">${a.i?won(a.i):''}</td>
+      <td style="text-align:right;color:var(--red)">${a.o?won(a.o):''}</td>
+      <td style="text-align:center;color:var(--text3)">${a.n}건</td><td></td></tr>`).join('')
+      +`<tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="2" style="padding:7px 5px">합계</td>
+      <td style="text-align:right;color:var(--green)">${won(ti)}</td><td style="text-align:right;color:var(--red)">${won(to)}</td>
+      <td style="text-align:center">${tn}건</td><td></td></tr>`
+      :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>');
+    return;
+  }
   document.getElementById('txBody').innerHTML=list.length?list.map(t=>{
     const st=mR.has(t.txn_id)?'수금매칭':(mC.has(t.txn_id)?'지급매칭':'');
     return `<tr><td>${t.txn_date}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${t.description||t.recv||''}</td>
@@ -929,12 +957,12 @@ function renderRecon(autoCnt,costCnt){
     </div>`).join('')):'';
   // v1.2(#13): 미분류·기타 재지정 (상시)
   const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);
-  document.getElementById('reconUnmatched').innerHTML+=rl.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미분류·기타 거래 재지정 <button onclick="saveReclass()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer;margin-left:6px">재지정 저장</button> <button onclick="openTxModal()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer">📄 CSV 거래 내역</button></div>'+rl.map(t=>`
+  document.getElementById('reconUnmatched').innerHTML+=rl.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미분류·기타 거래 재지정 <button onclick="saveReclass()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer;margin-left:6px">재지정 저장</button></div>'+rl.map(t=>`
     <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span style="flex:1;min-width:140px">${t.txn_date} ${t.description||t.recv||''} <b>${won(parseInt(t.inflow_amt)||parseInt(t.outflow_amt)||0)}</b></span>
       <select id="rc_${t.txn_id}" data-tid="${t.txn_id}" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface)">
         ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
-      </select></div>`).join('')):('<div style="margin-top:10px"><button onclick="openTxModal()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer">📄 CSV 거래 내역 조회</button></div>');
+      </select></div>`).join('')):'';
 }
 async function manualMatch(i){
   const t=unmatchedDep[i]; const revId=document.getElementById('mm_'+i).value;
