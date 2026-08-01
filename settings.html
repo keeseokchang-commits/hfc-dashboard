@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.0.2">
+<link rel="stylesheet" href="css/common.css?v=2.0.3">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -206,10 +206,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.0.2"></script>
-<script src="js/common.js?v=2.0.2"></script>
-<script src="js/calc.js?v=2.0.2"></script>
-<script src="js/nav.js?v=2.0.2"></script>
+<script src="js/schema.js?v=2.0.3"></script>
+<script src="js/common.js?v=2.0.3"></script>
+<script src="js/calc.js?v=2.0.3"></script>
+<script src="js/nav.js?v=2.0.3"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -262,8 +262,8 @@ function selectSet(sid){
   const s=sets[sid];
   if(!s) return;
   document.getElementById('setEditor').style.display='block';
-  document.getElementById('setNameInput').value=s.name;
-  document.getElementById('setDefaultChk').checked=s.isDefault;
+  (el=>{if(el)el.value=s.name;})(document.getElementById('setNameInput'));
+  (el=>{if(el)el.checked=s.isDefault;})(document.getElementById('setDefaultChk'));
   renderRateBody(s.grades);
 }
 
@@ -312,7 +312,7 @@ function addNewSet(){
     rateRows.push({set_id:newId,set_name:'새 단가 세트',grade:g,sell_price:'0',buy_price:'0',description:'',is_default:'N',updated_at:new Date().toISOString().slice(0,10)});
   });
   selectSet(newId);
-  document.getElementById('setNameInput').value='새 단가 세트';
+  (el=>{if(el)el.value='새 단가 세트';})(document.getElementById('setNameInput'));
   document.getElementById('setNameInput').focus();
 }
 
@@ -374,9 +374,9 @@ async function loadSettings(){
       if(el&&settingsMap[k]) el.value=settingsMap[k];
     });
     // 기본값 세팅 (없으면)
-    if(!settingsMap.kw_capital_inflow) document.getElementById('kw_capital_inflow').value='장기석';
-    if(!settingsMap.kw_card_branch) document.getElementById('kw_card_branch').value='하나은행0026,하나은행0996';
-    if(!settingsMap.kw_ai_branch) document.getElementById('kw_ai_branch').value='하나금융센터,하나증권금융센터';
+    if(!settingsMap.kw_capital_inflow) (el=>{if(el)el.value='장기석';})(document.getElementById('kw_capital_inflow'));
+    if(!settingsMap.kw_card_branch) (el=>{if(el)el.value='하나은행0026,하나은행0996';})(document.getElementById('kw_card_branch'));
+    if(!settingsMap.kw_ai_branch) (el=>{if(el)el.value='하나금융센터,하나증권금융센터';})(document.getElementById('kw_ai_branch'));
     // 파라미터
     ['param_alert_threshold','param_alert_days','param_cash_warn_months'].forEach(k=>{
       const el=document.getElementById(k);
