@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.0.3">
+<link rel="stylesheet" href="css/common.css?v=2.1">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -152,7 +152,7 @@
 
   <!-- ── 알림 파라미터 ── -->
   <div class="card">
-    <div class="card-title">🗂 코드 관리 <span style="font-size:11px;color:var(--text3);font-weight:400">v1.2 — 유형·규칙·항목 추가/삭제 가능 (아래가 우선 적용, 상단 키워드는 폴백)</span></div>
+    <div class="card-title">🗂 코드 관리 <a href="docs/코드관리_매뉴얼.pdf" target="_blank" style="font-size:11px;font-weight:600;color:var(--blue);text-decoration:none;border:1px solid var(--blue);border-radius:6px;padding:3px 9px;margin-left:8px">📖 매뉴얼(PDF)</a> <span style="font-size:11px;color:var(--text3);font-weight:400">v1.2 — 유형·규칙·항목 추가/삭제 가능 (아래가 우선 적용, 상단 키워드는 폴백)</span></div>
     <div style="font-size:12px;font-weight:700;margin:4px 0 6px">① 거래 유형 & 키워드 <small style="color:var(--text3)">(CSV 자동분류·대사·집계의 기준)</small></div>
     <div id="ctTxn"></div><button class="btn-mini" onclick="addCode('txn_type')">+ 유형 추가</button>
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">② 거래점 분류 규칙 <small style="color:var(--text3)">(거래점 패턴 → 유형, 키워드보다 후순위)</small></div>
@@ -164,7 +164,8 @@
   </div>
   <style>.btn-mini{font-size:11px;padding:5px 10px;border-radius:6px;border:1px dashed var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
   .code-row{display:flex;gap:6px;margin-bottom:6px}.code-row input{flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)}
-  .code-row button{border:none;background:none;color:var(--red);cursor:pointer;font-size:12px}</style>
+  .code-row button{border:none;background:none;color:var(--red);cursor:pointer;font-size:12px}
+  .code-row button[title]{color:var(--text3);font-size:11px}</style>
   <div class="card">
     <div class="card-title">🔔 알림 파라미터</div>
     <div class="param-row">
@@ -206,10 +207,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.0.3"></script>
-<script src="js/common.js?v=2.0.3"></script>
-<script src="js/calc.js?v=2.0.3"></script>
-<script src="js/nav.js?v=2.0.3"></script>
+<script src="js/schema.js?v=2.1"></script>
+<script src="js/common.js?v=2.1"></script>
+<script src="js/calc.js?v=2.1"></script>
+<script src="js/nav.js?v=2.1"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -452,6 +453,8 @@ function renderCodes(){
   const mk=(c,ph1,ph2,useDL)=>codeRows[c].map((r,i)=>`<div class="code-row">
     <input value="${r[0]||''}" placeholder="${ph1}" data-c="${c}" data-i="${i}" data-f="0" oninput="codeRows['${c}'][${i}][0]=this.value${c==='txn_type'?';fillDL()':''}">
     <input value="${r[1]||''}" placeholder="${ph2}" ${useDL?'list="typeDL"':''} oninput="codeRows['${c}'][${i}][1]=this.value">
+    <button onclick="moveCode('${c}',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
+    <button onclick="moveCode('${c}',${i},1)" title="우선순위 내리기" ${i===codeRows[c].length-1?'disabled style="opacity:.25"':''}>▼</button>
     <button onclick="codeRows['${c}'].splice(${i},1);renderCodes()">✕</button></div>`).join('');
   document.getElementById('ctTxn').innerHTML=mk('txn_type','유형명 (예: 매입지급)','키워드 콤마구분 (예: 오벳소프트,외주비)');
   document.getElementById('ctBranch').innerHTML=mk('branch_rule','거래점 패턴 (예: 하나은행0026)','적용 유형 (예: 법인카드)',true);
@@ -459,6 +462,11 @@ function renderCodes(){
   fillDL();
 }
 function fillDL(){document.getElementById('typeDL').innerHTML=codeRows.txn_type.map(r=>`<option value="${r[0]}">`).join('');}
+function moveCode(c,i,d){
+  const j=i+d; if(j<0||j>=codeRows[c].length) return;
+  [codeRows[c][i],codeRows[c][j]]=[codeRows[c][j],codeRows[c][i]];
+  renderCodes();
+}
 function addCode(c){codeRows[c].push(['','']);renderCodes();}
 async function saveCodes(){
   const today=new Date().toISOString().slice(0,10);
