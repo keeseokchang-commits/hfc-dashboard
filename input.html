@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.4.1">
+<link rel="stylesheet" href="css/common.css?v=2.4.2">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -273,10 +273,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.1"></script>
-<script src="js/common.js?v=2.4.1"></script>
-<script src="js/calc.js?v=2.4.1"></script>
-<script src="js/nav.js?v=2.4.1"></script>
+<script src="js/schema.js?v=2.4.2"></script>
+<script src="js/common.js?v=2.4.2"></script>
+<script src="js/calc.js?v=2.4.2"></script>
+<script src="js/nav.js?v=2.4.2"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 
@@ -345,6 +345,7 @@ function renderLists(){
       <span class="li-amt">합계 ${wf(r.cash_recv_amt)} <span style="font-size:10px;color:var(--text3)">(예정 ${r.cash_recv_date||'─'})</span></span>
       <span style="display:flex;gap:6px">
         ${!r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markInvoiced('${r.revenue_id}')">발행 완료</button>`:''}
+        ${r.is_received==='Y'?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkRecv('${r.revenue_id}')">입금 해제</button>`:''}
         <button class="btn-edit" onclick="editRev('${r.revenue_id}')">수정</button></span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
   const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
@@ -359,7 +360,8 @@ function renderLists(){
       <span class="li-amt">${wf(c.amount)}</span>
       <span style="display:flex;gap:6px">
         ${!c.invoice_date?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markCostInvoiced('${c.cost_id}')">수취 완료</button>`:''}
-        <button class="btn-edit" onclick="editCost('${c.cost_id}')">수정</button></span></div></div>`;}).join('')
+        <button class="btn-edit" ${c.pay_actual_date?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkPay('${c.cost_id}')">지급 해제</button>`:''}
+        onclick="editCost('${c.cost_id}')">수정</button></span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
   const fx=fixed.filter(f=>f.fixed_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('fix_cnt').textContent=`(${fx.length}건)`;
@@ -707,6 +709,19 @@ async function saveGen(){
   btn.disabled=false;btn.textContent='생성 저장';
   if(allOk){toast(`✓ 스케줄 생성 완료: ${msgs.join(' · ')}`);closeGenModal();renderLists();}
   else toast('저장 실패 — 남은 대상은 다시 시도하세요',true);
+}
+// v2.4.2: 오매칭 복구 — 입금/지급 확인 해제(매칭 정보 제거, 발행 정보는 보존)
+async function unmarkRecv(id){
+  if(!confirm('이 건의 입금확인을 해제합니다. (발행 정보는 유지)')) return;
+  const next=revenues.map(r=>r.revenue_id===id?{...r,is_received:'',recv_actual_date:'',matched_txn_id:''}:r);
+  const ok=await clearAndWrite(...W.S04,[H4,...dedupe(next,'revenue_id').map(r=>H4.map(h=>r[h]??''))]);
+  if(ok){revenues=dedupe(next,'revenue_id');toast('입금확인 해제 ✓');renderLists();}else toast('저장 실패',true);
+}
+async function unmarkPay(id){
+  if(!confirm('이 건의 지급확인을 해제합니다. (수취 정보는 유지)')) return;
+  const next=costs.map(c=>c.cost_id===id?{...c,pay_actual_date:'',matched_txn_id:''}:c);
+  const ok=await clearAndWrite(...W.S05,[H5,...dedupe(next,'cost_id').map(c=>H5.map(h=>c[h]??''))]);
+  if(ok){costs=dedupe(next,'cost_id');toast('지급확인 해제 ✓');renderLists();}else toast('저장 실패',true);
 }
 async function markInvoiced(id){
   const r=revenues.find(x=>x.revenue_id===id); if(!r)return;

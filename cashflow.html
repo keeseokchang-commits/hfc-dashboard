@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4.1">
+<link rel="stylesheet" href="css/common.css?v=2.4.2">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -283,10 +283,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.1"></script>
-<script src="js/common.js?v=2.4.1"></script>
-<script src="js/calc.js?v=2.4.1"></script>
-<script src="js/nav.js?v=2.4.1"></script>
+<script src="js/schema.js?v=2.4.2"></script>
+<script src="js/common.js?v=2.4.2"></script>
+<script src="js/calc.js?v=2.4.2"></script>
+<script src="js/nav.js?v=2.4.2"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -804,22 +804,18 @@ async function saveS04(next){
 }
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
+  // v2.4.2 보수 원칙(매입과 대칭): 발행 완료 건만 · 후보 정확히 1건일 때만 자동 · 사용된 거래ID 재매칭 금지
   const deps=parsedTxns.filter(t=>t.cat==='매출입금'&&t.inAmt>0);
-  const open=s04All.filter(r=>r.is_received!=='Y');
+  const usedTxnR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
+  const open=s04All.filter(r=>r.is_received!=='Y'&&r.invoice_date);
   const used=new Set(); unmatchedDep=[]; const matches=[];
   deps.forEach(t=>{
+    if(t.txnId&&usedTxnR.has(t.txnId)){return;} // 이미 다른 건에 매칭된 입금(재업로드) 스킵
     const cands=open.filter(r=>!used.has(r.revenue_id)
       &&Math.abs((parseInt(r.cash_recv_amt)||0)-t.inAmt)<=1000
       &&r.cash_recv_date&&Math.abs(dDiff(r.cash_recv_date,t.date))<=45);
-    let pick=cands.length===1?cands[0]:null;
-    if(!pick&&cands.length>1){
-      const kw=kws('kw_revenue_inflow','').find(k=>(t.recv||'').includes(k)||(t.desc||'').includes(k));
-      if(kw){const byC=cands.filter(r=>{const p=prjAll.find(x=>x.project_id===r.project_id);return p&&((p.client||'')+(p.project_name||'')).includes(kw);});
-        if(byC.length)pick=byC[0];}
-      if(!pick)pick=cands[0];
-    }
-    if(pick){used.add(pick.revenue_id);matches.push([t,pick]);}
-    else unmatchedDep.push(t);
+    if(cands.length===1){used.add(cands[0].revenue_id);matches.push([t,cands[0]]);}
+    else unmatchedDep.push(t); // 0건 또는 동액 다건 → 수동(추천 후보 버튼)
   });
   if(matches.length){
     const next=s04All.map(r=>{const m=matches.find(x=>x[1].revenue_id===r.revenue_id);
@@ -833,7 +829,9 @@ async function reconcile(){
   const eligible=()=>s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
   unmatchedOut=[]; const cMatches=[];
   const usedC=new Set();
+  const usedTxnC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
   outs.forEach(t=>{
+    if(t.txnId&&usedTxnC.has(t.txnId)){return;} // v2.4.2: 재업로드 중복 매칭 방지
     const cands=eligible().filter(c=>!usedC.has(c.cost_id)
       &&Math.abs(Math.round((parseInt(c.amount)||0)*1.1)-t.outAmt)<=1000
       &&c.payment_date&&Math.abs(dDiff(c.payment_date,t.date))<=45);
