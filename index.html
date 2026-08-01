@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 경영관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root {
     --bg:        #F2F4F7;
@@ -233,7 +234,7 @@
   }
 </style>
 </head>
-<body>
+<body data-page="dash">
 
 <!-- 헤더 -->
 <header class="app-header">
@@ -245,16 +246,7 @@
 </header>
 
 <!-- PC 사이드 네비 -->
-<nav class="side-nav" aria-label="메인 메뉴">
-  <button class="side-nav-item active"><span class="sn-icon">🏠</span> 대시보드</button>
-  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span> 사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span> 견적</button>
-    <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span> 세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span> 자금수지</button>
-  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav" aria-label="메인 메뉴"></nav>
 
 <!-- 메인 -->
 <main class="main" id="mainContent">
@@ -275,40 +267,19 @@
 </div>
 
 <!-- 하단 탭바 (모바일) -->
-<nav class="tab-bar" aria-label="하단 메뉴">
-  <button class="tab-item active"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar" aria-label="하단 메뉴"></nav>
 
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
 // ── 설정 ──────────────────────────────────────────────────────
-const SHEETS_ID  = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY    = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE'; // ← Google Cloud Console에서 발급한 API Key 입력
 
 // ── Sheets API 호출 ──────────────────────────────────────────
-async function fetchSheet(sheetName, range) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheetName + '!' + range)}?key=${API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Sheets API 오류: ${res.status}`);
-  const data = await res.json();
-  return data.values || [];
-}
-
 // 행 배열 → 객체 배열 변환
-function toObjects(rows) {
-  if (!rows.length) return [];
-  const headers = rows[0];
-  return rows.slice(1).map(r =>
-    Object.fromEntries(headers.map((h, i) => [h, r[i] ?? '']))
-  );
-}
-
 // ── 날짜 계산 ─────────────────────────────────────────────────
 function today() { return new Date(); }
 function parseDate(s) { return s ? new Date(s) : null; }
@@ -325,7 +296,6 @@ function won(n) {
   const v = parseInt(n) || 0;
   return (v/1000000).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' 백만원';
 }
-function wonFull(n) { return (parseInt(n)||0).toLocaleString() + '원'; }
 function pct(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
 
 // ── 알림 ─────────────────────────────────────────────────────
@@ -389,14 +359,14 @@ async function render() {
 
     // ── 데이터 호출 ──
     const [projRows, revRows, costRows, fixRows, dashRows, estRows, plRows, vtRows] = await Promise.all([
-      fetchSheet('S03_PROJECT',      'A1:K200'),
-      fetchSheet('S04_REVENUE',      'A1:M300'),
-      fetchSheet('S05_COST',         'A1:O300'),
-      fetchSheet('S06_FIXED_COST',   'A1:F300'),
-      fetchSheet('S09_DASHBOARD',    'A1:H24'),
-      fetchSheet('S02_CASHFLOW_EST', 'A1:G24'),
-      fetchSheet('S01_PIPELINE',     'A1:M300'),
-      fetchSheet('S13_VAT',          'A1:N20'),
+      fetchSheet(...R.S03),
+      fetchSheet(...R.S04),
+      fetchSheet(...R.S05),
+      fetchSheet(...R.S06),
+      fetchSheet(...R.S09),
+      fetchSheet(...R.S02),
+      fetchSheet(...R.S01),
+      fetchSheet(...R.S13),
     ]);
 
     // v2.2 §3 재무 반영 필터: 수주·계약·종료 사업기회 연결 프로젝트만

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -83,22 +84,13 @@
   .btn-gen{height:32px;font-size:12px;padding:0 14px;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:600}
 </style>
 </head>
-<body>
+<body data-page="input">
 <header class="app-header">
   <div class="app-logo">HFC 경영관리 <span>세금계산서 관리</span></div>
   <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
   <button class="btn-icon" onclick="location.href='settings.html'">⚙️</button>
 </header>
-<nav class="side-nav">
-  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
-  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
-  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item active"><span class="sn-icon">🧾</span>세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
-  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav"></nav>
 
 <main class="main">
   <div style="margin-bottom:10px"><a href="fixed.html" style="font-size:12px;color:var(--blue);text-decoration:none">🏢 고정비 계획 화면으로 →</a></div>
@@ -278,56 +270,18 @@
   </div>
 </div>
 
-<nav class="tab-bar">
-  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item active"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
-const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
-const SCOPES='https://www.googleapis.com/auth/spreadsheets';
-let accessToken=null,tokenClient;
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 
-function comma(n){return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString();}
-function un(s){return parseInt(String(s).replace(/,/g,''))||0;}
-function fc(v){const n=String(v).replace(/[^\d]/g,'');return n?parseInt(n).toLocaleString():'';}
 function wf(n){return comma(n)+'원';}
-function toast(m,e=false){const t=document.getElementById('toast');t.textContent=m;t.style.background=e?'#DC2626':'#1A202C';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
-async function fetchSheet(s,r){const u=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(s+'!'+r)}?key=${API_KEY}`;const x=await fetch(u);if(!x.ok)throw new Error('읽기 오류 '+x.status);return (await x.json()).values||[];}
-function toObj(rows){if(!rows.length)return[];const h=rows[0];return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));}
-async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!accessToken)return false;}
-  const b=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
-  await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
-  const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
-  return r.ok;}
 let pendingAuth=null;
-function initOAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{
-      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
-      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
-    }
-  });
-}
-function signIn(){
-  return new Promise(res=>{
-    pendingAuth=res;
-    try{ tokenClient.requestAccessToken(); }
-    catch(e){ pendingAuth=null; res(false); return; }
-    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
-  });
-}
-function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
-
 function switchTab(ev,t){
   document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
@@ -343,9 +297,9 @@ function nextId(list,key,prefix){
 async function loadAll(){
   try{
     const [plR,prR,rvR,csR,fxR,esR]=await Promise.all([
-      fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200'),
-      fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:O300'),fetchSheet('S06_FIXED_COST','A1:F300'),
-      fetchSheet('S12_ESTIMATE','A1:O500').catch(()=>[])]);
+      fetchSheet(...R.S01),fetchSheet(...R.S03),
+      fetchSheet(...R.S04),fetchSheet(...R.S05),fetchSheet(...R.S06),
+      fetchSheet(...R.S12).catch(()=>[])]);
     estAll=toObj(esR).filter(e=>e.estimate_id);
     pipelines=toObj(plR); allPrjs=toObj(prR);
     const pls=pipelines, prjs=allPrjs;
@@ -446,7 +400,7 @@ async function saveRev(){
     invoice_date:document.getElementById('rev_invdate').value||old.invoice_date||'',
     matched_txn_id:old.matched_txn_id||'',recv_actual_date:old.recv_actual_date||''};
   const next=dedupe([...revenues.filter(r=>r.revenue_id&&r.revenue_id!==id),rec],'revenue_id');
-  const ok=await clearAndWrite('S04_REVENUE','A:M',[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
+  const ok=await clearAndWrite(...W.S04,[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
   if(ok){revenues=next;toast('계획 매출 저장 ✓');resetRev();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 async function saveCost(){
@@ -463,7 +417,7 @@ async function saveCost(){
     invoice_date:document.getElementById('cost_invdate').value||oldc.invoice_date||'',
     matched_txn_id:oldc.matched_txn_id||'',pay_actual_date:oldc.pay_actual_date||''};
   const next=dedupe([...costs.filter(c=>c.cost_id&&c.cost_id!==id),rec],'cost_id');
-  const ok=await clearAndWrite('S05_COST','A:O',[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
+  const ok=await clearAndWrite(...W.S05,[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
   if(ok){costs=next;toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 async function saveFix(){
@@ -474,7 +428,7 @@ async function saveFix(){
   const rec={fixed_id:id,year_month:ym,category:document.getElementById('fix_category').value,
     amount:amt,payment_date:document.getElementById('fix_date').value,memo:document.getElementById('fix_memo').value};
   const next=dedupe([...fixed.filter(f=>f.fixed_id&&f.fixed_id!==id),rec],'fixed_id');
-  const ok=await clearAndWrite('S06_FIXED_COST','A:F',[H6,...next.map(f=>H6.map(h=>f[h]??''))]);
+  const ok=await clearAndWrite(...W.S06,[H6,...next.map(f=>H6.map(h=>f[h]??''))]);
   btn.disabled=false;btn.textContent='저장하기';
   if(ok){fixed=next;toast('고정비 저장 ✓');resetFix();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
 
@@ -529,69 +483,6 @@ function closeGenModal(){document.getElementById('genModal').classList.remove('o
 function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId);}
 function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);}
 function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);}
-function addMonthsKeepDay(d,k){
-  const y=d.getFullYear(),m=d.getMonth()+k,day=d.getDate();
-  const nd=new Date(y,m,day);
-  if(nd.getDate()!==day) return new Date(y,m+1,0); // 월말 보정 (1/31+1개월→2/28)
-  return nd;
-}
-function mmTotal(s,e){
-  // SI 관례(2026-07-25 승인): d일 투입 ~ (d-1)일 철수 = 정확히 1개월.
-  // 총MM = 대응 개월수 k + 잔여일/잔여월 총일수(소수 2자리)
-  if(!s||!e) return 0;
-  const a=new Date(s), b=new Date(e);
-  if(isNaN(a)||isNaN(b)||b<a) return 0;
-  let k=0;
-  while(k<240){
-    const cycEnd=new Date(addMonthsKeepDay(a,k+1).getTime()-86400000);
-    if(cycEnd<=b) k++; else break;
-  }
-  const anchor=addMonthsKeepDay(a,k);
-  let frac=0;
-  if(anchor<=b){
-    const dim=new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate();
-    const days=Math.round((b-anchor)/86400000)+1;
-    frac=Math.round(days/dim*100)/100;
-  }
-  return (k+frac).toFixed(2);
-}
-function mmMonthly(sd,ed){
-  // 월별 MM 분해: 시작월=일할 소수2자리 반올림(1일 시작이면 1.00), 중간=1.00, 마지막월=총MM-앞선 합(잔여)
-  const a=new Date(sd), b=new Date(ed);
-  if(isNaN(a)||isNaN(b)||b<a) return [];
-  const total=parseFloat(mmTotal(sd,ed));
-  const list=[]; let c=new Date(a.getFullYear(),a.getMonth(),1);
-  while(c<=b){ list.push({y:c.getFullYear(),m:c.getMonth()+1,mm:0}); c=new Date(c.getFullYear(),c.getMonth()+1,1); }
-  if(list.length===1){ list[0].mm=total; return list; }
-  const dim0=new Date(a.getFullYear(),a.getMonth()+1,0).getDate();
-  let first=(a.getDate()===1)?1:Math.round((dim0-a.getDate()+1)/dim0*100)/100;
-  list[0].mm=first; let acc=first;
-  for(let i=1;i<list.length-1;i++){ list[i].mm=1; acc+=1; }
-  list[list.length-1].mm=Math.max(0,Math.round((total-acc)*100)/100);
-  return list;
-}
-function monthlyProfile(items,priceField,defStart,defEnd){
-  // 항목별 기간 기반 월별 원시 금액(실수) 합산 — 라운딩은 profileToRows에서 일괄 처리
-  const byM={};
-  items.forEach(e=>{
-    const p=parseInt(e[priceField])||0; if(!p)return;
-    if(e.comp_type==='인건비'){
-      mmMonthly(e.start_date||defStart,e.end_date||defEnd).forEach(x=>{
-        const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+p*x.mm;});
-    } else {
-      const total=(parseInt(e.qty)||1)*p;
-      if(e.start_date&&e.end_date){
-        const ms=ymList(e.start_date,e.end_date); const tw=ms.reduce((s,x)=>s+x.w,0)||1;
-        ms.forEach(x=>{const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+total*x.w/tw;});
-      } else {
-        const sd=new Date(e.start_date||defStart);
-        const k=`${sd.getFullYear()}-${pad2(sd.getMonth()+1)}`;
-        byM[k]=(byM[k]||0)+total;
-      }
-    }
-  });
-  return byM;
-}
 function cut100(v){return Math.floor(v/100)*100;}
 function profileToRows(byM,totalExact){
   // 라운딩 표준: 각 월 백원단위 절사, 차액은 마지막 월 산입 → 합계=totalExact 정확 일치
@@ -795,7 +686,7 @@ async function saveGen(){
       cash_recv_date:g.recv,is_received:'N',memo:'청구 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
       invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',recv_actual_date:''};});
     const next=dedupe([...base,...recs],'revenue_id');
-    const ok=await clearAndWrite('S04_REVENUE','A:M',[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
+    const ok=await clearAndWrite(...W.S04,[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
     if(ok){revenues=next;msgs.push(`매출 ${recs.length}건`);}else allOk=false;
   }
   if(allOk&&doCost){
@@ -809,7 +700,7 @@ async function saveGen(){
       amount:g.supply,payment_date:g.pay,memo:'매입 스케줄 자동생성(월합산)',vat_amt:Math.round(g.supply*.1),
       invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',pay_actual_date:''};});
     const next=dedupe([...base,...recs],'cost_id');
-    const ok=await clearAndWrite('S05_COST','A:O',[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
+    const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
     if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
   }
   btn.disabled=false;btn.textContent='생성 저장';
@@ -825,7 +716,7 @@ async function markInvoiced(id){
   genPl=pl;
   const due=r.cash_recv_date||recvDue(today);
   const next=revenues.map(x=>x.revenue_id===id?{...x,invoice_date:today,cash_recv_date:due}:x);
-  const ok=await clearAndWrite('S04_REVENUE','A:M',[H4,...dedupe(next,'revenue_id').map(x=>H4.map(h=>x[h]??''))]);
+  const ok=await clearAndWrite(...W.S04,[H4,...dedupe(next,'revenue_id').map(x=>H4.map(h=>x[h]??''))]);
   if(ok){revenues=dedupe(next,'revenue_id');toast('발행 완료 ✓ 수금예정 '+due);renderLists();}
   else toast('저장 실패',true);
 }
@@ -834,7 +725,7 @@ async function markCostInvoiced(id){
   const today=new Date().toISOString().slice(0,10);
   if(!confirm(`${c.year_month} · ${c.cost_type} 건을 오늘(${today}) 수취 완료 처리할까요?`))return;
   const next=costs.map(x=>x.cost_id===id?{...x,invoice_date:today}:x);
-  const ok=await clearAndWrite('S05_COST','A:O',[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
+  const ok=await clearAndWrite(...W.S05,[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
   if(ok){costs=dedupe(next,'cost_id');toast('수취 완료 ✓');renderLists();}
   else toast('저장 실패',true);
 }

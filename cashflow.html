@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -110,22 +111,13 @@
   @media(max-width:767px){.side-nav{display:none}}
 </style>
 </head>
-<body>
+<body data-page="cashflow">
 <header class="app-header">
   <div class="app-logo">HFC 경영관리 <span>자금수지</span></div>
   <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
   <button class="btn-icon" title="설정" onclick="location.href='settings.html'">⚙️</button>
 </header>
-<nav class="side-nav">
-  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
-  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
-  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item active"><span class="sn-icon">💵</span>자금수지</button>
-  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav"></nav>
 
 <main class="main">
 
@@ -284,23 +276,14 @@
     <select id="txType" onchange="renderTx()" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)"></select></div>
   <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text3)"><th style="text-align:left;padding:5px">일자</th><th style="text-align:left">적요</th><th>입금</th><th>출금</th><th>유형</th><th>대사</th></tr></thead><tbody id="txBody"></tbody></table></div>
 </div></div>
-<nav class="tab-bar">
-  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item active"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
-const SHEETS_ID = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY   = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-const CLIENT_ID = '129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
-const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
-
-let accessToken = null, tokenClient;
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
 let unclassified = [];
@@ -312,26 +295,11 @@ function won(n, short=true){
   return (parseInt(n)||0).toLocaleString()+'원';
 }
 function pct(n){ return (parseFloat(n)||0).toFixed(1)+'%'; }
-function toast(msg,err=false){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C';
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800);
-}
 function thisMonth(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
 function gaugeColor(acc){ return acc===null?'a':acc>=80?'g':acc>=60?'a':'r'; }
 function gaugePct(acc){ return acc===null?0:Math.max(0,Math.min(100,acc)); }
 
 // ── Sheets 읽기 ───────────────────────────────────────────────
-async function fetchSheet(sheet,range){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
-  const r=await fetch(url); if(!r.ok) throw new Error(`읽기 오류 ${r.status}`);
-  return (await r.json()).values||[];
-}
-function toObj(rows){
-  if(!rows.length) return [];
-  const h=rows[0]; return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));
-}
-
 // ── Sheets 쓰기 ───────────────────────────────────────────────
 async function appendRows(sheet,rows){
   if(!accessToken){ await signIn(); if(!accessToken) return false; }
@@ -339,36 +307,8 @@ async function appendRows(sheet,rows){
   const r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
   return r.ok;
 }
-async function clearAndWrite(sheet,range,rows){
-  if(!accessToken){ await signIn(); if(!accessToken) return false; }
-  const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
-  await fetch(`${base}/values/${encodeURIComponent(sheet+'!'+range)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
-  const url=`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`;
-  const r=await fetch(url,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
-  return r.ok;
-}
-
 // ── OAuth ─────────────────────────────────────────────────────
 let pendingAuth=null;
-function initOAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{
-      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
-      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
-    }
-  });
-}
-function signIn(){
-  return new Promise(res=>{
-    pendingAuth=res;
-    try{ tokenClient.requestAccessToken(); }
-    catch(e){ pendingAuth=null; res(false); return; }
-    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
-  });
-}
-function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
-
 // ── CSV/XLSX 파싱 ─────────────────────────────────────────────
 function handleDrop(e){
   e.preventDefault();
@@ -741,7 +681,7 @@ async function saveToSheets(){
     m.outflow_card||0,m.outflow_ai||0,m.outflow_etc,
     m.inflow_capital||0,m.inflow_etc||0,m.unclassified_cnt||0,today
   ]);
-  const ok1=await clearAndWrite('S08_CASHFLOW_ACT','A:O',[s08Header,...s08Rows]);
+  const ok1=await clearAndWrite(...W.S08,[s08Header,...s08Rows]);
 
   // S08_DETAIL 헤더 + 거래 상세
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
@@ -749,7 +689,7 @@ async function saveToSheets(){
     t.txnId,
     t.date,t.desc,t.inAmt,t.outAmt,t.bal,t.recv,t.branch,t.cat,t.ym
   ]);
-  const ok2=await clearAndWrite('S08_DETAIL','A:J',[s08dHeader,...s08dRows]);
+  const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
 
   // S09_DASHBOARD 업데이트 (실잔액·정합도)
   await updateDashboard();
@@ -772,7 +712,7 @@ async function updateDashboard(){
     const alert=acc!==null&&acc<80?'Y':'N';
     return [e.year_month,estBal,actBal??'',diff??'',acc!==null?acc.toFixed(1):'',cause,alert,today];
   });
-  await clearAndWrite('S09_DASHBOARD','A:H',[s09Header,...s09Rows]);
+  await clearAndWrite(...W.S09,[s09Header,...s09Rows]);
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
@@ -780,16 +720,16 @@ let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=ne
 async function loadSheets(){
   try{
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR]=await Promise.all([
-      fetchSheet('S02_CASHFLOW_EST','A1:G24'),
-      fetchSheet('S09_DASHBOARD','A1:H24'),
-      fetchSheet('S10_SETTINGS','A1:E300'),
-      fetchSheet('S01_PIPELINE','A1:M300'),
-      fetchSheet('S03_PROJECT','A1:K200'),
-      fetchSheet('S04_REVENUE','A1:M300'),
-      fetchSheet('S05_COST','A1:O300'),
-      fetchSheet('S06_FIXED_COST','A1:F300'),
-      fetchSheet('S13_VAT','A1:N20'),
-      fetchSheet('S08_DETAIL','A1:J2000').catch(()=>[]),
+      fetchSheet(...R.S02),
+      fetchSheet(...R.S09),
+      fetchSheet(...R.S10),
+      fetchSheet(...R.S01),
+      fetchSheet(...R.S03),
+      fetchSheet(...R.S04),
+      fetchSheet(...R.S05),
+      fetchSheet(...R.S06),
+      fetchSheet(...R.S13),
+      fetchSheet(...R.S08_DETAIL).catch(()=>[]),
     ]);
     estData=toObj(estRows);
     dashData=toObj(dashRows);
@@ -808,7 +748,7 @@ async function loadSheets(){
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
-    const actRows=await fetchSheet('S08_CASHFLOW_ACT','A1:O24');
+    const actRows=await fetchSheet(...R.S08);
     const loaded=toObj(actRows);
     if(loaded.length) actData=loaded;
     renderAll();
@@ -853,10 +793,10 @@ function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
 async function saveS05(next){
-  return await clearAndWrite('S05_COST','A:O',[H5C,...dedupe(next,'cost_id').map(c=>H5C.map(h=>c[h]??''))]);
+  return await clearAndWrite(...W.S05,[H5C,...dedupe(next,'cost_id').map(c=>H5C.map(h=>c[h]??''))]);
 }
 async function saveS04(next){
-  return await clearAndWrite('S04_REVENUE','A:M',[H4C,...dedupe(next,'revenue_id').map(r=>H4C.map(h=>r[h]??''))]);
+  return await clearAndWrite(...W.S04,[H4C,...dedupe(next,'revenue_id').map(r=>H4C.map(h=>r[h]??''))]);
 }
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
@@ -932,7 +872,7 @@ async function saveReclass(){
     if(t&&el.value&&el.value!==t.category){t.category=el.value;n++;}});
   if(!n){toast('변경된 분류가 없습니다');return;}
   const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
-  const ok=await clearAndWrite('S08_DETAIL','A:J',[H,...detailAll.map(t=>H.map(h=>t[h]??''))]);
+  const ok=await clearAndWrite(...W.S08_DETAIL,[H,...detailAll.map(t=>H.map(h=>t[h]??''))]);
   toast(ok?`분류 재지정 ${n}건 저장 ✓`:'저장 실패',!ok);
   if(ok) rebuildRecon();
 }
@@ -1070,9 +1010,9 @@ async function recalcEstimate(){
       rows.push([m,inflow,outflow,vat,bal,weighted?'확도가중 ON':'확정분만',today]);
     });
     const header=['year_month','est_inflow','est_outflow','est_vat','est_balance','pipeline_basis','updated_at'];
-    const ok=await clearAndWrite('S02_CASHFLOW_EST','A:G',[header,...rows]);
+    const ok=await clearAndWrite(...W.S02,[header,...rows]);
     if(ok){
-      const er=await fetchSheet('S02_CASHFLOW_EST','A1:G24'); estData=toObj(er);
+      const er=await fetchSheet(...R.S02); estData=toObj(er);
       document.getElementById('recalcInfo').textContent=`마지막 재계산 ${today} (${weighted?'확도가중 ON':'확정분만'})`;
       toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct();
     } else toast('재계산 저장 실패',true);

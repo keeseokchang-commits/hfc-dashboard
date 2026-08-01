@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 프로젝트 조회</title>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -98,18 +99,9 @@
   .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:90dvh;overflow-y:auto;padding:20px 16px 32px}
 </style>
 </head>
-<body>
+<body data-page="project">
 <header class="app-header"><div class="app-logo">📁 프로젝트 조회<span id="hdrRight"></span></div></header>
-<nav class="side-nav">
-  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
-  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
-  <button class="side-nav-item active"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
-  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav"></nav>
 
 <main class="main">
 
@@ -141,39 +133,24 @@
   <div id="histBody" style="font-size:12px"></div>
 </div></div>
 
-<nav class="tab-bar">
-  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item active"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
-const SHEET_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-async function fetchSheet(name,range){
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name+'!'+range)}?key=${API_KEY}`);
-  if(!r.ok)throw new Error(name+' 로드 실패');
-  return (await r.json()).values||[];
-}
-function toObj(rows){if(!rows||rows.length<2)return[];const h=rows[0];return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]??'');return o;});}
-function dedupe(list,key){const m=new Map();(list||[]).forEach(r=>{if(r&&r[key])m.set(r[key],r);});return [...m.values()];}
-function comma(n){return (parseInt(n)||0).toLocaleString('ko-KR');}
 function wf(n){return comma(n)+'원';}
-function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',3000);}
-
 const SC={'수주':['#ECFDF5','#059669'],'계약':['#F0FDFA','#0D9488'],'종료':['#F1F5F9','#64748B']};
 let pipelines=[],prjs=[],s04=[],s05=[],est=[],curFilter='전체',curPrj=null,curPl=null;
 
 async function loadAll(){
  try{
   const [plR,prR,rvR,csR,esR]=await Promise.all([
-    fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200'),
-    fetchSheet('S04_REVENUE','A1:M300'),fetchSheet('S05_COST','A1:O300'),
-    fetchSheet('S12_ESTIMATE','A1:O500').catch(()=>[])]);
+    fetchSheet(...R.S01),fetchSheet(...R.S03),
+    fetchSheet(...R.S04),fetchSheet(...R.S05),
+    fetchSheet(...R.S12).catch(()=>[])]);
   pipelines=toObj(plR);
   const okPl=new Set(pipelines.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
   prjs=dedupe(toObj(prR).filter(p=>okPl.has(p.pipeline_id)),'project_id');
@@ -289,7 +266,7 @@ async function showHist(){
   document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">불러오는 중…</div>';
   document.getElementById('histModal').classList.add('open');
   try{
-    const rows=await fetchSheet('S14_HISTORY','A1:H999');
+    const rows=await fetchSheet(...R.S14);
     const list=toObj(rows).filter(h=>h.pipeline_id===curPrj.pipeline_id).sort((a,b)=>(b.changed_at||'').localeCompare(a.changed_at||''));
     document.getElementById('histBody').innerHTML=list.length?list.map(h=>`
       <div style="padding:9px 0;border-bottom:1px solid var(--border)">

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -99,23 +100,14 @@
   @media(max-width:767px){.side-nav{display:none}}
 </style>
 </head>
-<body>
+<body data-page="settings">
 
 <header class="app-header">
   <div class="app-logo">HFC 경영관리 <span>시스템 설정</span></div>
   <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
 </header>
 
-<nav class="side-nav">
-  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
-  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
-  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
-  <button class="side-nav-item active"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav"></nav>
 
 <main class="main">
 
@@ -211,23 +203,14 @@
 
 </main>
 
-<nav class="tab-bar">
-  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
-const SHEETS_ID = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY   = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-const CLIENT_ID = '129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
-const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
-
-let accessToken=null, tokenClient;
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
 let settingsMap={};   // S10 설정
@@ -235,55 +218,13 @@ let settingsMap={};   // S10 설정
 document.getElementById('sheetsLink').href=`https://docs.google.com/spreadsheets/d/${SHEETS_ID}/edit`;
 
 // ── 유틸 ──────────────────────────────────────────────────────
-function comma(n){ return (parseInt(n)||0).toLocaleString(); }
 function uncomma(s){ return parseInt(String(s).replace(/,/g,''))||0; }
-function toast(msg,err=false){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C';
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800);
-}
-
 // ── Sheets ────────────────────────────────────────────────────
-async function fetchSheet(sheet,range){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
-  const r=await fetch(url); if(!r.ok) throw new Error('읽기 오류 '+r.status);
-  return (await r.json()).values||[];
-}
-function toObj(rows){
-  if(!rows.length) return [];
-  const h=rows[0]; return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));
-}
-async function clearAndWrite(sheet,range,rows){
-  if(!accessToken){ await signIn(); if(!accessToken) return false; }
-  const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
-  await fetch(`${base}/values/${encodeURIComponent(sheet+'!'+range)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
-  const r=await fetch(`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
-  return r.ok;
-}
 let pendingAuth=null;
-function initOAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{
-      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
-      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
-    }
-  });
-}
-function signIn(){
-  return new Promise(res=>{
-    pendingAuth=res;
-    try{ tokenClient.requestAccessToken(); }
-    catch(e){ pendingAuth=null; res(false); return; }
-    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
-  });
-}
-function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
-
 // ── 단가 세트 ─────────────────────────────────────────────────
 async function loadRates(){
   try{
-    const rows=await fetchSheet('S11_GRADE_RATE','A1:H100');
+    const rows=await fetchSheet(...R.S11);
     rateRows=toObj(rows).filter(r=>r.set_id);
     renderSetSelector();
     // 기본 세트 자동 선택
@@ -405,7 +346,7 @@ async function saveRates(){
   const header=['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at'];
   const dataRows=rateRows.map(r=>header.map(h=>r[h]||''));
   toast('저장 중…');
-  const ok=await clearAndWrite('S11_GRADE_RATE','A:H',[header,...dataRows]);
+  const ok=await clearAndWrite(...W.S11,[header,...dataRows]);
   if(ok){ toast('✓ 단가 세트 저장 완료'); await loadRates(); }
   else toast('저장 실패. 로그인 상태를 확인하세요',true);
 }
@@ -417,7 +358,7 @@ async function deleteSet(){
   rateRows=rateRows.filter(r=>r.set_id!==currentSetId);
   const header=['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at'];
   const dataRows=rateRows.map(r=>header.map(h=>r[h]||''));
-  const ok=await clearAndWrite('S11_GRADE_RATE','A:H',[header,...dataRows]);
+  const ok=await clearAndWrite(...W.S11,[header,...dataRows]);
   if(ok){ toast('세트 삭제 완료'); currentSetId=null; await loadRates(); }
   else toast('삭제 실패',true);
 }
@@ -425,7 +366,7 @@ async function deleteSet(){
 // ── S10 설정 (키워드·파라미터) ─────────────────────────────────
 async function loadSettings(){
   try{
-    const rows=await fetchSheet('S10_SETTINGS','A1:E300');
+    const rows=await fetchSheet(...R.S10);
     toObj(rows).forEach(r=>{ if(r.setting_key) settingsMap[r.setting_key]=r.setting_value; });
     // 키워드 채우기
     ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow','kw_card_branch','kw_ai_branch'].forEach(k=>{ const _e=document.getElementById(k); if(!_e) return;
@@ -460,7 +401,7 @@ async function saveSettingsToSheet(){
   const rows=Object.entries(settingsMap).map(([k,v])=>[
     k,v,k.startsWith('kw_')?'keyword':'parameter',descMap[k]||'',today
   ]);
-  return await clearAndWrite('S10_SETTINGS','A:E',[header,...rows]);
+  return await clearAndWrite(...W.S10,[header,...rows]);
 }
 
 async function saveKeywords(){
@@ -497,7 +438,7 @@ let codeRows={txn_type:[],branch_rule:[],fixed_item:[]}, s10Other=[];
 const DEF_TYPES=[['매출입금',''],['매입지급',''],['고정비',''],['급여',''],['세금',''],['법인카드',''],['AI사용료',''],['기타비용',''],['기타입금','']];
 async function loadCodes(){
  try{
-  const rows=toObj(await fetchSheet('S10_SETTINGS','A1:E300'));
+  const rows=toObj(await fetchSheet(...R.S10));
   s10Other=rows.filter(r=>!['txn_type','branch_rule','fixed_item'].includes(r.category));
   ['txn_type','branch_rule','fixed_item'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.key,r.value]));
   if(!codeRows.txn_type.length){
@@ -524,7 +465,7 @@ async function saveCodes(){
   const H=['key','value','description','category','updated_at'];
   const rows=[...s10Other.map(r=>[r.key,r.value,r.description,r.category,r.updated_at])];
   ['txn_type','branch_rule','fixed_item'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'','',c,today])));
-  const ok=await clearAndWrite('S10_SETTINGS','A:E',[H,...rows]);
+  const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
 }
 window.addEventListener('load',loadCodes);

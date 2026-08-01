@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -119,7 +120,7 @@
   @media(max-width:767px){.side-nav{display:none}}
 </style>
 </head>
-<body>
+<body data-page="pipeline">
 
 <header class="app-header">
   <div class="app-logo">HFC 경영관리 <span>사업기회</span></div>
@@ -127,16 +128,7 @@
   <button class="btn-icon" onclick="location.href='settings.html'" title="설정">⚙️</button>
 </header>
 
-<nav class="side-nav">
-  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
-  <button class="side-nav-item active"><span class="sn-icon">📋</span>사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
-  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💵</span>자금수지</button>
-  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav"></nav>
 
 <main class="main">
   <div class="top-actions">
@@ -246,23 +238,14 @@
   </div>
 </div>
 
-<nav class="tab-bar">
-  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item active"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
-const SHEETS_ID = '1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY   = 'AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-const CLIENT_ID = '129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
-const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
-
-let accessToken=null, tokenClient;
 let opps=[];
 let currentFilter='전체';
 
@@ -271,57 +254,14 @@ const FINANCE_STATUS=['수주','계약','종료'];
 const NEXT_STATUS={'기회':'확정','확정':'수주','수주':'계약','계약':'종료'};
 
 // ── 유틸 ──────────────────────────────────────────────────────
-function comma(n){ return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString(); }
 function uncomma(s){ return parseInt(String(s).replace(/,/g,''))||0; }
 function formatComma(v){ const n=String(v).replace(/[^\d]/g,''); return n?parseInt(n).toLocaleString():''; }
-function wonFull(n){ return comma(n)+'원'; }
-function toast(msg,err=false){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C';
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800);
-}
-
 // ── Sheets ────────────────────────────────────────────────────
-async function fetchSheet(sheet,range){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
-  const r=await fetch(url); if(!r.ok) throw new Error('읽기 오류 '+r.status);
-  return (await r.json()).values||[];
-}
-function toObj(rows){
-  if(!rows.length) return [];
-  const h=rows[0]; return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));
-}
-async function clearAndWrite(sheet,range,rows){
-  if(!accessToken){ await signIn(); if(!accessToken) return false; }
-  const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
-  await fetch(`${base}/values/${encodeURIComponent(sheet+'!'+range)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
-  const r=await fetch(`${base}/values/${encodeURIComponent(sheet+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
-  return r.ok;
-}
 let pendingAuth=null;
-function initOAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{
-      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
-      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
-    }
-  });
-}
-function signIn(){
-  return new Promise(res=>{
-    pendingAuth=res;
-    try{ tokenClient.requestAccessToken(); }
-    catch(e){ pendingAuth=null; res(false); return; }
-    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
-  });
-}
-function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
-
 // ── 데이터 로드 ───────────────────────────────────────────────
 async function loadOpps(){
   try{
-    const rows=await fetchSheet('S01_PIPELINE','A1:M300');
+    const rows=await fetchSheet(...R.S01);
     opps=dedupe(toObj(rows).filter(o=>o.pipeline_id),'pipeline_id');
     const yf=document.getElementById('yearFilter');
     const cur=yf.value;
@@ -635,7 +575,7 @@ async function saveAll(successMsg){
   const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'];
   opps=dedupe(opps,'pipeline_id'); // PK 무결성 규칙
   const rows=opps.map(o=>header.map(h=>o[h]||''));
-  const ok=await clearAndWrite('S01_PIPELINE','A:M',[header,...rows]);
+  const ok=await clearAndWrite(...W.S01,[header,...rows]);
   if(ok){ toast(successMsg); renderFilter(); renderList(); }
   else toast('저장 실패. 로그인 상태를 확인하세요',true);
   return ok;
@@ -646,7 +586,7 @@ async function ensureProject(plId,status){
   try{
     const o=opps.find(x=>x.pipeline_id===plId);
     if(!o) return;
-    const rows=await fetchSheet('S03_PROJECT','A1:K200');
+    const rows=await fetchSheet(...R.S03);
     const header=rows[0]||['project_id','project_name','client','end_client','contract_amount','start_date','end_date','status','payment_terms','pipeline_id','memo'];
     const prjs=toObj(rows);
     let p=prjs.find(x=>x.pipeline_id===plId);
@@ -663,11 +603,11 @@ async function ensureProject(plId,status){
     }
     const uniq=dedupe(prjs,'project_id');
     const dataRows=uniq.map(x=>header.map(h=>x[h]||''));
-    const ok=await clearAndWrite('S03_PROJECT','A:K',[header,...dataRows]);
+    const ok=await clearAndWrite(...W.S03,[header,...dataRows]);
     if(ok){ toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
       if(status==='수주'){
         let hasEst=false;
-        try{ const er=await fetchSheet('S12_ESTIMATE','A1:O500'); hasEst=toObj(er).some(e=>e.pipeline_id===plId); }catch(e){}
+        try{ const er=await fetchSheet(...R.S12); hasEst=toObj(er).some(e=>e.pipeline_id===plId); }catch(e){}
         const msg=hasEst
           ?'저장된 견적이 있습니다.\n견적 기반으로 매출·매입 청구 스케줄을 지금 생성하시겠습니까?'
           :'청구 스케줄(세금계산서 발행·수금 계획)을 지금 생성하시겠습니까?';
@@ -678,12 +618,12 @@ async function ensureProject(plId,status){
 async function logHistory(entries){
   try{
     let list=[];
-    try{const rows=await fetchSheet('S14_HISTORY','A1:H999');list=toObj(rows);}catch(e){}
+    try{const rows=await fetchSheet(...R.S14);list=toObj(rows);}catch(e){}
     const H=['hist_id','changed_at','pipeline_id','target','old_value','new_value','reason','source'];
     let n=list.reduce((m,h)=>Math.max(m,parseInt((h.hist_id||'').replace(/\D/g,''))||0),0);
     const now=new Date().toISOString().slice(0,16).replace('T',' ');
     entries.forEach(e=>{n++;list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:now,pipeline_id:e.pl,target:e.target,old_value:String(e.old??''),new_value:String(e.newv??''),reason:e.reason||'',source:e.source});});
-    const ok=await clearAndWrite('S14_HISTORY','A:H',[H,...dedupe(list,'hist_id').map(h=>H.map(k=>h[k]??''))]);
+    const ok=await clearAndWrite(...W.S14,[H,...dedupe(list,'hist_id').map(h=>H.map(k=>h[k]??''))]);
     if(!ok)toast('이력 기록 실패 (S14_HISTORY 시트 확인)',true);
     else toast('변경 이력 기록 ✓');
   }catch(err){toast('이력 기록 실패: Google Sheets에 S14_HISTORY 시트를 추가하세요',true);}
@@ -694,7 +634,7 @@ async function showHistory(plId){
   document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">불러오는 중…</div>';
   document.getElementById('histModal').classList.add('open');
   try{
-    const rows=await fetchSheet('S14_HISTORY','A1:H999');
+    const rows=await fetchSheet(...R.S14);
     const list=toObj(rows).filter(h=>h.pipeline_id===plId).sort((a,b)=>(b.changed_at||'').localeCompare(a.changed_at||''));
     document.getElementById('histBody').innerHTML=list.length?list.map(h=>`
       <div style="padding:9px 0;border-bottom:1px solid var(--border)">

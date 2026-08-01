@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
+<link rel="stylesheet" href="css/common.css?v=2.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -64,23 +65,13 @@
   @media(max-width:767px){.side-nav{display:none}}
 </style>
 </head>
-<body>
+<body data-page="vat">
 <header class="app-header">
   <div class="app-logo">HFC 경영관리 <span>부가세 관리</span></div>
   <button class="btn-icon" onclick="location.href='cashflow.html'">💵</button>
   <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
 </header>
-<nav class="side-nav">
-  <button class="side-nav-item" onclick="location.href='index.html'"><span class="sn-icon">🏠</span>대시보드</button>
-  <button class="side-nav-item" onclick="location.href='pipeline.html'"><span class="sn-icon">📋</span>사업기회</button>
-  <button class="side-nav-item" onclick="location.href='estimate.html'"><span class="sn-icon">📊</span>견적</button>
-  <button class="side-nav-item" onclick="location.href='project.html'"><span class="sn-icon">📁</span>프로젝트</button>
-  <button class="side-nav-item" onclick="location.href='input.html'"><span class="sn-icon">🧾</span>세금계산서</button>
-  <button class="side-nav-item" onclick="location.href='fixed.html'"><span class="sn-icon">🏢</span>고정비</button>
-  <button class="side-nav-item" onclick="location.href='cashflow.html'"><span class="sn-icon">💰</span>자금수지</button>
-  <button class="side-nav-item active"><span class="sn-icon">🧾</span>부가세</button>
-  <button class="side-nav-item" onclick="location.href='settings.html'"><span class="sn-icon">⚙️</span>설정</button>
-</nav>
+<nav class="side-nav"></nav>
 
 <main class="main">
   <div class="card">
@@ -108,65 +99,27 @@
   </div>
 </main>
 
-<nav class="tab-bar">
-  <button class="tab-item" onclick="location.href='index.html'"><span class="tab-icon">🏠</span>대시보드</button>
-  <button class="tab-item" onclick="location.href='pipeline.html'"><span class="tab-icon">📋</span>사업기회</button>
-  <button class="tab-item" onclick="location.href='estimate.html'"><span class="tab-icon">📊</span>견적</button>
-  <button class="tab-item" onclick="location.href='project.html'"><span class="tab-icon">📁</span>프로젝트</button>
-  <button class="tab-item" onclick="location.href='input.html'"><span class="tab-icon">🧾</span>세금계산서</button>
-  <button class="tab-item" onclick="location.href='cashflow.html'"><span class="tab-icon">💵</span>자금수지</button>
-</nav>
+<nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
+<script src="js/schema.js?v=2.0"></script>
+<script src="js/common.js?v=2.0"></script>
+<script src="js/calc.js?v=2.0"></script>
+<script src="js/nav.js?v=2.0"></script>
 <script>
-const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
-const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
-const SCOPES='https://www.googleapis.com/auth/spreadsheets';
-let accessToken=null,tokenClient;
 let vats=[],revs=[],costs=[],prjMap={},selQ=null;
 const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
   '1F':{name:'1기 확정',months:['2026-04','2026-05','2026-06'],due:'2026-07-25',payYm:'2026-07'},
   '2P':{name:'2기 예정',months:['2026-07','2026-08','2026-09'],due:'2026-10-25',payYm:'2026-10'},
   '2F':{name:'2기 확정',months:['2026-10','2026-11','2026-12'],due:'2027-01-25',payYm:'2027-01'}};
 
-function comma(n){return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString();}
-function un(s){return parseInt(String(s).replace(/,/g,''))||0;}
-function fc(v){const n=String(v).replace(/[^\d]/g,'');return n?parseInt(n).toLocaleString():'';}
 function wf(n){return comma(n)+'원';}
-function toast(m,e=false){const t=document.getElementById('toast');t.textContent=m;t.style.background=e?'#DC2626':'#1A202C';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
-async function fetchSheet(s,r){const u=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(s+'!'+r)}?key=${API_KEY}`;const x=await fetch(u);if(!x.ok)throw new Error('읽기 '+x.status);return (await x.json()).values||[];}
-function toObj(rows){if(!rows.length)return[];const h=rows[0];return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])));}
-async function clearAndWrite(s,rg,rows){if(!accessToken){await signIn();if(!accessToken)return false;}
-  const b=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
-  await fetch(`${b}/values/${encodeURIComponent(s+'!'+rg)}:clear`,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'}});
-  const r=await fetch(`${b}/values/${encodeURIComponent(s+'!A1')}?valueInputOption=RAW`,{method:'PUT',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
-  return r.ok;}
 let pendingAuth=null;
-function initOAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{
-      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
-      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
-    }
-  });
-}
-function signIn(){
-  return new Promise(res=>{
-    pendingAuth=res;
-    try{ tokenClient.requestAccessToken(); }
-    catch(e){ pendingAuth=null; res(false); return; }
-    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
-  });
-}
-function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
-
 async function loadAll(){
   try{
     const [vtR,rvR,csR,plR,prR]=await Promise.all([
-      fetchSheet('S13_VAT','A1:N20'),fetchSheet('S04_REVENUE','A1:M300'),
-      fetchSheet('S05_COST','A1:O300'),fetchSheet('S01_PIPELINE','A1:M300'),fetchSheet('S03_PROJECT','A1:K200')]);
+      fetchSheet(...R.S13),fetchSheet(...R.S04),
+      fetchSheet(...R.S05),fetchSheet(...R.S01),fetchSheet(...R.S03)]);
     vats=dedupe(toObj(vtR).filter(v=>v.vat_id),'vat_id');
     const pls=toObj(plR),prjs=toObj(prR);
     // 재무 필터
@@ -230,7 +183,7 @@ const H13=['vat_id','year','quarter_code','period_start','period_end','due_date'
 async function saveS13(){
   vats=dedupe(vats,'vat_id'); // PK 무결성 규칙
   const rows=vats.map(v=>H13.map(h=>v[h]??''));
-  return await clearAndWrite('S13_VAT','A:N',[H13,...rows]);
+  return await clearAndWrite(...W.S13,[H13,...rows]);
 }
 function upsertVat(code,patch){
   const q=QINFO[code];const c=calcQ(code);
@@ -261,12 +214,12 @@ async function reflectCashflow(){
   const btn=document.getElementById('btnReflect');btn.disabled=true;
   try{
     // S09 해당월 est_balance 차감 방식이 아닌, S02 est_outflow/est_vat 반영
-    const rows=await fetchSheet('S02_CASHFLOW_EST','A1:G24');
+    const rows=await fetchSheet(...R.S02);
     const header=rows[0];const data=toObj(rows);
     const t=data.find(r=>r.year_month===q.payYm);
     if(t){t.est_vat=amt;
       const dataRows=data.map(r=>header.map(h=>r[h]??''));
-      await clearAndWrite('S02_CASHFLOW_EST','A:G',[header,...dataRows]);}
+      await clearAndWrite(...W.S02,[header,...dataRows]);}
     upsertVat(selQ,{cashflow_reflected:'Y'});
     const ok=await saveS13();
     btn.disabled=false;
