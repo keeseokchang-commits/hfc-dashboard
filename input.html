@@ -104,11 +104,17 @@
 
   <!-- 계획 매출 -->
   <div class="tab-content active" id="tab-rev">
+    <div class="list-card"><div class="card-title"><span>매출 발행 목록 <span id="rev_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+      <span style="display:flex;gap:6px">
+        <button style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500" onclick="openGenModal()">⚡ 청구 스케줄 생성</button>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetRev()">초기화</button></span>
+      <select id="revStFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 상태</option><option>발행대기</option><option>발행완료</option><option>입금완료</option></select>
+      <select id="revYearFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 연도</option></select>
+      <select id="revPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
+      <div id="rev_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
     <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3);padding:6px 2px">➕ 매출 개별 추가 (예외용 — 펼치기)</summary><div class="form-card" style="margin-top:12px">
       <div class="card-title"><span id="revTitle">➕ 매출 개별 추가 <small style="font-weight:400;color:var(--text3)">(예외용)</small></span>
-        <span style="display:flex;gap:6px">
-        <button style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500" onclick="openGenModal()">⚡ 청구 스케줄 생성</button>
-        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetRev()">초기화</button></span></div>
+        </div>
       <input type="hidden" id="rev_id">
       <div class="form-row">
         <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
@@ -136,20 +142,21 @@
       <div class="btn-row"><button class="btn btn-secondary" onclick="resetRev()">취소</button>
         <button class="btn btn-primary" id="rev_btn" onclick="saveRev()">저장하기</button></div>
     </div></details>
-    <div class="list-card"><div class="card-title"><span>매출 발행 목록 <span id="rev_cnt" style="font-size:11px;color:var(--text3)"></span></span>
-      <select id="revStFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 상태</option><option>발행대기</option><option>발행완료</option><option>입금완료</option></select>
-      <select id="revYearFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 연도</option></select>
-      <select id="revPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
-      <div id="rev_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
 
   <!-- 계획 매입 -->
   <div class="tab-content" id="tab-cost">
+    <div class="list-card"><div class="card-title"><span>매입 수취 목록 <span id="cost_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+      <span style="display:flex;gap:6px">
+        <button style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer;font-weight:500" onclick="openGenModal(true)">⚡ 매입 스케줄 생성</button>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetCost()">초기화</button></span>
+      <select id="costStFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 상태</option><option>수취대기</option><option>수취완료</option><option>지급완료</option></select>
+      <select id="costYearFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 연도</option></select>
+      <select id="costPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
+      <div id="cost_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
     <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3);padding:6px 2px">➕ 매입 개별 추가 (예외용 — 펼치기)</summary><div class="form-card" style="margin-top:12px">
       <div class="card-title"><span>➕ 매입 개별 추가 <small style="font-weight:400;color:var(--text3)">(예외용)</small></span>
-        <span style="display:flex;gap:6px">
-        <button style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer;font-weight:500" onclick="openGenModal(true)">⚡ 매입 스케줄 생성</button>
-        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetCost()">초기화</button></span></div>
+        </div>
       <input type="hidden" id="cost_id">
       <div class="form-row">
         <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
@@ -185,11 +192,6 @@
       <div class="btn-row"><button class="btn btn-secondary" onclick="resetCost()">취소</button>
         <button class="btn btn-primary" id="cost_btn" onclick="saveCost()">저장하기</button></div>
     </div></details>
-    <div class="list-card"><div class="card-title"><span>매입 수취 목록 <span id="cost_cnt" style="font-size:11px;color:var(--text3)"></span></span>
-      <select id="costStFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 상태</option><option>수취대기</option><option>수취완료</option><option>지급완료</option></select>
-      <select id="costYearFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);outline:none"><option value="">전체 연도</option></select>
-      <select id="costPrjFilter" onchange="renderLists()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text2);max-width:180px;outline:none"><option value="">전체 프로젝트</option></select></div>
-      <div id="cost_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
 
   <!-- 고정비 -->
@@ -346,6 +348,7 @@ async function loadAll(){
     const opts=financePrjs.map(p=>`<option value="${p.project_id}">${p.project_id} ${p.project_name}</option>`).join('');
     document.getElementById('rev_project').innerHTML='<option value="">선택</option>'+opts;
     document.getElementById('cost_project').innerHTML='<option value="">선택</option>'+opts;
+    fillPrjFilters();
     renderLists();
   }catch(e){toast('로드 실패: '+e.message,true);}
 }

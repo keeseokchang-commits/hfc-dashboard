@@ -75,6 +75,15 @@
 </style>
 <style>.modal-title{font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .dtable{width:100%;border-collapse:collapse;font-size:12px}.dtable th{font-size:11px;color:var(--text3);padding:7px 6px;border-bottom:2px solid var(--border);text-align:left}.dtable td{padding:7px 6px;border-bottom:1px solid var(--border)}</style>
+<style>
+/* v1.4(#10): PC=중앙 카드형 모달(바텀시트는 모바일 전용), 폼 세로 1열·간격 표준 */
+@media(min-width:769px){
+  .modal-overlay{align-items:center;justify-content:center}
+  .modal{width:auto;min-width:400px;max-width:480px;border-radius:16px;padding:24px 22px;max-height:85dvh}
+}
+.modal .form-row{display:block;margin-bottom:15px}
+.modal .form-label{margin-bottom:6px}
+</style>
 </head><body>
 <header class="app-header"><div class="app-logo">🏢 고정비 계획<span id="authState" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></header>
 <nav class="side-nav">
