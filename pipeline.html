@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.3.1">
+<link rel="stylesheet" href="css/common.css?v=2.4">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -241,10 +241,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.3.1"></script>
-<script src="js/common.js?v=2.3.1"></script>
-<script src="js/calc.js?v=2.3.1"></script>
-<script src="js/nav.js?v=2.3.1"></script>
+<script src="js/schema.js?v=2.4"></script>
+<script src="js/common.js?v=2.4"></script>
+<script src="js/calc.js?v=2.4"></script>
+<script src="js/nav.js?v=2.4"></script>
 <script>
 let opps=[];
 let currentFilter='전체';
@@ -563,6 +563,9 @@ async function saveOpp(){
         } }
     }catch(e){}
   }
+  if(ok && ['포기','실주'].includes(status)){ // v2.4: 포기·실주 전환 시 미발행 계획 스케줄 삭제(발행·완료 건 보존)
+    await cleanupSchedules(id||opps[opps.length-1].pipeline_id,status);
+  }
   if(ok && ['확정','수주','계약','종료'].includes(status)){  // v1.2(#7): 확정 단계부터 프로젝트 생성
     const plId=id||opps[opps.length-1].pipeline_id;
     await ensureProject(plId,status);
@@ -582,6 +585,29 @@ async function saveAll(successMsg){
 }
 
 // S03 자동생성·동기화 (v2.2 §3)
+
+// v2.4: 포기·실주 전환 시 계획 스케줄 정리 — 미발행 매출·미수취 매입만 삭제, 이력 기록
+async function cleanupSchedules(plId,status){
+ try{
+  const [prR,rvR,csR]=await Promise.all([fetchSheet(...R.S03),fetchSheet(...R.S04),fetchSheet(...R.S05)]);
+  const set=new Set(toObj(prR).filter(p=>p.pipeline_id===plId).map(p=>p.project_id));
+  if(!set.size) return;
+  const rv=toObj(rvR).filter(r=>r.revenue_id), cs=toObj(csR).filter(c=>c.cost_id);
+  const delR=rv.filter(r=>set.has(r.project_id)&&!r.invoice_date&&r.is_received!=='Y');
+  const delC=cs.filter(c=>set.has(c.project_id)&&!c.invoice_date&&!c.pay_actual_date);
+  if(!delR.length&&!delC.length) return;
+  if(!confirm(`${status} 전환: 계획 스케줄을 삭제합니다.\n· 미발행 매출 ${delR.length}건 / 미수취 매입 ${delC.length}건\n(발행·수취·입금·지급 완료 건은 보존됩니다)`)) return;
+  const dR=new Set(delR.map(r=>r.revenue_id)), dC=new Set(delC.map(c=>c.cost_id));
+  const HR=HEADERS.S04, HC=HEADERS.S05;
+  const ok1=await clearAndWrite(...W.S04,[HR,...rv.filter(r=>!dR.has(r.revenue_id)).map(r=>HR.map(h=>r[h]??''))]);
+  const ok2=await clearAndWrite(...W.S05,[HC,...cs.filter(c=>!dC.has(c.cost_id)).map(c=>HC.map(h=>c[h]??''))]);
+  if(ok1&&ok2){
+    toast(`계획 스케줄 삭제 완료 — 매출 ${delR.length}·매입 ${delC.length}건 ✓`);
+    try{ await logHistory([{pl:plId,target:'청구 스케줄',old:`매출 ${delR.length}·매입 ${delC.length}건`,newv:'삭제',reason:status+' 전환 자동 정리',source:'pipeline'}]); }catch(e){}
+  } else toast(`스케줄 삭제 ${ok1?'':'매출 실패 '}${ok2?'':'매입 실패'} — 시트 상태를 확인하세요`,true);
+ }catch(e){ toast('스케줄 정리 오류: '+e.message,true); }
+}
+
 async function ensureProject(plId,status){
   try{
     const o=opps.find(x=>x.pipeline_id===plId);
