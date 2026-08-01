@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.2">
+<link rel="stylesheet" href="css/common.css?v=2.2.1">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -150,7 +150,7 @@
 
   <!-- 통장 대사 -->
   <div class="card" id="reconCard" style="display:none">
-    <div class="card-title">🔗 통장 대사 <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
+    <div class="card-title">🔗 통장 대사 <button onclick="openTxModal()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt,#EFF6FF);color:var(--blue);cursor:pointer;font-weight:600">📄 CSV 거래 내역</button> <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
     <div id="reconUnmatched"></div>
   </div>
 
@@ -283,10 +283,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.2"></script>
-<script src="js/common.js?v=2.2"></script>
-<script src="js/calc.js?v=2.2"></script>
-<script src="js/nav.js?v=2.2"></script>
+<script src="js/schema.js?v=2.2.1"></script>
+<script src="js/common.js?v=2.2.1"></script>
+<script src="js/calc.js?v=2.2.1"></script>
+<script src="js/nav.js?v=2.2.1"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
