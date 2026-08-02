@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4.6">
+<link rel="stylesheet" href="css/common.css?v=2.4.7">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -287,10 +287,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.6"></script>
-<script src="js/common.js?v=2.4.6"></script>
-<script src="js/calc.js?v=2.4.6"></script>
-<script src="js/nav.js?v=2.4.6"></script>
+<script src="js/schema.js?v=2.4.7"></script>
+<script src="js/common.js?v=2.4.7"></script>
+<script src="js/calc.js?v=2.4.7"></script>
+<script src="js/nav.js?v=2.4.7"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -467,7 +467,10 @@ function classify(desc,recv,branch,inAmt,outAmt){
 function aggregateMonthly(txns){
   const monthly={};
   const monthTxns={};
-  txns.forEach(t=>{
+  // v2.4.7: 파일 정렬 방향 자동 감지(하나은행 CSV는 통상 최신순) — 월말 잔액 판별에 사용
+  const _asc=txns.length<2||String(txns[0].date)<=String(txns[txns.length-1].date);
+  const _best={};
+  txns.forEach((t,_i)=>{
     if(!monthly[t.ym]){
       monthly[t.ym]={act_balance:0,act_inflow:0,act_outflow:0,
         inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,
@@ -476,8 +479,11 @@ function aggregateMonthly(txns){
       monthTxns[t.ym]=[];
     }
     const m=monthly[t.ym];
-    // 잔액: 잔액>0인 마지막 행
-    if(t.bal>0) m.act_balance=t.bal;
+    // v2.4.7: 실잔액 = 월 내 '최신 일시' 거래의 잔액 (구버전은 파일상 마지막 행이라 최신순 CSV에서 월초 잔액이 잡히던 결함)
+    if(t.bal>0){
+      const k=String(t.date), b=_best[t.ym];
+      if(!b||k>b.k||(k===b.k&&(_asc?_i>b.i:_i<b.i))){ _best[t.ym]={k,i:_i}; m.act_balance=t.bal; }
+    }
     m.act_inflow+=t.inAmt;
     m.act_outflow+=t.outAmt;
     monthTxns[t.ym].push(t);
