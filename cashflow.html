@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4.2">
+<link rel="stylesheet" href="css/common.css?v=2.4.3">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -283,10 +283,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.2"></script>
-<script src="js/common.js?v=2.4.2"></script>
-<script src="js/calc.js?v=2.4.2"></script>
-<script src="js/nav.js?v=2.4.2"></script>
+<script src="js/schema.js?v=2.4.3"></script>
+<script src="js/common.js?v=2.4.3"></script>
+<script src="js/calc.js?v=2.4.3"></script>
+<script src="js/nav.js?v=2.4.3"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -494,7 +494,9 @@ function aggregateMonthly(txns){
   // 미분류 체크 (기타비용·기타입금 중 금액 큰 것)
   unclassified=txns.filter(t=>t.cat==='기타비용'&&t.outAmt>=50000);
   parsedMonthly=monthly;
-  actData=Object.entries(monthly).map(([ym,v])=>({year_month:ym,...v})).sort((a,b)=>a.year_month.localeCompare(b.year_month));
+  // v2.4.3: 병합 원칙 — 기존 시트의 월 실적은 보존하고, 이번 CSV에 등장한 월만 갱신
+  const _newAct=Object.entries(monthly).map(([ym,v])=>({year_month:ym,...v}));
+  actData=dedupe([...actData,..._newAct],'year_month').sort((a,b)=>a.year_month.localeCompare(b.year_month));
   renderAll();
   rebuildRecon();
   if(unclassified.length>0){
@@ -669,7 +671,7 @@ function saveUnclassified(){
 
 // ── Google Sheets 저장 ─────────────────────────────────────────
 function promptSaveToSheets(){
-  if(!confirm(`파싱 완료! Google Sheets에 저장하시겠습니까?\n(S08_CASHFLOW_ACT, S08_DETAIL 시트에 기록됩니다)`)) return;
+  if(!confirm(`파싱 완료! Google Sheets에 저장하시겠습니까?\n(기존 월 데이터와 병합하여 S08_CASHFLOW_ACT, S08_DETAIL에 기록됩니다)`)) return;
   saveToSheets();
 }
 
@@ -689,11 +691,12 @@ async function saveToSheets(){
 
   // S08_DETAIL 헤더 + 거래 상세
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
-  const s08dRows=parsedTxns.map((t,i)=>[
-    t.txnId,
-    t.date,t.desc,t.inAmt,t.outAmt,t.bal,t.recv,t.branch,t.cat,t.ym
-  ]);
+  // v2.4.3: 기존 거래(detailAll)와 병합(txn_id 기준, 신규 우선) — 과거 업로드분 보존
+  const _newD=parsedTxns.map(t=>({txn_id:t.txnId,txn_date:t.date,description:t.desc,inflow_amt:t.inAmt,outflow_amt:t.outAmt,balance:t.bal,recv:t.recv,branch:t.branch,category:t.cat,year_month:t.ym}));
+  const _mergedD=dedupe([...detailAll,..._newD],'txn_id').sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date)));
+  const s08dRows=_mergedD.map(t=>s08dHeader.map(h=>t[h]??''));
   const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
+  if(ok2) detailAll=_mergedD;
 
   // S09_DASHBOARD 업데이트 (실잔액·정합도)
   await updateDashboard();
