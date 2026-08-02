@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4.3">
+<link rel="stylesheet" href="css/common.css?v=2.4.4">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -283,10 +283,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.3"></script>
-<script src="js/common.js?v=2.4.3"></script>
-<script src="js/calc.js?v=2.4.3"></script>
-<script src="js/nav.js?v=2.4.3"></script>
+<script src="js/schema.js?v=2.4.4"></script>
+<script src="js/common.js?v=2.4.4"></script>
+<script src="js/calc.js?v=2.4.4"></script>
+<script src="js/nav.js?v=2.4.4"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -504,8 +504,9 @@ function aggregateMonthly(txns){
     document.getElementById('unclassCount').textContent=unclassified.length+'건';
   }
   // 유형별 집계 카드 (최근 월)
-  const latestYm=actData.slice(-1)[0]?.year_month;
-  if(latestYm){
+  // v2.4.4: 요약 카드는 '이번 CSV'의 최근 월 기준 (병합 actData 최신 월이 이번 CSV에 없을 수 있음)
+  const latestYm=Object.keys(monthly).sort().slice(-1)[0];
+  if(latestYm&&monthly[latestYm]){
     showBreakdown(latestYm, monthly[latestYm]);
   }
 }
