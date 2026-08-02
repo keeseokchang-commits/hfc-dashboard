@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4.4">
+<link rel="stylesheet" href="css/common.css?v=2.4.5">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -269,6 +269,10 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="planModal"><div class="modal">
+  <div class="modal-title"><span id="planModalTitle">계획 상세</span><button onclick="document.getElementById('planModal').classList.remove('open')" style="border:none;background:none;font-size:16px;cursor:pointer">✕</button></div>
+  <div id="planModalBody" style="max-height:60dvh;overflow-y:auto;font-size:12px"></div>
+</div></div>
 <div class="modal-overlay" id="txModal"><div class="modal">
   <div class="modal-title"><span>📄 CSV 거래 내역</span><button onclick="document.getElementById('txModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -283,10 +287,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.4"></script>
-<script src="js/common.js?v=2.4.4"></script>
-<script src="js/calc.js?v=2.4.4"></script>
-<script src="js/nav.js?v=2.4.4"></script>
+<script src="js/schema.js?v=2.4.5"></script>
+<script src="js/common.js?v=2.4.5"></script>
+<script src="js/calc.js?v=2.4.5"></script>
+<script src="js/nav.js?v=2.4.5"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -765,6 +769,29 @@ async function loadSheets(){
     renderAging();
   } catch(e){ toast('데이터 로드 실패: '+e.message,true); }
 }
+// v2.4.5: 계획 금액 건별 근거 — 셀 클릭 시 구성 내역(프로젝트·예정일·금액) 표시
+function openPlanDetail(ym,dir){
+  const t=document.getElementById('planModalTitle'), b=document.getElementById('planModalBody');
+  const pn=id=>{const p=prjAll.find(x=>x.project_id===id);return p?`${id} ${p.project_name||''}`:id;};
+  const row=(l,d,amt,extra)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)"><span>${l}<br><span style="color:var(--text3);font-size:11px">${d}${extra||''}</span></span><b style="white-space:nowrap">${wonFull(amt)}</b></div>`;
+  let html='',tot=0;
+  if(dir==='in'){
+    t.textContent=`${ym} 계획입금 구성 (수금예정일 기준 · VAT 포함)`;
+    planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym)
+      .forEach(r=>{const a=parseInt(r.cash_recv_amt)||0;tot+=a;
+        html+=row(pn(r.project_id),`발생 ${r.year_month} · 수금예정 ${r.cash_recv_date||'(미지정→발생월)'}`,a,r.is_received==='Y'?' · <span style="color:var(--green)">입금완료</span>':'');});
+  }else{
+    t.textContent=`${ym} 계획출금 구성 (지급예정일 기준 · VAT 포함)`;
+    planCost.filter(c2=>(((c2.payment_date||'').slice(0,7))||c2.year_month)===ym)
+      .forEach(c2=>{const a=Math.round((parseInt(c2.amount)||0)*1.1);tot+=a;
+        html+=row(pn(c2.project_id)+(c2.person_name?' · '+c2.person_name:''),`발생 ${c2.year_month} · 지급예정 ${c2.payment_date||'(미지정→발생월)'}`,a,c2.pay_actual_date?' · <span style="color:var(--green)">지급완료</span>':'');});
+    planFix.filter(f=>f.year_month===ym)
+      .forEach(f=>{const a=parseInt(f.amount)||0;tot+=a;html+=row('고정비 · '+(f.category||''),`지급예정 ${f.payment_date||ym}`,a);});
+  }
+  html+=`<div style="display:flex;justify-content:space-between;padding:9px 2px;font-weight:700;border-top:2px solid var(--border)"><span>합계</span><span>${wonFull(tot)}</span></div>`;
+  b.innerHTML=html||'<div style="color:var(--text3);padding:12px">해당 건 없음</div>';
+  document.getElementById('planModal').classList.add('open');
+}
 function renderPlanAct(){
   const yr=document.getElementById('yearSel').value;
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
@@ -780,9 +807,9 @@ function renderPlanAct(){
     if(!pIn&&!pOut&&aIn===null) return '';
     const dIn=aIn!==null?aIn-pIn:null, dOut=aOut!==null?aOut-pOut:null;
     return `<tr><td>${parseInt(m)}월</td>
-      <td>${pIn?won(pIn,false):'─'}</td>
+      <td>${pIn?`<span style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" onclick="openPlanDetail('${ym}','in')">${won(pIn,false)}</span>`:'─'}</td>
       <td>${aIn!==null?`${won(aIn,false)}<br><span style="font-size:10px" class="${dIn>=0?'pos':'neg'}">${dIn>=0?'+':''}${won(dIn,false)}</span>`:'─'}</td>
-      <td>${pOut?won(pOut,false):'─'}</td>
+      <td>${pOut?`<span style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" onclick="openPlanDetail('${ym}','out')">${won(pOut,false)}</span>`:'─'}</td>
       <td>${aOut!==null?`${won(aOut,false)}<br><span style="font-size:10px" class="${dOut<=0?'pos':'neg'}">${dOut>=0?'+':''}${won(dOut,false)}</span>`:'─'}</td></tr>`;
   }).join('')||'<tr><td colspan="5"><div class="empty-state">데이터 없음</div></td></tr>';
 }
