@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.4.5">
+<link rel="stylesheet" href="css/common.css?v=2.4.6">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -287,10 +287,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.5"></script>
-<script src="js/common.js?v=2.4.5"></script>
-<script src="js/calc.js?v=2.4.5"></script>
-<script src="js/nav.js?v=2.4.5"></script>
+<script src="js/schema.js?v=2.4.6"></script>
+<script src="js/common.js?v=2.4.6"></script>
+<script src="js/calc.js?v=2.4.6"></script>
+<script src="js/nav.js?v=2.4.6"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -647,6 +647,42 @@ function openDetailModal(ym){
   ].filter(r=>r.v!=='─'||r.k==='추정 잔액'||r.k==='실잔액');
   document.getElementById('detailBody').innerHTML=rows.map(r=>`
     <div class="detail-row"><span class="detail-label">${r.k}</span><span class="detail-val">${r.v}</span></div>`).join('');
+  // v2.4.6: 추정 잔액 구성(산식·낱개) — [추정 vs 실적] 신뢰도 검증용
+  (function(){
+    const bx=document.getElementById('detailBody');
+    if(!est){return;}
+    const anchor=!est.est_inflow&&!est.est_outflow; // '실적 기준' 앵커 월
+    let h='<div style="margin-top:14px;padding-top:10px;border-top:2px solid var(--border);font-weight:700;font-size:12px">📐 추정 잔액 구성</div>';
+    if(anchor){
+      h+='<div style="font-size:12px;color:var(--text3);padding:6px 0">이 달은 <b>실잔액 앵커 월</b>입니다 — 통장 실잔액을 기점으로 사용하므로 추정 잔액=실잔액입니다. 이후 월부터 추정이 누적됩니다.</div>';
+    }else{
+      const prevYm=(d=>{const[y,mm]=ym.split('-').map(Number);const p=new Date(y,mm-2,1);return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}`;})();
+      const pe=estData.find(e=>e.year_month===prevYm);
+      const A=pe?parseInt(pe.est_balance)||0:0;
+      const inF=parseInt(est.est_inflow)||0, outF=parseInt(est.est_outflow)||0, vat=parseInt(est.est_vat)||0;
+      const line=(l,v,sign)=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 2px"><span>${l}</span><b>${sign||''}${wonFull(Math.abs(v))}</b></div>`;
+      h+=line(`전월(${prevYm}) 잔액`,A);
+      // 입금 낱개: 재무 미수 수금예정
+      const inRows=s04All.filter(r=>okPrjSet.has(r.project_id)&&r.is_received!=='Y'&&(r.cash_recv_date||'').slice(0,7)===ym);
+      let inSum=0;
+      inRows.forEach(r=>{const a=parseInt(r.cash_recv_amt)||0;inSum+=a;
+        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 수금예정 ${r.project_id} (${r.year_month}분)</span><span>${wonFull(a)}</span></div>`;});
+      const wPart=inF-inSum;
+      if(wPart>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
+      h+=line('추정입금 소계',inF,'+');
+      // 출금 낱개: 매입 + 고정비 + VAT
+      planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).forEach(c=>{
+        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 지급예정 ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(Math.round((parseInt(c.amount)||0)*1.1))}</span></div>`;});
+      planFix.filter(f=>f.year_month===ym).forEach(f=>{
+        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(parseInt(f.amount)||0)}</span></div>`;});
+      if(vat) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
+      h+=line('추정출금 소계',outF,'−');
+      const calc=A+inF-outF, ok=calc===(parseInt(est.est_balance)||0);
+      h+=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 2px;border-top:1px solid var(--border);font-weight:700"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(parseInt(est.est_balance)||0)}</span></div>`;
+      h+=`<div style="font-size:10px;color:var(--text3);padding:3px 2px">기준: ${est.pipeline_basis||''} · 산식 = 전월 잔액 + 추정입금 − 추정출금(매입·고정비·VAT 포함)</div>`;
+    }
+    bx.innerHTML+=h;
+  })();
   document.getElementById('detailModal').classList.add('open');
 }
 function closeDetailModal(){ document.getElementById('detailModal').classList.remove('open'); }
