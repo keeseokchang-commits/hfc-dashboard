@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>HFC 프로젝트 조회</title>
-<link rel="stylesheet" href="css/common.css?v=2.4.8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 세금계산서 관리</title>
+<link rel="stylesheet" href="css/common.css?v=2.4.9">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -76,207 +76,709 @@
     .main{max-width:680px;padding:20px 24px 24px}
   }
   @media(max-width:767px){.side-nav{display:none}}
-</style>
-<style>
-  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
-  .chip-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-  .chip{padding:6px 13px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:12px;color:var(--text2);cursor:pointer}
-  .chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .prj-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-  .prj-card:active{transform:scale(.995)}
-  .gauge{height:7px;background:var(--border);border-radius:4px;overflow:hidden;margin:8px 0 4px}
-  .gauge>div{height:100%;background:var(--green);border-radius:4px}
-  .dtable{width:100%;border-collapse:collapse;font-size:12px}
-  .dtable th{font-size:11px;color:var(--text3);padding:7px 6px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
-  .dtable td{padding:7px 6px;border-bottom:1px solid var(--border);white-space:nowrap}
-  .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .kv .box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
-  .kv .box .l{font-size:11px;color:var(--text3)}
-  .kv .box .v{font-size:15px;font-weight:700;margin-top:3px}
-  .link-btn{padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12px;color:var(--text2);cursor:pointer;flex:1}
-  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
-  .modal-overlay.open{display:flex}
-  .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:90dvh;overflow-y:auto;padding:20px 16px 32px}
+  /* v1.5 목록 툴바 표준: 컨트롤 높이 32px 통일, 프로젝트 필터 신축(잘림 방지) */
+  .list-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 12px}
+  .list-toolbar select{height:32px;font-size:12px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text2);outline:none}
+  .list-toolbar select.tb-grow{flex:1;min-width:170px;max-width:none}
+  .list-toolbar .tb-reset{height:32px;font-size:12px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text3);cursor:pointer}
+  .btn-gen{height:32px;font-size:12px;padding:0 14px;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:600}
 </style>
 </head>
-<body data-page="project">
-<header class="app-header"><div class="app-logo">📁 프로젝트 조회<span id="hdrRight"></span></div></header>
+<body data-page="input">
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>세금계산서 관리</span></div>
+  <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
+  <button class="btn-icon" onclick="location.href='settings.html'">⚙️</button>
+</header>
 <nav class="side-nav"></nav>
 
 <main class="main">
-
-  <!-- 목록 뷰 -->
-  <div id="listView">
-    <div class="chip-bar" id="chips"></div>
-    <div id="prjList"><div class="empty-state" style="text-align:center;color:var(--text3);padding:30px 0;font-size:13px">불러오는 중…</div></div>
+  <div style="margin-bottom:10px"><a href="fixed.html" style="font-size:12px;color:var(--blue);text-decoration:none">🏢 고정비 계획 화면으로 →</a></div>
+  <div class="info-note">💡 대상은 <b>확정</b> 이후 단계 프로젝트입니다. 재무 실적 집계는 수주부터 반영됩니다. 기존: <b>수주·계약·종료</b> 상태의 사업기회에 연결된 프로젝트만 표시됩니다 (재무 반영 기준).</div>
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab(event,'rev')">💰 매출 발행</button>
+    <button class="tab-btn" onclick="switchTab(event,'cost')">🧾 매입 수취</button>
   </div>
 
-  <!-- 상세 뷰 -->
-  <div id="detailView" style="display:none">
-    <button onclick="backToList()" style="background:none;border:none;color:var(--blue);font-size:13px;cursor:pointer;padding:0;margin-bottom:10px">← 목록으로</button>
-    <div class="card" id="dHeader"></div>
-    <div class="card"><div class="card-title">💰 손익 요약 (계획 기준)</div><div class="kv" id="dProfit"></div><div id="dEstNote" style="font-size:11px;color:var(--text3);margin-top:8px"></div></div>
-    <div class="card"><div class="card-title">🪙 수금 현황</div><div class="kv" id="dRecv"></div><div id="dOverdue" style="margin-top:8px"></div></div>
-    <div class="card"><div class="card-title">📤 매출 청구 스케줄</div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>발행예정</th><th>발행일</th><th>공급가액</th><th>VAT포함</th><th>수금예정</th><th>상태</th><th>실입금</th></tr></thead><tbody id="dRevBody"></tbody></table></div></div>
-    <div class="card"><div class="card-title">📥 매입 청구 스케줄 <span style="font-size:11px;color:var(--text3);font-weight:400">지급 대사: 수취완료 건 기준 자동 확인</span></div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>수취예정</th><th>수취일</th><th>공급가액</th><th>합계(VAT포함)</th><th>지급예정</th><th>상태</th><th>실지급</th></tr></thead><tbody id="dCostBody"></tbody></table></div></div>
-    <div style="display:flex;gap:8px;margin-bottom:20px">
-      <button class="link-btn" id="btnEst">📊 견적 보기</button>
-      <button class="link-btn" id="btnGen">⚡ 스케줄 생성</button>
-      <button class="link-btn" onclick="showHist()">🕘 변경 이력</button>
+  <!-- 계획 매출 -->
+  <div class="tab-content active" id="tab-rev">
+    <div class="list-card"><div class="card-title"><span>매출 발행 목록 <span id="rev_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+        <button class="btn-gen" style="background:var(--green)" onclick="openGenModal()">⚡ 청구 스케줄 생성</button></div>
+      <div class="list-toolbar">
+        <select id="revStFilter" onchange="renderLists()"><option value="">전체 상태</option><option>발행대기</option><option>발행완료</option><option>입금완료</option></select>
+        <select id="revYearFilter" onchange="renderLists()"><option value="">전체 연도</option></select>
+        <select id="revPrjFilter" class="tb-grow" onchange="renderLists()"><option value="">전체 프로젝트</option></select>
+        <button class="tb-reset" onclick="resetFilters('rev')">필터 초기화</button>
+      </div>
+      <div id="rev_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3);padding:6px 2px">➕ 매출 개별 추가 (예외용 — 펼치기)</summary><div class="form-card" style="margin-top:12px">
+      <div class="card-title"><span id="revTitle">➕ 매출 개별 추가 <small style="font-weight:400;color:var(--text3)">(예외용)</small></span>
+        </div>
+      <input type="hidden" id="rev_id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
+          <select class="form-input" id="rev_project"><option value="">선택</option></select></div>
+        <div class="form-group"><label class="form-label">년월 <span class="req">*</span></label>
+          <input class="form-input" id="rev_ym" type="month"></div>
+      </div>
+      <div class="form-group"><label class="form-label">공급가액 (VAT 제외) <span class="req">*</span></label>
+        <input class="form-input" id="rev_supply" inputmode="numeric" placeholder="예: 13,200,000" oninput="this.value=comma(this.value);calcRevVat()"></div>
+      <div class="vat-box">
+        <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="rev_vat_disp">0원</span></div>
+        <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="rev_total_disp">0원</span></div>
+        <div class="vat-note">※ 합계 금액이 자금수지 비교 기준(입금 예정액)입니다</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">발행 예정일</label><input class="form-input" id="rev_invplan" type="date"></div>
+        <div class="form-group"><label class="form-label">발행일 (완료 시)</label><input class="form-input" id="rev_invdate" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">입금 예정일</label><input class="form-input" id="rev_date" type="date"></div>
+        <div class="form-group"><label class="form-label">입금 여부</label>
+          <select class="form-input" id="rev_received"><option value="N">미입금</option><option value="Y">입금완료</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">메모</label><input class="form-input" id="rev_memo" placeholder="예: 7월분 기성"></div>
+      <div class="btn-row"><button class="btn btn-secondary" onclick="resetRev()">취소</button>
+        <button class="btn btn-secondary" style="margin-right:8px" onclick="resetRev()">초기화</button><button class="btn btn-primary" id="rev_btn" onclick="saveRev()">저장하기</button></div>
+    </div></details>
+  </div>
+
+  <!-- 계획 매입 -->
+  <div class="tab-content" id="tab-cost">
+    <div class="list-card"><div class="card-title"><span>매입 수취 목록 <span id="cost_cnt" style="font-size:11px;color:var(--text3)"></span></span>
+        <button class="btn-gen" style="background:var(--amber)" onclick="openGenModal(true)">⚡ 매입 스케줄 생성</button></div>
+      <div class="list-toolbar">
+        <select id="costStFilter" onchange="renderLists()"><option value="">전체 상태</option><option>수취대기</option><option>수취완료</option><option>지급완료</option></select>
+        <select id="costYearFilter" onchange="renderLists()"><option value="">전체 연도</option></select>
+        <select id="costPrjFilter" class="tb-grow" onchange="renderLists()"><option value="">전체 프로젝트</option></select>
+        <button class="tb-reset" onclick="resetFilters('cost')">필터 초기화</button>
+      </div>
+      <div id="cost_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3);padding:6px 2px">➕ 매입 개별 추가 (예외용 — 펼치기)</summary><div class="form-card" style="margin-top:12px">
+      <div class="card-title"><span>➕ 매입 개별 추가 <small style="font-weight:400;color:var(--text3)">(예외용)</small></span>
+        </div>
+      <input type="hidden" id="cost_id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
+          <select class="form-input" id="cost_project"><option value="">선택</option></select></div>
+        <div class="form-group"><label class="form-label">년월 <span class="req">*</span></label>
+          <input class="form-input" id="cost_ym" type="month"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">유형 <span class="req">*</span></label>
+          <select class="form-input" id="cost_type"><option>인건비</option><option>외주비</option><option>기타원가</option></select></div>
+        <div class="form-group"><label class="form-label">인력명</label><input class="form-input" id="cost_person"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">단가 (원/MM)</label>
+          <input class="form-input" id="cost_unit" inputmode="numeric" oninput="this.value=comma(this.value);calcCostAmt()"></div>
+        <div class="form-group"><label class="form-label">MM</label>
+          <input class="form-input" id="cost_mm" type="number" step="0.01" oninput="calcCostAmt()"></div>
+      </div>
+      <div class="form-group"><label class="form-label">공급가액 (VAT 제외) <span class="req">*</span></label>
+        <input class="form-input" id="cost_supply" inputmode="numeric" placeholder="단가×MM 자동 또는 직접입력" oninput="this.value=comma(this.value);calcCostVat()"></div>
+      <div class="vat-box">
+        <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="cost_vat_disp">0원</span></div>
+        <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="cost_total_disp">0원</span></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">계산서 수취 예정일</label><input class="form-input" id="cost_invplan" type="date"></div>
+        <div class="form-group"><label class="form-label">수취일 (완료 시)</label><input class="form-input" id="cost_invdate" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">지급 예정일</label><input class="form-input" id="cost_date" type="date"></div>
+        <div class="form-group"><label class="form-label">메모</label><input class="form-input" id="cost_memo"></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-secondary" onclick="resetCost()">취소</button>
+        <button class="btn btn-secondary" style="margin-right:8px" onclick="resetCost()">초기화</button><button class="btn btn-primary" id="cost_btn" onclick="saveCost()">저장하기</button></div>
+    </div></details>
+  </div>
+
+  <!-- 고정비 -->
+  <div class="tab-content" id="tab-fix" style="display:none">
+    <div class="form-card" style="margin-top:12px">
+      <div class="card-title"><span>고정비 입력</span>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="resetFix()">초기화</button></div>
+      <input type="hidden" id="fix_id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">년월 <span class="req">*</span></label>
+          <input class="form-input" id="fix_ym" type="month"></div>
+        <div class="form-group"><label class="form-label">항목 <span class="req">*</span></label>
+          <select class="form-input" id="fix_category"><option>인건비</option><option>법인카드</option><option>임차료</option><option>4대보험</option><option>통신비</option><option>세무사</option><option>차량비</option><option>AI사용료</option><option>기타비용</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">금액 (원) <span class="req">*</span></label>
+          <input class="form-input" id="fix_amount" inputmode="numeric" oninput="this.value=comma(this.value)"></div>
+        <div class="form-group"><label class="form-label">지급일</label><input class="form-input" id="fix_date" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">메모</label><input class="form-input" id="fix_memo"></div>
+      <div class="btn-row"><button class="btn btn-secondary" onclick="resetFix()">취소</button>
+        <button class="btn btn-primary" id="fix_btn" onclick="saveFix()">저장하기</button></div>
     </div>
+    <div class="list-card"><div class="card-title">고정비 내역 <span id="fix_cnt" style="font-size:11px;color:var(--text3)"></span></div>
+      <div id="fix_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
   </div>
 </main>
 
-<div class="modal-overlay" id="histModal"><div class="modal">
-  <div style="font-size:15px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between">변경 이력
-    <button onclick="document.getElementById('histModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
-  <div id="histBody" style="font-size:12px"></div>
-</div></div>
+<div class="modal-overlay" id="genModal">
+  <div class="modal">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">⚡ 청구 스케줄 생성
+      <button onclick="closeGenModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">사업수행형태·지급조건 기반으로 발행·수금 계획을 자동 생성합니다. 금액·일자는 수정 가능합니다.</div>
+    <div class="form-group"><label class="form-label">프로젝트</label>
+      <select class="form-input" id="genPrj" onchange="onGenPrjChange()"><option value="">선택</option></select></div>
+    <div id="genInfo" style="font-size:12px;color:#1E40AF;background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:9px 12px;margin-bottom:12px;display:none"></div>
+    <div id="genTargets" style="display:none;margin-bottom:12px;font-size:13px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="genDoRev" checked onchange="buildGen()"> 매출 청구 생성</label>
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="genDoCost" onchange="buildGen()"> 매입 청구 생성 <span id="genCostHint" style="font-size:11px;color:var(--text3)"></span></label>
+      </div>
+      <div id="revBaseWrap" style="display:flex;gap:14px;font-size:12px;color:var(--text2)">
+        <span>매출 기준:</span>
+        <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genRevBase" value="contract" checked onchange="buildGen()"> 계약금액</label>
+        <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genRevBase" value="est" id="revBaseEst" onchange="buildGen()"> 견적 매출 합계</label>
+      </div>
+    </div>
+    <div id="msArea" style="display:none;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <label class="form-label" style="margin:0">지급 회차</label>
+        <select class="form-input" style="max-width:110px;padding:7px 10px" id="genRounds" onchange="setupMs()">
+          <option value="3">3회</option><option value="4">4회</option></select>
+        <span style="font-size:11px;color:var(--text3)">비율 합계 <b id="msSum">100</b>%</span>
+      </div>
+      <div class="ms-row" style="font-size:11px;color:var(--text3)"><span>구분</span><span>비율(%)</span><span>발행 기준일</span></div>
+      <div id="msRows"></div>
+    </div>
+    <div id="genPreviewWrap" style="display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">생성 미리보기 <span id="genCnt" style="font-weight:400;color:var(--text3)"></span></div>
+      <div style="overflow-x:auto"><table class="gen-table">
+        <thead><tr><th>발행예정일</th><th>공급가액</th><th>합계(VAT포함)</th><th>수금예정일</th></tr></thead>
+        <tbody id="genPreview"></tbody></table></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px" id="genTotal"></div>
+    </div>
+    <div id="genCostWrap" style="display:none;margin-top:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">매입 미리보기 <span id="genCostCnt" style="font-weight:400;color:var(--text3)"></span></div>
+      <div style="overflow-x:auto"><table class="gen-table">
+        <thead><tr><th>수취예정일</th><th>항목</th><th>공급가액</th><th>합계(VAT포함)</th><th>지급예정일</th></tr></thead>
+        <tbody id="genCostPreview"></tbody></table></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px" id="genCostTotal"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" onclick="closeGenModal()">취소</button>
+      <button class="btn btn-primary" id="genSaveBtn" onclick="saveGen()" disabled>생성 저장</button>
+    </div>
+  </div>
+</div>
 
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.8"></script>
-<script src="js/common.js?v=2.4.8"></script>
-<script src="js/calc.js?v=2.4.8"></script>
-<script src="js/nav.js?v=2.4.8"></script>
+<script src="js/schema.js?v=2.4.9"></script>
+<script src="js/common.js?v=2.4.9"></script>
+<script src="js/calc.js?v=2.4.9"></script>
+<script src="js/nav.js?v=2.4.9"></script>
 <script>
-function wf(n){return comma(n)+'원';}
-const SC={'수주':['#ECFDF5','#059669'],'계약':['#F0FDFA','#0D9488'],'종료':['#F1F5F9','#64748B']};
-let pipelines=[],prjs=[],s04=[],s05=[],est=[],curFilter='전체',curPrj=null,curPl=null;
+let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 
+function wf(n){return comma(n)+'원';}
+let pendingAuth=null;
+function switchTab(ev,t){
+  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  ev.target.classList.add('active');
+}
+function nextId(list,key,prefix){
+  const n=list.reduce((m,r)=>{const x=parseInt((r[key]||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,x);},0);
+  return `${prefix}-2026-${String(n+1).padStart(3,'0')}`;
+}
+
+// ── 로드 (재무필터 적용) ──
 async function loadAll(){
- try{
-  const [plR,prR,rvR,csR,esR]=await Promise.all([
-    fetchSheet(...R.S01),fetchSheet(...R.S03),
-    fetchSheet(...R.S04),fetchSheet(...R.S05),
-    fetchSheet(...R.S12).catch(()=>[])]);
-  pipelines=toObj(plR);
-  const okPl=new Set(pipelines.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
-  prjs=dedupe(toObj(prR).filter(p=>okPl.has(p.pipeline_id)),'project_id');
-  s04=dedupe(toObj(rvR).filter(r=>r.revenue_id),'revenue_id');
-  s05=dedupe(toObj(csR).filter(c=>c.cost_id),'cost_id');
-  est=toObj(esR).filter(e=>e.estimate_id);
-  document.getElementById('hdrRight').textContent=`재무 대상 ${prjs.length}개`;
-  renderChips(); 
-  const q=new URLSearchParams(location.search).get('pid');
-  if(q){
-    const t=prjs.find(p=>p.project_id===q||p.pipeline_id===q);
-    if(t){openDetail(t.project_id);return;}
-    toast('해당 프로젝트('+q+')를 찾을 수 없습니다',true);
-  }
-  renderList();
- }catch(e){toast('로드 실패: '+e.message,true);}
-}
-function renderChips(){
-  const sts=['전체','수주','계약','종료'];
-  document.getElementById('chips').innerHTML=sts.map(s=>{
-    const n=s==='전체'?prjs.length:prjs.filter(p=>plOf(p)?.status===s).length;
-    return `<button class="chip ${curFilter===s?'on':''}" onclick="curFilter='${s}';renderChips();renderList()">${s} ${n}</button>`;}).join('');
-}
-function plOf(p){return pipelines.find(x=>x.pipeline_id===p.pipeline_id);}
-function revOf(pid){return s04.filter(r=>r.project_id===pid);}
-function costOf(pid){return s05.filter(c=>c.project_id===pid);}
-function renderList(){
-  const list=prjs.filter(p=>curFilter==='전체'||plOf(p)?.status===curFilter);
-  document.getElementById('prjList').innerHTML=list.length?list.map(p=>{
-    const pl=plOf(p)||{};
-    const rv=revOf(p.project_id);
-    const tot=rv.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-    const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-    const today=new Date().toISOString().slice(0,10);
-    const od=rv.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today).length;
-    const pct=tot?Math.round(done/tot*100):0;
-    const [bg,fg]=SC[pl.status]||['#EEE','#666'];
-    return `<div class="prj-card" onclick="openDetail('${p.project_id}')">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <b style="font-size:14px">${p.project_name||p.project_id}</b>
-        <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${bg};color:${fg};font-weight:600">${pl.status||'-'}</span></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">${p.client||''} · ${p.start_date||''}~${p.end_date||''} · ${pl.biz_type||''}</div>
-      <div class="gauge"><div style="width:${pct}%"></div></div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2)">
-        <span>계약 <b>${comma(p.contract_amount)}원</b></span>
-        <span>수금률 <b style="color:var(--green)">${pct}%</b>${od?` · <b style="color:var(--red)">미수 ${od}건</b>`:''}</span></div>
-    </div>`;}).join(''):'<div style="text-align:center;color:var(--text3);padding:30px 0;font-size:13px">해당 상태의 프로젝트가 없습니다</div>';
-}
-function backToList(){document.getElementById('detailView').style.display='none';document.getElementById('listView').style.display='block';
-  history.replaceState(null,'',location.pathname);renderChips();renderList();}
-function openDetail(pid){
-  curPrj=prjs.find(p=>p.project_id===pid); if(!curPrj)return;
-  curPl=plOf(curPrj)||{};
-  document.getElementById('listView').style.display='none';
-  document.getElementById('detailView').style.display='block';
-  history.replaceState(null,'','?pid='+pid);
-  const [bg,fg]=SC[curPl.status]||['#EEE','#666'];
-  document.getElementById('dHeader').innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <b style="font-size:16px">${curPrj.project_name||pid}</b>
-      <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${bg};color:${fg};font-weight:600">${curPl.status||'-'}</span></div>
-    <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.7">
-      ${curPrj.client||''}${curPrj.end_client?' → '+curPrj.end_client:''}<br>
-      ${curPl.biz_type||'─'} · 지급조건 ${curPl.payment_cycle||'─'} · ${curPrj.start_date}~${curPrj.end_date}<br>
-      <span style="color:var(--text3)">${pid} · 사업기회 <a href="pipeline.html?pid=${curPrj.pipeline_id}" style="color:var(--blue);text-decoration:none">${curPrj.pipeline_id||'─'} ↗</a></span></div>`;
-  const rv=revOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
-  const cs=costOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
-  const revSum=rv.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0);
-  const costSum=cs.reduce((s,c)=>s+(parseInt(c.amount)||0),0);
-  const profit=revSum-costSum, margin=revSum?Math.round(profit/revSum*1000)/10:0;
-  document.getElementById('dProfit').innerHTML=`
-    <div class="box"><div class="l">계약금액</div><div class="v">${comma(curPrj.contract_amount)}원</div></div>
-    <div class="box"><div class="l">계획 매출 합 (공급가)</div><div class="v" style="color:var(--blue)">${wf(revSum)}</div></div>
-    <div class="box"><div class="l">계획 매입 합 (공급가)</div><div class="v" style="color:var(--amber)">${wf(costSum)}</div></div>
-    <div class="box"><div class="l">추정 이익 (이익률 ${margin}%)</div><div class="v" style="color:${profit>=0?'var(--green)':'var(--red)'}">${wf(profit)}</div></div>`;
-  const items=est.filter(e=>e.pipeline_id===curPrj.pipeline_id);
-  if(items.length){
-    const eS=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
-    const eB=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
-    document.getElementById('dEstNote').textContent=`견적: 매출 ${comma(eS)}원 · 매입 ${comma(eB)}원 (${items.length}개 항목)`;
-  } else document.getElementById('dEstNote').textContent='저장된 견적 없음';
-  const today=new Date().toISOString().slice(0,10);
-  const totV=rv.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-  const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-  const open=rv.filter(r=>r.is_received!=='Y');
-  const openAmt=open.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-  const od=open.filter(r=>r.cash_recv_date&&r.cash_recv_date<today);
-  document.getElementById('dRecv').innerHTML=`
-    <div class="box"><div class="l">수금 완료 (VAT포함)</div><div class="v" style="color:var(--green)">${wf(done)}</div></div>
-    <div class="box"><div class="l">미수 잔액</div><div class="v" style="color:${openAmt?'var(--red)':'var(--text)'}">${wf(openAmt)}</div></div>`;
-  document.getElementById('dOverdue').innerHTML=od.length?od.map(r=>{
-    const dd=Math.round((new Date(today)-new Date(r.cash_recv_date))/86400000);
-    return `<div style="font-size:12px;color:var(--red);padding:3px 0">⏰ ${r.year_month} ${wf(r.cash_recv_amt)} — 예정 ${r.cash_recv_date} (D+${dd})</div>`;}).join('')
-    :`<div style="font-size:12px;color:var(--text3)">수금예정일 경과 건 없음</div>`;
-  document.getElementById('dRevBody').innerHTML=rv.length?rv.map(r=>{
-    const st=r.is_received==='Y'?['입금완료','var(--green)']:(r.invoice_date?['발행완료','var(--blue)']:['발행예정','var(--amber)']);
-    return `<tr><td>${r.year_month}</td><td>${r.invoice_plan_date||'─'}</td><td>${r.invoice_date||'─'}</td>
-      <td style="text-align:right">${comma(r.tax_invoice_amt)}</td><td style="text-align:right">${comma(r.cash_recv_amt)}</td>
-      <td>${r.cash_recv_date||'─'}</td><td style="color:${st[1]};font-weight:600">${st[0]}</td><td>${r.recv_actual_date||'─'}</td></tr>`;}).join('')
-    :'<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:14px 0">청구 스케줄 없음 — [⚡ 스케줄 생성]으로 만드세요</td></tr>';
-  document.getElementById('dCostBody').innerHTML=cs.length?cs.map(c=>{
-    const amt=parseInt(c.amount)||0;
-    const vatTot=amt+(parseInt(c.vat_amt)||Math.round(amt*.1));
-    const st=c.pay_actual_date?['지급완료','var(--green)']:(c.invoice_date?['수취완료','var(--blue)']:['수취예정','var(--amber)']);
-    return `<tr><td>${c.year_month}</td><td>${c.invoice_plan_date||'─'}</td><td>${c.invoice_date||'─'}</td>
-      <td style="text-align:right">${comma(amt)}</td><td style="text-align:right">${comma(vatTot)}</td>
-      <td>${c.payment_date||'─'}</td><td style="color:${st[1]};font-weight:600">${st[0]}</td><td>${c.pay_actual_date||'─'}</td></tr>`;}).join('')
-    :'<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:14px 0">매입 스케줄 없음</td></tr>';
-  document.getElementById('btnEst').onclick=()=>location.href='estimate.html?pid='+curPrj.pipeline_id;
-  document.getElementById('btnGen').onclick=()=>location.href='input.html?gen='+curPrj.pipeline_id+'&full=1';
-}
-async function showHist(){
-  document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">불러오는 중…</div>';
-  document.getElementById('histModal').classList.add('open');
   try{
-    const rows=await fetchSheet(...R.S14);
-    const list=toObj(rows).filter(h=>h.pipeline_id===curPrj.pipeline_id).sort((a,b)=>(b.changed_at||'').localeCompare(a.changed_at||''));
-    document.getElementById('histBody').innerHTML=list.length?list.map(h=>`
-      <div style="padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between"><b>${h.target}</b><span style="color:var(--text3);font-size:11px">${h.changed_at}</span></div>
-        <div>${comma(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${comma(h.new_value)||'(없음)'}</b></div>
-        ${h.reason?`<div style="color:var(--text3);font-size:11px">사유: ${h.reason}</div>`:''}</div>`).join('')
-      :'<div style="text-align:center;padding:20px;color:var(--text3)">기록된 변경 이력이 없습니다</div>';
-  }catch(e){document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">S14_HISTORY 시트가 없습니다</div>';}
+    const [plR,prR,rvR,csR,fxR,esR]=await Promise.all([
+      fetchSheet(...R.S01),fetchSheet(...R.S03),
+      fetchSheet(...R.S04),fetchSheet(...R.S05),fetchSheet(...R.S06),
+      fetchSheet(...R.S12).catch(()=>[])]);
+    estAll=toObj(esR).filter(e=>e.estimate_id);
+    pipelines=toObj(plR); allPrjs=toObj(prR);
+    const pls=pipelines, prjs=allPrjs;
+    revenues=dedupe(toObj(rvR),'revenue_id'); costs=dedupe(toObj(csR),'cost_id'); fixed=dedupe(toObj(fxR),'fixed_id');
+    // 재무 반영 필터: S01 수주·계약·종료 → 연결 PRJ
+    const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    financePrjs=prjs.filter(p=>okPl.has(p.pipeline_id));
+    const opts=financePrjs.map(p=>`<option value="${p.project_id}">${p.project_id} ${p.project_name}</option>`).join('');
+    document.getElementById('rev_project').innerHTML='<option value="">선택</option>'+opts;
+    document.getElementById('cost_project').innerHTML='<option value="">선택</option>'+opts;
+    fillPrjFilters();
+    renderLists();
+  }catch(e){toast('로드 실패: '+e.message,true);}
 }
-window.addEventListener('load',loadAll);
+function prjLabel(pid){const p=allPrjs.find(x=>x.project_id===pid);return p?(p.project_name||pid):pid;}
+function fillPrjFilters(){
+  const _ok=new Set(financePrjs.map(p=>p.project_id));
+  const yrs=[...new Set([...revenues,...costs].filter(r=>_ok.has(r.project_id)).map(r=>(r.year_month||'').slice(0,4)).filter(Boolean))].sort();
+  ['revYearFilter','costYearFilter'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;
+    el.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
+    if([...el.options].some(o=>o.value===v))el.value=v;});
+  const opts='<option value="">전체 프로젝트</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_name||p.project_id}</option>`).join('');
+  ['revPrjFilter','costPrjFilter'].forEach(id=>{const el=document.getElementById(id);const v=el.value;el.innerHTML=opts;
+    if([...el.options].some(o=>o.value===v))el.value=v;});
+}
+function resetFilters(p){['StFilter','YearFilter','PrjFilter'].forEach(k=>{const el=document.getElementById(p+k);if(el)el.value='';});renderLists();}
+function renderLists(){
+  const okIds=new Set(financePrjs.map(p=>p.project_id));
+  const gv=id=>(document.getElementById(id)||{}).value||'';
+  const ry=gv('revYearFilter'), rf=gv('revPrjFilter'), rst=gv('revStFilter');
+  const cy=gv('costYearFilter'), cf=gv('costPrjFilter'), cst=gv('costStFilter');
+  const revSt=r=>r.is_received==='Y'?'입금완료':(r.invoice_date?'발행완료':'발행대기');
+  const costSt=c=>c.pay_actual_date?'지급완료':(c.invoice_date?'수취완료':'수취대기');
+  const rv=revenues.filter(r=>r.revenue_id&&okIds.has(r.project_id)&&(!ry||(r.year_month||'').startsWith(ry))&&(!rf||r.project_id===rf)&&(!rst||revSt(r)===rst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  document.getElementById('rev_cnt').textContent=`(${rv.length}건)`;
+  document.getElementById('rev_list').innerHTML=rv.length?rv.map(r=>{
+    const st=r.is_received==='Y'?['badge-on','입금완료']:(r.invoice_date?['badge-on','발행완료·수금대기']:['badge-hold','발행예정']);
+    return `
+    <div class="list-item"><div class="li-r1"><div class="li-name" style="cursor:pointer;color:var(--blue)" onclick="location.href='project.html?pid=${r.project_id}'">${r.year_month} · ${prjLabel(r.project_id)}</div>
+      <span class="badge ${st[0]}">${st[1]}</span></div>
+    <div class="li-meta">${r.project_id} · 공급 ${wf(r.tax_invoice_amt)} + VAT ${wf(r.vat_amt||Math.round((parseInt(r.tax_invoice_amt)||0)*.1))}${r.invoice_plan_date?' · 발행예정 '+r.invoice_plan_date:''}${r.invoice_date?' · 발행 '+r.invoice_date:''}${r.recv_actual_date?' · 입금 '+r.recv_actual_date:''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+      <span class="li-amt">합계 ${wf(r.cash_recv_amt)} <span style="font-size:10px;color:var(--text3)">(예정 ${r.cash_recv_date||'─'})</span></span>
+      <span style="display:flex;gap:6px">
+        ${!r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markInvoiced('${r.revenue_id}')">발행 완료</button>`:''}
+        ${r.is_received==='Y'?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkRecv('${r.revenue_id}')">입금 해제</button>`:''}
+        ${r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelInvoice('${r.revenue_id}')">발행 취소</button>`:''}
+        <button class="btn-edit" onclick="editRev('${r.revenue_id}')">수정</button></span></div></div>`;}).join('')
+    :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
+  const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
+  document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
+    const st=c.pay_actual_date?['badge-on','지급완료']:(c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정']);
+    return `
+    <div class="list-item"><div class="li-r1"><div class="li-name" style="cursor:pointer;color:var(--blue)" onclick="location.href='project.html?pid=${c.project_id}'">${c.year_month} · ${prjLabel(c.project_id)}</div>
+      <span class="badge ${st[0]}">${st[1]}</span></div>
+    <div class="li-meta">${c.project_id} · ${c.cost_type}${c.person_name?'· '+c.person_name:''} ${c.mm?c.mm+'MM':''}${c.invoice_plan_date?' · 수취예정 '+c.invoice_plan_date:''}${c.invoice_date?' · 수취 '+c.invoice_date:''}${c.payment_date?' · 지급예정 '+c.payment_date:''}${c.pay_actual_date?' · 실지급 '+c.pay_actual_date:''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+      <span class="li-amt">${wf(c.amount)}</span>
+      <span style="display:flex;gap:6px">
+        ${!c.invoice_date?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markCostInvoiced('${c.cost_id}')">수취 완료</button>`:''}
+        <button class="btn-edit" ${c.pay_actual_date?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkPay('${c.cost_id}')">지급 해제</button>`:''}
+        ${c.invoice_date&&!c.pay_actual_date?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelReceipt('${c.cost_id}')">수취 취소</button>`:''}
+        onclick="editCost('${c.cost_id}')">수정</button></span></div></div>`;}).join('')
+    :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
+  const fx=fixed.filter(f=>f.fixed_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  document.getElementById('fix_cnt').textContent=`(${fx.length}건)`;
+  document.getElementById('fix_list').innerHTML=fx.length?fx.map(f=>`
+    <div class="list-item"><div class="li-r1"><div class="li-name">${f.year_month} · ${f.category}</div>
+      <span class="li-amt">${wf(f.amount)}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="li-meta">${f.memo||''}</span>
+      <button class="btn-edit" onclick="editFix('${f.fixed_id}')">수정</button></div></div>`).join('')
+    :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
+}
+
+// ── VAT 계산 ──
+function calcRevVat(){const s=un(document.getElementById('rev_supply').value);
+  document.getElementById('rev_vat_disp').textContent=wf(Math.round(s*.1));
+  document.getElementById('rev_total_disp').textContent=wf(Math.round(s*1.1));}
+function calcCostAmt(){const u=un(document.getElementById('cost_unit').value),m=parseFloat(document.getElementById('cost_mm').value)||0;
+  if(u&&m){document.getElementById('cost_supply').value=comma(Math.round(u*m));calcCostVat();}}
+function calcCostVat(){const s=un(document.getElementById('cost_supply').value);
+  document.getElementById('cost_vat_disp').textContent=wf(Math.round(s*.1));
+  document.getElementById('cost_total_disp').textContent=wf(Math.round(s*1.1));}
+
+// ── 저장 (S04 9컬럼 / S05 11컬럼 / S06 6컬럼 — 전체 재작성) ──
+const H4=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
+const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
+const H6=['fixed_id','year_month','category','amount','payment_date','memo'];
+
+async function saveRev(){
+  const pj=document.getElementById('rev_project').value, ym=document.getElementById('rev_ym').value, sup=un(document.getElementById('rev_supply').value);
+  if(!pj||!ym||!sup){toast('프로젝트·년월·공급가액은 필수입니다',true);return;}
+  const btn=document.getElementById('rev_btn');btn.disabled=true;btn.textContent='저장 중…';
+  const id=document.getElementById('rev_id').value||nextId(revenues,'revenue_id','REV');
+  const old=revenues.find(r=>r.revenue_id===id)||{};
+  const rec={revenue_id:id,project_id:pj,year_month:ym,tax_invoice_amt:sup,
+    cash_recv_amt:Math.round(sup*1.1),cash_recv_date:document.getElementById('rev_date').value,
+    is_received:document.getElementById('rev_received').value,memo:document.getElementById('rev_memo').value,
+    vat_amt:Math.round(sup*.1),
+    invoice_plan_date:document.getElementById('rev_invplan').value||old.invoice_plan_date||'',
+    invoice_date:document.getElementById('rev_invdate').value||old.invoice_date||'',
+    matched_txn_id:old.matched_txn_id||'',recv_actual_date:old.recv_actual_date||''};
+  const next=dedupe([...revenues.filter(r=>r.revenue_id&&r.revenue_id!==id),rec],'revenue_id');
+  const ok=await clearAndWrite(...W.S04,[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
+  btn.disabled=false;btn.textContent='저장하기';
+  if(ok){revenues=next;toast('계획 매출 저장 ✓');resetRev();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
+async function saveCost(){
+  const pj=document.getElementById('cost_project').value, ym=document.getElementById('cost_ym').value, sup=un(document.getElementById('cost_supply').value);
+  if(!pj||!ym||!sup){toast('프로젝트·년월·공급가액은 필수입니다',true);return;}
+  const btn=document.getElementById('cost_btn');btn.disabled=true;btn.textContent='저장 중…';
+  const id=document.getElementById('cost_id').value||nextId(costs,'cost_id','COST');
+  const oldc=costs.find(c=>c.cost_id===id)||{};
+  const rec={cost_id:id,project_id:pj,year_month:ym,cost_type:document.getElementById('cost_type').value,
+    person_name:document.getElementById('cost_person').value,unit_price:un(document.getElementById('cost_unit').value)||0,
+    mm:document.getElementById('cost_mm').value||0,amount:sup,payment_date:document.getElementById('cost_date').value,
+    memo:document.getElementById('cost_memo').value,vat_amt:Math.round(sup*.1),
+    invoice_plan_date:document.getElementById('cost_invplan').value||oldc.invoice_plan_date||'',
+    invoice_date:document.getElementById('cost_invdate').value||oldc.invoice_date||'',
+    matched_txn_id:oldc.matched_txn_id||'',pay_actual_date:oldc.pay_actual_date||''};
+  const next=dedupe([...costs.filter(c=>c.cost_id&&c.cost_id!==id),rec],'cost_id');
+  const ok=await clearAndWrite(...W.S05,[H5,...next.map(c=>H5.map(h=>c[h]??''))]);
+  btn.disabled=false;btn.textContent='저장하기';
+  if(ok){costs=next;toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
+async function saveFix(){
+  const ym=document.getElementById('fix_ym').value, amt=un(document.getElementById('fix_amount').value);
+  if(!ym||!amt){toast('년월·금액은 필수입니다',true);return;}
+  const btn=document.getElementById('fix_btn');btn.disabled=true;btn.textContent='저장 중…';
+  const id=document.getElementById('fix_id').value||nextId(fixed,'fixed_id','FX');
+  const rec={fixed_id:id,year_month:ym,category:document.getElementById('fix_category').value,
+    amount:amt,payment_date:document.getElementById('fix_date').value,memo:document.getElementById('fix_memo').value};
+  const next=dedupe([...fixed.filter(f=>f.fixed_id&&f.fixed_id!==id),rec],'fixed_id');
+  const ok=await clearAndWrite(...W.S06,[H6,...next.map(f=>H6.map(h=>f[h]??''))]);
+  btn.disabled=false;btn.textContent='저장하기';
+  if(ok){fixed=next;toast('고정비 저장 ✓');resetFix();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
+
+// ── 수정·초기화 ──
+// v2.4.9: 수정 시 접힌 개별 폼을 자동으로 펼치고 그 위치로 이동
+function openFormFor(pref){
+  const det=document.querySelector('#tab-'+pref+' details');
+  if(det){det.open=true;det.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+function editRev(id){const r=revenues.find(x=>x.revenue_id===id);if(!r)return;
+  document.getElementById('rev_id').value=id;document.getElementById('rev_project').value=r.project_id;
+  document.getElementById('rev_ym').value=r.year_month;document.getElementById('rev_supply').value=comma(r.tax_invoice_amt);
+  document.getElementById('rev_date').value=r.cash_recv_date;document.getElementById('rev_received').value=r.is_received||'N';
+  document.getElementById('rev_memo').value=r.memo||'';
+  document.getElementById('rev_invplan').value=r.invoice_plan_date||'';
+  document.getElementById('rev_invdate').value=r.invoice_date||'';calcRevVat();openFormFor('rev');}
+function editCost(id){const c=costs.find(x=>x.cost_id===id);if(!c)return;
+  document.getElementById('cost_id').value=id;document.getElementById('cost_project').value=c.project_id;
+  document.getElementById('cost_ym').value=c.year_month;document.getElementById('cost_type').value=c.cost_type||'인건비';
+  document.getElementById('cost_person').value=c.person_name||'';document.getElementById('cost_unit').value=c.unit_price?comma(c.unit_price):'';
+  document.getElementById('cost_mm').value=c.mm||'';document.getElementById('cost_supply').value=comma(c.amount);
+  document.getElementById('cost_date').value=c.payment_date||'';document.getElementById('cost_memo').value=c.memo||'';
+  document.getElementById('cost_invplan').value=c.invoice_plan_date||'';document.getElementById('cost_invdate').value=c.invoice_date||'';
+  calcCostVat();openFormFor('cost');}
+function editFix(id){const f=fixed.find(x=>x.fixed_id===id);if(!f)return;
+  document.getElementById('fix_id').value=id;document.getElementById('fix_ym').value=f.year_month;
+  document.getElementById('fix_category').value=f.category||'기타비용';document.getElementById('fix_amount').value=comma(f.amount);
+  document.getElementById('fix_date').value=f.payment_date||'';document.getElementById('fix_memo').value=f.memo||'';
+  window.scrollTo({top:0,behavior:'smooth'});}
+function resetRev(){['rev_id','rev_supply','rev_date','rev_memo','rev_invplan','rev_invdate'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('rev_received').value='N';calcRevVat();}
+function resetCost(){['cost_id','cost_person','cost_unit','cost_mm','cost_supply','cost_date','cost_memo','cost_invplan','cost_invdate'].forEach(i=>document.getElementById(i).value='');calcCostVat();}
+function resetFix(){['fix_id','fix_amount','fix_date','fix_memo'].forEach(i=>document.getElementById(i).value='');}
+
+// ═══ 청구 스케줄 자동 생성 (v2.3) ═══
+let genRows=[], genCostRows=[], genPl=null;
+function lastDayStr(y,m){return `${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;}
+function nextMonthEnd(dateStr){const d=new Date(dateStr);let y=d.getFullYear(),m=d.getMonth()+2;if(m>12){m-=12;y++;}return lastDayStr(y,m);}
+function recvDue(invDate){return (genPl&&genPl.payment_cycle==='기타')?invDate:nextMonthEnd(invDate);}
+function ymList(s,e){const a=new Date(s),b=new Date(e);const r=[];let c=new Date(a.getFullYear(),a.getMonth(),1);
+  while(c<=b){const dim=new Date(c.getFullYear(),c.getMonth()+1,0).getDate();
+    const f=(c.getFullYear()===a.getFullYear()&&c.getMonth()===a.getMonth())?a.getDate():1;
+    const t=(c.getFullYear()===b.getFullYear()&&c.getMonth()===b.getMonth())?b.getDate():dim;
+    r.push({y:c.getFullYear(),m:c.getMonth()+1,w:(t-f+1)/dim});
+    c=new Date(c.getFullYear(),c.getMonth()+1,1);} return r;}
+function pad2(n){return String(n).padStart(2,'0');}
+function openGenModal(withCost){
+  const sel=document.getElementById('genPrj');
+  sel.innerHTML='<option value="">선택</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_id} ${p.project_name}</option>`).join('');
+  document.getElementById('genDoCost').checked=!!withCost;
+  document.getElementById('genModal').classList.add('open');
+}
+function closeGenModal(){document.getElementById('genModal').classList.remove('open');genRows=[];genCostRows=[];
+  ['genPreviewWrap','genCostWrap','msArea','genInfo','genTargets'].forEach(i=>document.getElementById(i).style.display='none');
+  document.getElementById('msRows').innerHTML='';
+  document.getElementById('genSaveBtn').disabled=true;}
+function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId);}
+function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);}
+function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);}
+function cut100(v){return Math.floor(v/100)*100;}
+function profileToRows(byM,totalExact){
+  // 라운딩 표준: 각 월 백원단위 절사, 차액은 마지막 월 산입 → 합계=totalExact 정확 일치
+  // 총액=원시합(견적 기준)이면 스케일 없이 원시값 절사 → 완전월은 단가 그대로 유지
+  const keys=Object.keys(byM).sort();
+  const raw=keys.reduce((s,k)=>s+byM[k],0)||1;
+  const scaled=Math.abs(totalExact-raw)>=1;  // 계약금액 기준 등 총액이 다를 때만 비례 스케일
+  let acc=0;
+  return keys.map((k,i)=>{
+    const [y,m]=k.split('-').map(Number);
+    const v=(i===keys.length-1)?(totalExact-acc):(scaled?cut100(totalExact*byM[k]/raw):Math.round(byM[k]));
+    acc+=v;
+    const plan=lastDayStr(y,m);
+    return {plan,supply:v,recv:recvDue(plan),pay:nextMonthEnd(plan),name:k+' 합산'};
+  });
+}
+function profileTotal(items,field,ds,de){
+  const b=monthlyProfile(items,field,ds,de);
+  return Math.round(Object.keys(b).reduce((s,k)=>s+b[k],0));
+}
+function genCtx(){
+  const pid=document.getElementById('genPrj').value; if(!pid)return null;
+  const prj=allPrjs.find(p=>p.project_id===pid); if(!prj)return null;
+  genPl=pipelines.find(p=>p.pipeline_id===prj.pipeline_id); if(!genPl)return null;
+  const items=estOf(genPl.pipeline_id);
+  const hasEst=items.length>0;
+  const st0=genPl.expected_start||prj.start_date, en0=genPl.expected_end||prj.end_date;
+  // 기준총액 = 항목 기간 기반 정밀 합 (mm 반올림 오차 배제 → 완전월=단가 그대로)
+  const eSell=hasEst?profileTotal(items,'unit_price',st0,en0):0;
+  const eBuy=hasEst?profileTotal(items,'buy_price',st0,en0):0;
+  const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
+  const amt=un(genPl.contract_amount||prj.contract_amount);
+  return {pid,prj,biz:genPl.biz_type||'인력공급',pay:genPl.payment_cycle||'익월말',
+    start:genPl.expected_start||prj.start_date,end:genPl.expected_end||prj.end_date,
+    amt,items,hasEst,eSell,eBuy,revAmt:(revBase==='est'&&hasEst)?eSell:amt};
+}
+function onGenPrjChange(){
+  // 견적이 있으면 기본 = 견적 매출(단가×월 그대로), 없으면 계약금액
+  const pid=document.getElementById('genPrj').value;
+  const prj=allPrjs.find(p=>p.project_id===pid);
+  const pl=prj?pipelines.find(p=>p.pipeline_id===prj.pipeline_id):null;
+  const hasEst=pl?estOf(pl.pipeline_id).length>0:false;
+  document.getElementById('revBaseEst').checked=hasEst;
+  document.querySelector('input[name=genRevBase][value=contract]').checked=!hasEst;
+  buildGen();
+}
+let genScaleNote='';
+function buildGen(){
+ try{
+  const c=genCtx(); if(!c)return;
+  document.getElementById('genTargets').style.display='block';
+  const doCostEl=document.getElementById('genDoCost');
+  document.getElementById('genCostHint').textContent=c.hasEst?`(견적 매입 합계 ${comma(c.eBuy)}원 → 월 합산)`:'(견적 없음 — 생성 불가)';
+  doCostEl.disabled=!c.hasEst; if(!c.hasEst)doCostEl.checked=false;
+  document.getElementById('revBaseEst').disabled=!c.hasEst;
+  const info=document.getElementById('genInfo');
+  info.style.display='block';
+  info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>`;
+  if(!c.start||!c.end||(!c.revAmt&&!c.eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
+    genRows=[];genCostRows=[];renderGenPreview();renderGenCostPreview();return;}
+  const rb=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
+  genScaleNote=(rb==='contract'&&c.hasEst&&c.amt&&c.eSell&&c.amt!==c.eSell)
+    ?` <span style="color:var(--amber)">⚠ 계약금액 스케일 ×${(c.amt/c.eSell).toFixed(3)} 적용 — 월 금액이 견적 단가와 다르게 표시됩니다</span>`:'';
+  if(c.biz==='용역턴키'){
+    document.getElementById('msArea').style.display='block';
+    ensureMsRows(c); msCalc();
+  } else {
+    document.getElementById('msArea').style.display='none';
+    const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
+    // ── 매출: 견적 항목 기간 기반 월별 합산 (v2.4 보정) ──
+    genRows=[];
+    if(document.getElementById('genDoRev').checked&&c.revAmt){
+      if(c.hasEst){
+        const sellByM=monthlyProfile(c.items,'unit_price',c.start,c.end);
+        // 견적 기준=프로파일 그대로 / 계약금액 기준=프로파일 패턴 유지+계약금액 스케일
+        genRows=profileToRows(sellByM, revBase==='est'?c.eSell:c.amt)
+          .map(r=>({plan:r.plan,supply:r.supply,recv:r.recv}));
+      } else {
+        const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
+        genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.revAmt-acc:cut100(c.revAmt*x.w/totW);acc+=sup;
+          const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
+      }
+    }
+    // ── 매입: 견적 항목 기간 기반 월별 합산 ──
+    genCostRows=[];
+    if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
+      const buyByM=monthlyProfile(c.items,'buy_price',c.start,c.end);
+      genCostRows=profileToRows(buyByM,c.eBuy)
+        .map(r=>({plan:r.plan,name:r.name.replace('합산','매입 합산'),supply:r.supply,pay:r.pay}));
+    }
+    renderGenPreview(); renderGenCostPreview();
+  }
+ }catch(e){ toast('생성 계산 오류: '+e.message,true); }
+}
+function ensureMsRows(c){
+  const n=parseInt(document.getElementById('genRounds').value);
+  if(document.querySelectorAll('#msRows .ms-row').length===n)return;
+  const ratios=n===4?[30,30,20,20]:[30,40,30];
+  const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
+  const sd=new Date(c.start), ed=new Date(c.end), span=ed-sd;
+  document.getElementById('msRows').innerHTML=labels.map((lb,i)=>{
+    const d=new Date(sd.getTime()+span*(i/(n-1)));
+    return `<div class="ms-row"><span>${lb}</span>
+      <input type="number" id="msR_${i}" value="${ratios[i]}" oninput="msCalc()">
+      <input type="date" id="msD_${i}" value="${d.toISOString().slice(0,10)}" onchange="msCalc()"></div>`;}).join('');
+}
+function setupMs(){ document.getElementById('msRows').innerHTML=''; buildGen(); }
+function msCalc(){
+ try{
+  const c=genCtx(); if(!c)return;
+  const n=parseInt(document.getElementById('genRounds').value);
+  const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
+  let sum=0,rs=[];
+  for(let i=0;i<n;i++){const r=parseFloat((document.getElementById('msR_'+i)||{}).value)||0;sum+=r;rs.push(r);}
+  document.getElementById('msSum').textContent=sum;
+  document.getElementById('msSum').style.color=sum===100?'var(--green)':'var(--red)';
+  let acc=0, accC=0;
+  genRows=[]; genCostRows=[];
+  rs.forEach((r,i)=>{
+    const plan=(document.getElementById('msD_'+i)||{}).value||'';
+    if(document.getElementById('genDoRev').checked&&c.revAmt){
+      let sup=(i===n-1)?c.revAmt-acc:cut100(c.revAmt*r/100); acc+=sup;
+      genRows.push({plan,supply:sup,recv:plan?recvDue(plan):''});}
+    if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
+      let supC=(i===n-1)?c.eBuy-accC:cut100(c.eBuy*r/100); accC+=supC;
+      genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):''});}
+  });
+  renderGenPreview(); renderGenCostPreview();
+ }catch(e){ toast('마일스톤 계산 오류: '+e.message,true); }
+}
+// ── 미리보기 (셀 단위 실시간 갱신) ──
+function renderGenPreview(){
+  const on=document.getElementById('genDoRev').checked&&genRows.length;
+  document.getElementById('genPreviewWrap').style.display=on?'block':'none';
+  if(on){
+    document.getElementById('genCnt').textContent=`(${genRows.length}건 · 월 합산)`;
+    document.getElementById('genPreview').innerHTML=genRows.map((g,i)=>`
+      <tr><td><input type="date" value="${g.plan}" onchange="chgRevPlan(${i},this.value)"></td>
+      <td><input value="${comma(g.supply)}" oninput="updRev(${i},this)" style="text-align:right"></td>
+      <td style="text-align:right;font-size:12px;white-space:nowrap" id="revVat_${i}">${comma(Math.round(g.supply*1.1))}원</td>
+      <td><input type="date" value="${g.recv}" id="revRecv_${i}" onchange="genRows[${i}].recv=this.value"></td></tr>`).join('');
+    updGenTotal();
+  }
+  syncSaveBtn();
+}
+function chgRevPlan(i,v){genRows[i].plan=v;genRows[i].recv=recvDue(v);
+  const el=document.getElementById('revRecv_'+i); if(el)el.value=genRows[i].recv;}
+function updRev(i,el){el.value=fc(el.value);genRows[i].supply=un(el.value);
+  const v=document.getElementById('revVat_'+i); if(v)v.textContent=comma(Math.round(genRows[i].supply*1.1))+'원';
+  updGenTotal();}
+function renderGenCostPreview(){
+  const on=document.getElementById('genDoCost').checked&&genCostRows.length;
+  document.getElementById('genCostWrap').style.display=on?'block':'none';
+  if(on){
+    document.getElementById('genCostCnt').textContent=`(${genCostRows.length}건 · 월 합산)`;
+    document.getElementById('genCostPreview').innerHTML=genCostRows.map((g,i)=>`
+      <tr><td><input type="date" value="${g.plan}" onchange="chgCostPlan(${i},this.value)"></td>
+      <td style="font-size:11px;white-space:nowrap">${g.name}</td>
+      <td><input value="${comma(g.supply)}" oninput="updCost(${i},this)" style="text-align:right"></td>
+      <td style="text-align:right;font-size:12px;white-space:nowrap" id="costVat_${i}">${comma(Math.round(g.supply*1.1))}원</td>
+      <td><input type="date" value="${g.pay}" id="costPay_${i}" onchange="genCostRows[${i}].pay=this.value"></td></tr>`).join('');
+    updGenCostTotal();
+  }
+  syncSaveBtn();
+}
+function chgCostPlan(i,v){genCostRows[i].plan=v;genCostRows[i].pay=nextMonthEnd(v);
+  const el=document.getElementById('costPay_'+i); if(el)el.value=genCostRows[i].pay;}
+function updCost(i,el){el.value=fc(el.value);genCostRows[i].supply=un(el.value);
+  const v=document.getElementById('costVat_'+i); if(v)v.textContent=comma(Math.round(genCostRows[i].supply*1.1))+'원';
+  updGenCostTotal();}
+function updGenTotal(){
+  const t=genRows.reduce((s,g)=>s+g.supply,0);
+  document.getElementById('genTotal').innerHTML=`매출 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`+genScaleNote;
+}
+function updGenCostTotal(){
+  const t=genCostRows.reduce((s,g)=>s+g.supply,0);
+  document.getElementById('genCostTotal').innerHTML=`매입 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
+}
+function syncSaveBtn(){
+  const r=document.getElementById('genDoRev').checked&&genRows.length;
+  const co=document.getElementById('genDoCost').checked&&genCostRows.length;
+  document.getElementById('genSaveBtn').disabled=!(r||co);
+}
+async function saveGen(){
+  const c=genCtx(); if(!c)return;
+  const doRev=document.getElementById('genDoRev').checked&&genRows.length;
+  const doCost=document.getElementById('genDoCost').checked&&genCostRows.length;
+  if(!doRev&&!doCost)return;
+  if(doRev&&genRows.some(g=>!g.plan||!g.supply)){toast('매출: 발행예정일·금액을 확인하세요',true);return;}
+  if(doCost&&genCostRows.some(g=>!g.plan||!g.supply)){toast('매입: 수취예정일·금액을 확인하세요',true);return;}
+  const btn=document.getElementById('genSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
+  let allOk=true, msgs=[];
+  if(doRev){
+    let base=revenues;
+    const existOpen=revenues.filter(r=>r.project_id===c.pid&&r.is_received!=='Y');
+    if(existOpen.length&&confirm(`이 프로젝트의 기존 미수 청구 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
+      base=revenues.filter(r=>!(r.project_id===c.pid&&r.is_received!=='Y'));
+    let seq=revenues.reduce((m,r)=>{const n=parseInt((r.revenue_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
+    const recs=genRows.map(g=>{seq++;return {revenue_id:`REV-2026-${String(seq).padStart(3,'0')}`,project_id:c.pid,
+      year_month:g.plan.slice(0,7),tax_invoice_amt:g.supply,cash_recv_amt:Math.round(g.supply*1.1),
+      cash_recv_date:g.recv,is_received:'N',memo:'청구 스케줄 자동생성',vat_amt:Math.round(g.supply*.1),
+      invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',recv_actual_date:''};});
+    const next=dedupe([...base,...recs],'revenue_id');
+    const ok=await clearAndWrite(...W.S04,[H4,...next.map(r=>H4.map(h=>r[h]??''))]);
+    if(ok){revenues=next;msgs.push(`매출 ${recs.length}건`);}else allOk=false;
+  }
+  if(allOk&&doCost){
+    let base=costs;
+    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date);
+    if(existOpen.length&&confirm(`이 프로젝트의 기존 미수취 매입 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
+      base=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
+    let seq=costs.reduce((m,x)=>{const n=parseInt((x.cost_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
+    const recs=genCostRows.map(g=>{seq++;return {cost_id:`COST-2026-${String(seq).padStart(3,'0')}`,project_id:c.pid,
+      year_month:g.plan.slice(0,7),cost_type:'외주비',person_name:'',unit_price:'',mm:'',
+      amount:g.supply,payment_date:g.pay,memo:'매입 스케줄 자동생성(월합산)',vat_amt:Math.round(g.supply*.1),
+      invoice_plan_date:g.plan,invoice_date:'',matched_txn_id:'',pay_actual_date:''};});
+    const next=dedupe([...base,...recs],'cost_id');
+    const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
+    if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
+  }
+  btn.disabled=false;btn.textContent='생성 저장';
+  if(allOk){toast(`✓ 스케줄 생성 완료: ${msgs.join(' · ')}`);closeGenModal();renderLists();}
+  else toast('저장 실패 — 남은 대상은 다시 시도하세요',true);
+}
+// v2.4.2: 오매칭 복구 — 입금/지급 확인 해제(매칭 정보 제거, 발행 정보는 보존)
+// v2.4.9: 발행/수취 상태 되돌리기(입금·지급 전 건만)
+async function cancelInvoice(id){
+  if(!confirm('이 건의 발행 상태를 취소하고 발행예정으로 되돌립니다.')) return;
+  const next=revenues.map(r=>r.revenue_id===id?{...r,invoice_date:''}:r);
+  const ok=await clearAndWrite(...W.S04,[H4,...dedupe(next,'revenue_id').map(r=>H4.map(h=>r[h]??''))]);
+  if(ok){revenues=dedupe(next,'revenue_id');toast('발행 취소 ✓ (발행예정 상태)');renderLists();}else toast('저장 실패',true);
+}
+async function cancelReceipt(id){
+  if(!confirm('이 건의 수취 상태를 취소하고 수취대기로 되돌립니다.')) return;
+  const next=costs.map(x=>x.cost_id===id?{...x,invoice_date:''}:x);
+  const ok=await clearAndWrite(...W.S05,[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
+  if(ok){costs=dedupe(next,'cost_id');toast('수취 취소 ✓ (수취대기 상태)');renderLists();}else toast('저장 실패',true);
+}
+async function unmarkRecv(id){
+  if(!confirm('이 건의 입금확인을 해제합니다. (발행 정보는 유지)')) return;
+  const next=revenues.map(r=>r.revenue_id===id?{...r,is_received:'',recv_actual_date:'',matched_txn_id:''}:r);
+  const ok=await clearAndWrite(...W.S04,[H4,...dedupe(next,'revenue_id').map(r=>H4.map(h=>r[h]??''))]);
+  if(ok){revenues=dedupe(next,'revenue_id');toast('입금확인 해제 ✓');renderLists();}else toast('저장 실패',true);
+}
+async function unmarkPay(id){
+  if(!confirm('이 건의 지급확인을 해제합니다. (수취 정보는 유지)')) return;
+  const next=costs.map(c=>c.cost_id===id?{...c,pay_actual_date:'',matched_txn_id:''}:c);
+  const ok=await clearAndWrite(...W.S05,[H5,...dedupe(next,'cost_id').map(c=>H5.map(h=>c[h]??''))]);
+  if(ok){costs=dedupe(next,'cost_id');toast('지급확인 해제 ✓');renderLists();}else toast('저장 실패',true);
+}
+async function markInvoiced(id){
+  const r=revenues.find(x=>x.revenue_id===id); if(!r)return;
+  const today=new Date().toISOString().slice(0,10);
+  if(!confirm(`${r.year_month} · ${r.project_id} 건을 오늘(${today}) 발행 완료 처리할까요?`))return;
+  const prj=allPrjs.find(p=>p.project_id===r.project_id);
+  const pl=prj?pipelines.find(p=>p.pipeline_id===prj.pipeline_id):null;
+  genPl=pl;
+  const due=r.cash_recv_date||recvDue(today);
+  const next=revenues.map(x=>x.revenue_id===id?{...x,invoice_date:today,cash_recv_date:due}:x);
+  const ok=await clearAndWrite(...W.S04,[H4,...dedupe(next,'revenue_id').map(x=>H4.map(h=>x[h]??''))]);
+  if(ok){revenues=dedupe(next,'revenue_id');toast('발행 완료 ✓ 수금예정 '+due);renderLists();}
+  else toast('저장 실패',true);
+}
+async function markCostInvoiced(id){
+  const c=costs.find(x=>x.cost_id===id); if(!c)return;
+  const today=new Date().toISOString().slice(0,10);
+  if(!confirm(`${c.year_month} · ${c.cost_type} 건을 오늘(${today}) 수취 완료 처리할까요?`))return;
+  const next=costs.map(x=>x.cost_id===id?{...x,invoice_date:today}:x);
+  const ok=await clearAndWrite(...W.S05,[H5,...dedupe(next,'cost_id').map(x=>H5.map(h=>x[h]??''))]);
+  if(ok){costs=dedupe(next,'cost_id');toast('수취 완료 ✓');renderLists();}
+  else toast('저장 실패',true);
+}
+window.addEventListener('load',async()=>{
+  await loadAll();
+  const q=new URLSearchParams(location.search);
+  const gen=q.get('gen');
+  if(gen){const prj=financePrjs.find(p=>p.pipeline_id===gen);
+    if(prj){
+      openGenModal(q.get('full')==='1');
+      if(q.get('rev')==='0')document.getElementById('genDoRev').checked=false;
+      document.getElementById('genPrj').value=prj.project_id;
+      if(q.get('revbase')==='est'){document.getElementById('revBaseEst').checked=true;buildGen();}
+      else if(q.get('revbase')==='contract'){document.querySelector('input[name=genRevBase][value=contract]').checked=true;buildGen();}
+      else onGenPrjChange();}}
+});
 </script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>
 </html>
