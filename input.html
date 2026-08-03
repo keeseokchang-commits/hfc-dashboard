@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.4.7">
+<link rel="stylesheet" href="css/common.css?v=2.4.8">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -122,7 +122,7 @@
           <input class="form-input" id="rev_ym" type="month"></div>
       </div>
       <div class="form-group"><label class="form-label">공급가액 (VAT 제외) <span class="req">*</span></label>
-        <input class="form-input" id="rev_supply" inputmode="numeric" placeholder="예: 13,200,000" oninput="this.value=fc(this.value);calcRevVat()"></div>
+        <input class="form-input" id="rev_supply" inputmode="numeric" placeholder="예: 13,200,000" oninput="this.value=comma(this.value);calcRevVat()"></div>
       <div class="vat-box">
         <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="rev_vat_disp">0원</span></div>
         <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="rev_total_disp">0원</span></div>
@@ -171,12 +171,12 @@
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">단가 (원/MM)</label>
-          <input class="form-input" id="cost_unit" inputmode="numeric" oninput="this.value=fc(this.value);calcCostAmt()"></div>
+          <input class="form-input" id="cost_unit" inputmode="numeric" oninput="this.value=comma(this.value);calcCostAmt()"></div>
         <div class="form-group"><label class="form-label">MM</label>
           <input class="form-input" id="cost_mm" type="number" step="0.01" oninput="calcCostAmt()"></div>
       </div>
       <div class="form-group"><label class="form-label">공급가액 (VAT 제외) <span class="req">*</span></label>
-        <input class="form-input" id="cost_supply" inputmode="numeric" placeholder="단가×MM 자동 또는 직접입력" oninput="this.value=fc(this.value);calcCostVat()"></div>
+        <input class="form-input" id="cost_supply" inputmode="numeric" placeholder="단가×MM 자동 또는 직접입력" oninput="this.value=comma(this.value);calcCostVat()"></div>
       <div class="vat-box">
         <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="cost_vat_disp">0원</span></div>
         <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="cost_total_disp">0원</span></div>
@@ -208,7 +208,7 @@
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">금액 (원) <span class="req">*</span></label>
-          <input class="form-input" id="fix_amount" inputmode="numeric" oninput="this.value=fc(this.value)"></div>
+          <input class="form-input" id="fix_amount" inputmode="numeric" oninput="this.value=comma(this.value)"></div>
         <div class="form-group"><label class="form-label">지급일</label><input class="form-input" id="fix_date" type="date"></div>
       </div>
       <div class="form-group"><label class="form-label">메모</label><input class="form-input" id="fix_memo"></div>
@@ -273,10 +273,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.7"></script>
-<script src="js/common.js?v=2.4.7"></script>
-<script src="js/calc.js?v=2.4.7"></script>
-<script src="js/nav.js?v=2.4.7"></script>
+<script src="js/schema.js?v=2.4.8"></script>
+<script src="js/common.js?v=2.4.8"></script>
+<script src="js/calc.js?v=2.4.8"></script>
+<script src="js/nav.js?v=2.4.8"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 

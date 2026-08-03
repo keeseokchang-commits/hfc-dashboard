@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.4.7">
+<link rel="stylesheet" href="css/common.css?v=2.4.8">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.7"></script>
-<script src="js/common.js?v=2.4.7"></script>
-<script src="js/calc.js?v=2.4.7"></script>
-<script src="js/nav.js?v=2.4.7"></script>
+<script src="js/schema.js?v=2.4.8"></script>
+<script src="js/common.js?v=2.4.8"></script>
+<script src="js/calc.js?v=2.4.8"></script>
+<script src="js/nav.js?v=2.4.8"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 let selStatus=new Set(['기회','확정','수주','계약']);
@@ -251,8 +251,8 @@ function renderLabor(){
           </select></div>
       </div>
       <div class="fr">
-        <div><label class="fl">매출 단가 (원/MM)</label><input class="fi" value="${comma(p.sell)}" oninput="this.value=fc(this.value);labor[${i}].sell=un(this.value);recalc()"></div>
-        <div><label class="fl">매입 단가 (원/MM)</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=fc(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
+        <div><label class="fl">매출 단가 (원/MM)</label><input class="fi" value="${comma(p.sell)}" oninput="this.value=comma(this.value);labor[${i}].sell=un(this.value);recalc()"></div>
+        <div><label class="fl">매입 단가 (원/MM)</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
       </div>
       <div class="fr3">
         <div><label class="fl">시작예정일</label><input class="fi" type="date" value="${p.start}" onchange="labor[${i}].start=this.value;autoMM(${i})"></div>
@@ -285,8 +285,8 @@ function renderItems(k){
       </div>
       <div class="fr3">
         <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=parseInt(this.value)||0;recalc()"></div>
-        <div><label class="fl">매출 단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=fc(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
-        <div><label class="fl">매입 단가 (원)</label><input class="fi" value="${comma(it.buy||0)}" oninput="this.value=fc(this.value);items['${k}'][${i}].buy=un(this.value);recalc()"></div>
+        <div><label class="fl">매출 단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=comma(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
+        <div><label class="fl">매입 단가 (원)</label><input class="fi" value="${comma(it.buy||0)}" oninput="this.value=comma(this.value);items['${k}'][${i}].buy=un(this.value);recalc()"></div>
       </div>
       <div class="fr">
         <div><label class="fl">시작일 (선택 — 기간 입력 시 월할 분배)</label><input class="fi" type="date" value="${it.start||''}" onchange="items['${k}'][${i}].start=this.value"></div>
