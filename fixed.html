@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.5">
+<link rel="stylesheet" href="css/common.css?v=2.5.1">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -109,10 +109,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.5"></script>
-<script src="js/common.js?v=2.5"></script>
-<script src="js/calc.js?v=2.5"></script>
-<script src="js/nav.js?v=2.5"></script>
+<script src="js/schema.js?v=2.5.1"></script>
+<script src="js/common.js?v=2.5.1"></script>
+<script src="js/calc.js?v=2.5.1"></script>
+<script src="js/nav.js?v=2.5.1"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -136,21 +136,45 @@ function renderFx(){
   document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
     <tr><td>${x.year_month}</td><td>${x.category}</td><td style="text-align:right">${comma(x.amount)}원</td>
     <td>${x.payment_date||'─'}</td><td style="color:var(--text3)">${x.memo||''}</td>
-    <td><button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
+    <td><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;margin-right:6px">수정</button><button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
     :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
 }
-function openFxModal(){const t=new Date().toISOString().slice(0,7);document.getElementById('fx_sm').value=t;document.getElementById('fx_em').value=t;document.getElementById('fxModal').classList.add('open');}
+function openFxModal(){resetFxEdit();const t=new Date().toISOString().slice(0,7);document.getElementById('fx_sm').value=t;document.getElementById('fx_em').value=t;document.getElementById('fxModal').classList.add('open');}
 async function writeFx(next){
   const H=['fixed_id','year_month','category','amount','payment_date','memo'];
   const ok=await clearAndWrite(...W.S06,[H,...dedupe(next,'fixed_id').map(x=>H.map(h=>x[h]??''))]);
   if(ok){fixedAll=dedupe(next,'fixed_id');renderFx();}
   return ok;
 }
+let editingFxId=null;
+// v2.5.1: 고정비 단건 수정 — 삭제·재등록 프로세스 대체
+function editFx(id){
+  const x=fixedAll.find(f=>f.fixed_id===id); if(!x) return;
+  editingFxId=id;
+  document.getElementById('fx_cat').value=x.category||'';
+  document.getElementById('fx_amt').value=fcv(x.amount||'');
+  document.getElementById('fx_day').value=parseInt((x.payment_date||'').slice(8,10))||25;
+  document.getElementById('fx_sm').value=x.year_month||'';
+  const em=document.getElementById('fx_em'); em.value=x.year_month||''; em.disabled=true; // 단건 수정: 기간 전개 없음
+  document.getElementById('fx_memo').value=x.memo||'';
+  const btn=document.getElementById('fxSaveBtn'); if(btn) btn.textContent='수정 저장';
+  document.getElementById('fxModal').classList.add('open');
+}
 async function saveFx(){
   const cat=document.getElementById('fx_cat').value.trim(), amt=unv(document.getElementById('fx_amt').value);
   const day=parseInt(document.getElementById('fx_day').value)||25;
   const sm=document.getElementById('fx_sm').value, em=document.getElementById('fx_em').value||sm;
   if(!cat||!amt||!sm){toast('항목·금액·기간을 입력하세요',true);return;}
+  if(editingFxId){ // 단건 수정 모드
+    const dim=new Date(parseInt(sm.slice(0,4)),parseInt(sm.slice(5,7)),0).getDate();
+    const next=fixedAll.map(x=>x.fixed_id===editingFxId?{...x,category:cat,amount:amt,year_month:sm,
+      payment_date:`${sm}-${String(Math.min(day,dim)).padStart(2,'0')}`,memo:document.getElementById('fx_memo').value||x.memo||''}:x);
+    const btn2=document.getElementById('fxSaveBtn');btn2.disabled=true;
+    const ok2=await writeFx(next); btn2.disabled=false;
+    if(ok2){toast('✓ 고정비 수정 완료');resetFxEdit();document.getElementById('fxModal').classList.remove('open');}
+    else toast('저장 실패',true);
+    return;
+  }
   let seq=fixedAll.reduce((m,x)=>Math.max(m,parseInt((x.fixed_id||'').replace(/\D/g,'').slice(-3))||0),0);
   const rows=[]; let c=new Date(sm+'-01');
   const end=new Date(em+'-01');
@@ -166,6 +190,11 @@ async function saveFx(){
   btn.disabled=false;
   if(ok){toast(`✓ 고정비 ${rows.length}건 생성`);document.getElementById('fxModal').classList.remove('open');}
   else toast('저장 실패',true);
+}
+function resetFxEdit(){
+  editingFxId=null;
+  const em=document.getElementById('fx_em'); if(em) em.disabled=false;
+  const btn=document.getElementById('fxSaveBtn'); if(btn) btn.textContent='저장';
 }
 async function delFx(id){
   if(!confirm('이 고정비 계획을 삭제할까요?'))return;
