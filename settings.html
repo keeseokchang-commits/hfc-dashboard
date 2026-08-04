@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.4.9">
+<link rel="stylesheet" href="css/common.css?v=2.5">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -176,6 +176,10 @@
       <span class="param-label">마감 임박 경고 D-day</span>
       <span><input class="param-input" type="number" id="param_alert_days" value="7"><span class="param-unit">일</span></span>
     </div>
+      <div class="param-row"><span class="param-label">추정 기초 잔액 (자본금)</span>
+      <span><input class="param-input" type="number" id="param_base_balance" value="20000000" style="width:110px"><span class="param-unit">원</span></span></div>
+      <div class="param-row"><span class="param-label">추정 기산월</span>
+      <span><input class="param-input" type="month" id="param_base_ym" value="2026-03" style="width:120px"></span></div>
     <div class="param-row">
       <span class="param-label">현금 부족 경고 선행 개월</span>
       <span><input class="param-input" type="number" id="param_cash_warn_months" value="3"><span class="param-unit">개월</span></span>
@@ -207,10 +211,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.4.9"></script>
-<script src="js/common.js?v=2.4.9"></script>
-<script src="js/calc.js?v=2.4.9"></script>
-<script src="js/nav.js?v=2.4.9"></script>
+<script src="js/schema.js?v=2.5"></script>
+<script src="js/common.js?v=2.5"></script>
+<script src="js/calc.js?v=2.5"></script>
+<script src="js/nav.js?v=2.5"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -379,7 +383,7 @@ async function loadSettings(){
     if(!settingsMap.kw_card_branch) (el=>{if(el)el.value='하나은행0026,하나은행0996';})(document.getElementById('kw_card_branch'));
     if(!settingsMap.kw_ai_branch) (el=>{if(el)el.value='하나금융센터,하나증권금융센터';})(document.getElementById('kw_ai_branch'));
     // 파라미터
-    ['param_alert_threshold','param_alert_days','param_cash_warn_months'].forEach(k=>{
+    ['param_alert_threshold','param_alert_days','param_cash_warn_months','param_base_balance','param_base_ym'].forEach(k=>{
       const el=document.getElementById(k);
       if(el&&settingsMap[k]) el.value=settingsMap[k];
     });
@@ -396,7 +400,7 @@ async function saveSettingsToSheet(){
     kw_capital_inflow:'자본 납입 키워드',kw_card_branch:'법인카드 거래점',
     kw_ai_branch:'AI 사용료 거래점',
     param_alert_threshold:'정합도 이탈 경고 기준(%)',
-    param_alert_days:'마감 임박 경고 D-day',
+    param_alert_days:'마감 임박 경고 D-day',param_base_balance:'추정 기초 잔액(자본금)',param_base_ym:'추정 기산월',
     param_cash_warn_months:'현금 부족 경고 선행 개월',
   };
   const rows=Object.entries(settingsMap).map(([k,v])=>[
@@ -424,7 +428,7 @@ async function saveBranchRules(){
 }
 
 async function saveParams(){
-  ['param_alert_threshold','param_alert_days','param_cash_warn_months'].forEach(k=>{
+  ['param_alert_threshold','param_alert_days','param_cash_warn_months','param_base_balance','param_base_ym'].forEach(k=>{
     settingsMap[k]=document.getElementById(k).value;
   });
   toast('저장 중…');
