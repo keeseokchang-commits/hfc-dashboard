@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.5.3">
+<link rel="stylesheet" href="css/common.css?v=2.5.4">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -287,10 +287,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.5.3"></script>
-<script src="js/common.js?v=2.5.3"></script>
-<script src="js/calc.js?v=2.5.3"></script>
-<script src="js/nav.js?v=2.5.3"></script>
+<script src="js/schema.js?v=2.5.4"></script>
+<script src="js/common.js?v=2.5.4"></script>
+<script src="js/calc.js?v=2.5.4"></script>
+<script src="js/nav.js?v=2.5.4"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -469,6 +469,34 @@ function classify(desc,recv,branch,inAmt,outAmt){
 }
 
 // ── 월별 집계 ─────────────────────────────────────────────────
+// v2.5.4: S08_DETAIL(원천) → 월별 실적 재파생 (SSOT — 저장된 분류·확정 순서 사용)
+function deriveActFromDetail(det){
+  if(!det||!det.length) return [];
+  const rows=[...det].sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
+  const monthly={};
+  rows.forEach(t=>{
+    const ym=t.year_month||String(t.txn_date).slice(0,7);
+    const m=monthly[ym]=monthly[ym]||{year_month:ym,act_balance:0,act_inflow:0,act_outflow:0,inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,outflow_card:0,outflow_ai:0,outflow_etc:0,inflow_capital:0,inflow_etc:0,unclassified_cnt:0};
+    const inA=parseInt(t.inflow_amt)||0, outA=parseInt(t.outflow_amt)||0, bal=parseInt(t.balance)||0;
+    m.act_inflow+=inA; m.act_outflow+=outA;
+    if(bal>0) m.act_balance=bal; // 정렬 확정 순서의 마지막 거래 잔액 = 월말 잔액
+    switch(t.category){
+      case '매출입금': m.inflow_revenue+=inA; break;
+      case '자본납입': m.inflow_capital+=inA; break;
+      case '기타입금': m.inflow_etc+=inA; break;
+      case '매입지급': m.outflow_cost+=outA; break;
+      case '고정비':   m.outflow_fixed+=outA; break;
+      case '급여':     m.outflow_fixed+=outA; break;
+      case '세금':     m.outflow_tax+=outA; break;
+      case '법인카드': m.outflow_card+=outA; break;
+      case 'AI사용료': m.outflow_ai+=outA; break;
+      default:         if(outA) m.outflow_etc+=outA; else if(inA) m.inflow_etc+=inA;
+    }
+    if((t.category==='기타비용'||t.category==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
+  });
+  return Object.values(monthly).sort((a,b)=>a.year_month.localeCompare(b.year_month));
+}
+
 // v2.5.2: 시간 오름차순 재배열 + 동일 일시 그룹은 잔액 체이닝(직전잔액+입금−출금=잔액)으로 순서 확정
 function orderAndChain(txns){
   const desc=txns.length>1&&String(txns[0].dt)>String(txns[txns.length-1].dt);
@@ -778,7 +806,7 @@ async function saveToSheets(){
     .sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
   const s08dRows=_mergedD.map(t=>s08dHeader.map(h=>t[h]??''));
   const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
-  if(ok2) detailAll=_mergedD;
+  if(ok2){ detailAll=_mergedD; actData=deriveActFromDetail(detailAll); }
 
   // S09_DASHBOARD 업데이트 (실잔액·정합도)
   await updateDashboard();
@@ -837,9 +865,8 @@ async function loadSheets(){
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
-    const actRows=await fetchSheet(...R.S08);
-    const loaded=toObj(actRows);
-    if(loaded.length) actData=loaded;
+    // v2.5.4 SSOT: 실적 표시는 항상 원천(S08_DETAIL)에서 재파생 — 원천 삭제·수정이 즉시 반영. S08_ACT는 기록용.
+    actData=deriveActFromDetail(detailAll);
     renderAll();
     renderPlanAct();
     renderVatBanner();
