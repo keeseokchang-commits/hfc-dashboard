@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.5.1">
+<link rel="stylesheet" href="css/common.css?v=2.5.3">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -287,10 +287,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.5.1"></script>
-<script src="js/common.js?v=2.5.1"></script>
-<script src="js/calc.js?v=2.5.1"></script>
-<script src="js/nav.js?v=2.5.1"></script>
+<script src="js/schema.js?v=2.5.3"></script>
+<script src="js/common.js?v=2.5.3"></script>
+<script src="js/calc.js?v=2.5.3"></script>
+<script src="js/nav.js?v=2.5.3"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -411,9 +411,10 @@ function processBankRows(rows){
   for(let i=headerIdx+1;i<rows.length;i++){
     const r=rows[i];
     if(!r||!r[colIdx.date]) continue;
-    const dateRaw=String(r[colIdx.date]||'').trim().slice(0,10);
-    if(!dateRaw.match(/\d{4}[-\/]\d{2}[-\/]\d{2}/)) continue;
-    const date=dateRaw.replace(/\//g,'-');
+    const rawFull=String(r[colIdx.date]||'').trim();
+    if(!rawFull.slice(0,10).match(/\d{4}[-\/]\d{2}[-\/]\d{2}/)) continue;
+    const dt=rawFull.replace(/\//g,'-'); // v2.5.2: 시분초 보존 — 동일 시간대 순서 판별의 기초
+    const date=dt.slice(0,10);
     const desc=String(r[colIdx.desc]||'').trim();
     const recv=String(r[colIdx.recv]||'').trim();
     const inAmt=parseInt(String(r[colIdx.in]||'0').replace(/,/g,''))||0;
@@ -423,13 +424,17 @@ function processBankRows(rows){
     // 더미 행 제거 (입출금 모두 0이고 잔액도 0)
     if(inAmt===0&&outAmt===0&&bal===0) continue;
     const cat=classify(desc,recv,branch,inAmt,outAmt);
-    const txnId='TXN-'+date.replace(/-/g,'')+'-'+String(txns.length+1).padStart(3,'0');
-    txns.push({date,ym:date.slice(0,7),desc,recv,inAmt,outAmt,bal,branch,cat,txnId});
+    txns.push({date,dt,ym:date.slice(0,7),desc,recv,inAmt,outAmt,bal,branch,cat,fp:dt+'|'+inAmt+'|'+outAmt+'|'+bal});
   }
 
   if(!txns.length){ toast('파싱된 거래 데이터가 없습니다.',true); return; }
-  parsedTxns=txns;
-  aggregateMonthly(txns);
+  // v2.5.2: 잔액 연속성 기반 순서 확정 → 확정 순서로 결정적 ID 부여
+  const oc=orderAndChain(txns);
+  oc.seq.forEach((t,i)=>{ t.txnId='TXN-'+t.date.replace(/-/g,'')+'-'+String(oc.seq.filter((x,j)=>j<=i&&x.date===t.date).length).padStart(3,'0'); });
+  parsedTxns=oc.seq;
+  if(oc.breaks>0) toast(`⚠ 잔액 연속성 ${oc.breaks}지점 불일치 — 해당 구간 순서는 파일 순서 유지`,true);
+  else toast('잔액 연속성 검증: 전 구간 연속 ✓');
+  aggregateMonthly(parsedTxns);
   document.getElementById('lastUpload').textContent=`최종 업로드: ${new Date().toLocaleDateString('ko-KR')}`;
   toast(`✓ ${txns.length}건 파싱 완료`);
   promptSaveToSheets();
@@ -464,13 +469,37 @@ function classify(desc,recv,branch,inAmt,outAmt){
 }
 
 // ── 월별 집계 ─────────────────────────────────────────────────
+// v2.5.2: 시간 오름차순 재배열 + 동일 일시 그룹은 잔액 체이닝(직전잔액+입금−출금=잔액)으로 순서 확정
+function orderAndChain(txns){
+  const desc=txns.length>1&&String(txns[0].dt)>String(txns[txns.length-1].dt);
+  let seq=desc?[...txns].reverse():[...txns]; // 파일 방향 보정(그룹 내 상대 순서 포함)
+  // 동일 dt 그룹 경계로 분할
+  const groups=[]; let g=[seq[0]];
+  for(let i=1;i<seq.length;i++){ if(seq[i].dt===g[0].dt) g.push(seq[i]); else {groups.push(g); g=[seq[i]];} }
+  groups.push(g);
+  const out=[]; let prevBal=null, breaks=0;
+  groups.forEach(gr=>{
+    if(gr.length>1&&prevBal!==null){
+      // 체이닝: prevBal에서 이어지는 거래를 차례로 선택
+      const pool=[...gr]; const chain=[]; let p=prevBal, fail=false;
+      while(pool.length){
+        const k=pool.findIndex(t=>p+t.inAmt-t.outAmt===t.bal);
+        if(k<0){ fail=true; break; }
+        const t=pool.splice(k,1)[0]; chain.push(t); p=t.bal;
+      }
+      if(!fail){ gr=chain; } else { breaks++; }
+    }
+    gr.forEach(t=>{
+      if(prevBal!==null&&prevBal+t.inAmt-t.outAmt!==t.bal) breaks++;
+      prevBal=t.bal; out.push(t);
+    });
+  });
+  return {seq:out,breaks};
+}
 function aggregateMonthly(txns){
   const monthly={};
   const monthTxns={};
-  // v2.4.7: 파일 정렬 방향 자동 감지(하나은행 CSV는 통상 최신순) — 월말 잔액 판별에 사용
-  const _asc=txns.length<2||String(txns[0].date)<=String(txns[txns.length-1].date);
-  const _best={};
-  txns.forEach((t,_i)=>{
+  txns.forEach(t=>{
     if(!monthly[t.ym]){
       monthly[t.ym]={act_balance:0,act_inflow:0,act_outflow:0,
         inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,
@@ -480,10 +509,8 @@ function aggregateMonthly(txns){
     }
     const m=monthly[t.ym];
     // v2.4.7: 실잔액 = 월 내 '최신 일시' 거래의 잔액 (구버전은 파일상 마지막 행이라 최신순 CSV에서 월초 잔액이 잡히던 결함)
-    if(t.bal>0){
-      const k=String(t.date), b=_best[t.ym];
-      if(!b||k>b.k||(k===b.k&&(_asc?_i>b.i:_i<b.i))){ _best[t.ym]={k,i:_i}; m.act_balance=t.bal; }
-    }
+    // v2.5.2: txns는 orderAndChain으로 시간·잔액체인 순서가 확정됨 — 월의 마지막 요소 잔액이 월말 잔액
+    if(t.bal>0) m.act_balance=t.bal;
     m.act_inflow+=t.inAmt;
     m.act_outflow+=t.outAmt;
     monthTxns[t.ym].push(t);
@@ -740,8 +767,15 @@ async function saveToSheets(){
   // S08_DETAIL 헤더 + 거래 상세
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
   // v2.4.3: 기존 거래(detailAll)와 병합(txn_id 기준, 신규 우선) — 과거 업로드분 보존
-  const _newD=parsedTxns.map(t=>({txn_id:t.txnId,txn_date:t.date,description:t.desc,inflow_amt:t.inAmt,outflow_amt:t.outAmt,balance:t.bal,recv:t.recv,branch:t.branch,category:t.cat,year_month:t.ym}));
-  const _mergedD=dedupe([...detailAll,..._newD],'txn_id').sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date)));
+  // v2.5.2: 지문(fp)으로 기존 거래 식별 — 기존 txn_id 유지(대사 링크 보존), 신규만 새 ID. 일시는 txn_date에 시분초로 저장
+  const _fpOf=d=>String(d.txn_date)+'|'+(parseInt(d.inflow_amt)||0)+'|'+(parseInt(d.outflow_amt)||0)+'|'+(parseInt(d.balance)||0);
+  const _oldByFp=new Map(detailAll.map(d=>[_fpOf(d),d]));
+  const _newD=parsedTxns.map(t=>{
+    const ex=_oldByFp.get(t.fp)||_oldByFp.get(t.date+'|'+t.inAmt+'|'+t.outAmt+'|'+t.bal); // 구(날짜만) 데이터 호환
+    return {txn_id:ex?ex.txn_id:t.txnId,txn_date:t.dt,description:t.desc,inflow_amt:t.inAmt,outflow_amt:t.outAmt,balance:t.bal,recv:t.recv,branch:t.branch,category:ex&&ex.category&&t.cat.startsWith('기타')?ex.category:t.cat,year_month:t.ym};
+  });
+  const _mergedD=dedupe([...detailAll,..._newD],'txn_id')
+    .sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
   const s08dRows=_mergedD.map(t=>s08dHeader.map(h=>t[h]??''));
   const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
   if(ok2) detailAll=_mergedD;
