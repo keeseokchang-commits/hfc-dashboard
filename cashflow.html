@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.5.5">
+<link rel="stylesheet" href="css/common.css?v=2.5.6">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -287,10 +287,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.5.5"></script>
-<script src="js/common.js?v=2.5.5"></script>
-<script src="js/calc.js?v=2.5.5"></script>
-<script src="js/nav.js?v=2.5.5"></script>
+<script src="js/schema.js?v=2.5.6"></script>
+<script src="js/common.js?v=2.5.6"></script>
+<script src="js/calc.js?v=2.5.6"></script>
+<script src="js/nav.js?v=2.5.6"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -780,19 +780,8 @@ function promptSaveToSheets(){
 
 async function saveToSheets(){
   toast('Sheets 저장 중…');
-  // S08_CASHFLOW_ACT 헤더 + 데이터
-  const s08Header=['year_month','act_balance','act_inflow','act_outflow','inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc','unclassified_cnt','csv_uploaded_at'];
   const today=new Date().toISOString().slice(0,10);
-  actData=dedupe(actData,'year_month'); // PK 무결성 규칙
-  const s08Rows=actData.map(m=>[
-    m.year_month,m.act_balance,m.act_inflow,m.act_outflow,
-    m.inflow_revenue,m.outflow_cost,m.outflow_fixed,m.outflow_tax,
-    m.outflow_card||0,m.outflow_ai||0,m.outflow_etc,
-    m.inflow_capital||0,m.inflow_etc||0,m.unclassified_cnt||0,today
-  ]);
-  const ok1=await clearAndWrite(...W.S08,[s08Header,...s08Rows]);
-
-  // S08_DETAIL 헤더 + 거래 상세
+  // S08_DETAIL(원천) 병합을 먼저 확정하고, S08_ACT는 그 원장에서 재파생해 기록 — v2.5.6: 시트 간 완전 정합
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
   // v2.4.3: 기존 거래(detailAll)와 병합(txn_id 기준, 신규 우선) — 과거 업로드분 보존
   // v2.5.2: 지문(fp)으로 기존 거래 식별 — 기존 txn_id 유지(대사 링크 보존), 신규만 새 ID. 일시는 txn_date에 시분초로 저장
@@ -807,6 +796,8 @@ async function saveToSheets(){
   const s08dRows=_mergedD.map(t=>s08dHeader.map(h=>t[h]??''));
   const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
   if(ok2){ detailAll=_mergedD; actData=deriveActFromDetail(detailAll); }
+  // S08_CASHFLOW_ACT = 병합 원장의 재파생본 기록 (원천과 항상 일치)
+  const ok1=await writeActFromDetail(today);
 
   // S09_DASHBOARD 업데이트 (실잔액·정합도)
   await updateDashboard();
@@ -815,6 +806,17 @@ async function saveToSheets(){
   else toast('저장 실패. 로그인 상태를 확인하세요.', true);
 }
 
+// v2.5.6: S08_ACT 시트를 원장(S08_DETAIL) 재파생본으로 재작성 — 파생 시트 동기화
+async function writeActFromDetail(today){
+  const H=['year_month','act_balance','act_inflow','act_outflow','inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc','unclassified_cnt','csv_uploaded_at'];
+  const rows=deriveActFromDetail(detailAll).map(m=>[
+    m.year_month,m.act_balance,m.act_inflow,m.act_outflow,
+    m.inflow_revenue,m.outflow_cost,m.outflow_fixed,m.outflow_tax,
+    m.outflow_card||0,m.outflow_ai||0,m.outflow_etc||0,
+    m.inflow_capital||0,m.inflow_etc||0,m.unclassified_cnt||0,today||new Date().toISOString().slice(0,10)
+  ]);
+  return await clearAndWrite(...W.S08,[H,...rows]);
+}
 async function updateDashboard(){
   // S02에서 추정잔액 읽기 (이미 estData에 있음)
   const s09Header=['year_month','est_balance','act_balance','diff_amount','accuracy_pct','diff_cause','alert_flag','updated_at'];
@@ -1170,6 +1172,7 @@ async function recalcEstimate(){
       rows.push([m,inflow,outflow,vat,bal,(weighted?'확도가중 ON':'확정분만')+' · 계획 누적',today]);
     });
     const header=['year_month','est_inflow','est_outflow','est_vat','est_balance','pipeline_basis','updated_at'];
+    await writeActFromDetail(); // v2.5.6: 파생 시트 동기화
     const ok=await clearAndWrite(...W.S02,[header,...rows]);
     if(ok){
       const er=await fetchSheet(...R.S02); estData=toObj(er);
