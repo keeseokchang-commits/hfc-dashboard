@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.6">
+<link rel="stylesheet" href="css/common.css?v=2.7">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -158,7 +158,10 @@
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">② 거래점 분류 규칙 <small style="color:var(--text3)">(거래점 패턴 → 유형, 키워드보다 후순위)</small></div>
     <div id="ctBranch"></div><button class="btn-mini" onclick="addCode('branch_rule')">+ 규칙 추가</button>
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">③ 고정비 항목 <small style="color:var(--text3)">(고정비 계획 화면의 항목 드롭다운)</small></div>
-    <div id="ctFixed"></div><button class="btn-mini" onclick="addCode('fixed_item')">+ 항목 추가</button>
+    <div id="ctFixed"></div>
+    <div style="font-size:12px;font-weight:700;margin:16px 0 6px">④ 기술 태그 <small style="color:var(--text3)">(인력 프로필 검색용 — 동의어는 콤마: React / 리액트,react)</small>
+      <button onclick="addCode('skill_tag')" style="font-size:11px;margin-left:8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:3px 9px;cursor:pointer">+ 추가</button></div>
+    <div id="ctSkill"></div><button class="btn-mini" onclick="addCode('fixed_item')">+ 항목 추가</button>
     <datalist id="typeDL"></datalist>
     <button onclick="saveCodes()" style="width:100%;margin-top:14px;padding:11px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer">🗂 코드 전체 저장</button>
   </div>
@@ -211,10 +214,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.6"></script>
-<script src="js/common.js?v=2.6"></script>
-<script src="js/calc.js?v=2.6"></script>
-<script src="js/nav.js?v=2.6"></script>
+<script src="js/schema.js?v=2.7"></script>
+<script src="js/common.js?v=2.7"></script>
+<script src="js/calc.js?v=2.7"></script>
+<script src="js/nav.js?v=2.7"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -439,13 +442,13 @@ async function saveParams(){
 window.addEventListener('load',()=>{ loadRates(); loadSettings(); });
 
 // ═══ v1.2 코드 관리 (#10,#14,#15) ═══
-let codeRows={txn_type:[],branch_rule:[],fixed_item:[]}, s10Other=[];
+let codeRows={txn_type:[],branch_rule:[],fixed_item:[],skill_tag:[]}, s10Other=[];
 const DEF_TYPES=[['매출입금',''],['매입지급',''],['고정비',''],['급여',''],['세금',''],['법인카드',''],['AI사용료',''],['기타비용',''],['기타입금','']];
 async function loadCodes(){
  try{
   const rows=toObj(await fetchSheet(...R.S10));
-  s10Other=rows.filter(r=>!['txn_type','branch_rule','fixed_item'].includes(r.category));
-  ['txn_type','branch_rule','fixed_item'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.key,r.value]));
+  s10Other=rows.filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category));
+  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
   if(!codeRows.txn_type.length){
     const kw=k=>(rows.find(r=>r.key===k)||{}).value||'';
     codeRows.txn_type=DEF_TYPES.map(([n,_])=>[n,{'매출입금':kw('kw_revenue_inflow'),'매입지급':kw('kw_cost_outflow'),'고정비':kw('kw_fixed_outflow'),'세금':kw('kw_tax_outflow')}[n]||'']);
@@ -463,6 +466,7 @@ function renderCodes(){
   document.getElementById('ctTxn').innerHTML=mk('txn_type','유형명 (예: 매입지급)','키워드 콤마구분 (예: 오벳소프트,외주비)');
   document.getElementById('ctBranch').innerHTML=mk('branch_rule','거래점 패턴 (예: 하나은행0026)','적용 유형 (예: 법인카드)',true);
   document.getElementById('ctFixed').innerHTML=mk('fixed_item','항목명 (예: 임차료)','대사 키워드(선택)');
+  document.getElementById('ctSkill').innerHTML=mk('skill_tag','태그명 (예: React)','동의어 콤마구분 (예: 리액트,react)');
   fillDL();
 }
 function fillDL(){document.getElementById('typeDL').innerHTML=codeRows.txn_type.map(r=>`<option value="${r[0]}">`).join('');}
@@ -476,7 +480,7 @@ async function saveCodes(){
   const today=new Date().toISOString().slice(0,10);
   const H=['key','value','description','category','updated_at'];
   const rows=[...s10Other.map(r=>[r.key,r.value,r.description,r.category,r.updated_at])];
-  ['txn_type','branch_rule','fixed_item'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'','',c,today])));
+  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'','',c,today])));
   const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
 }

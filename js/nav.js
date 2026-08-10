@@ -5,6 +5,7 @@ const NAV_ITEMS=[
   ['estimate','📊','견적','estimate.html',true],
   ['project','📁','프로젝트','project.html',true],
   ['input','🧾','세금계산서','input.html',true],
+  ['profile','👥','인력 프로필','profile.html',false],
   ['fixed','🏢','고정비','fixed.html',false],
   ['cashflow','💰','자금수지','cashflow.html',true],
   ['vat','🧾','부가세','vat.html',false],

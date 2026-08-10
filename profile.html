@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>HFC 인력 프로필</title>
+<link rel="stylesheet" href="css/common.css?v=2.7">
+<style>
+.chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
+.st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
+.sec-t{font-size:13px;font-weight:700;margin:14px 0 6px;color:var(--blue)}
+.itbl{width:100%;border-collapse:collapse;font-size:11px}
+.itbl th{background:var(--bg);padding:5px;border:1px solid var(--border);font-weight:600;color:var(--text2)}
+.itbl td{padding:5px;border:1px solid var(--border);vertical-align:top}
+.frow{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.frow input,.frow select,.frow textarea{padding:7px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface)}
+.irow{display:grid;gap:4px;margin-bottom:5px;align-items:start}
+.irow input,.irow textarea{padding:5px;border:1px solid var(--border);border-radius:6px;font-size:11px}
+.irow button{border:none;background:none;color:var(--red);cursor:pointer}
+.mask{cursor:pointer;color:var(--text3);text-decoration:underline dotted}
+</style>
+</head>
+<body data-page="profile">
+<header class="app-header"><div class="app-title">HFC 경영관리 <span>인력 프로필</span></div>
+<div style="display:flex;gap:8px"><button id="loginBtn" onclick="signIn()" style="font-size:11px;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface);cursor:pointer">Google 로그인</button></div></header>
+<nav class="side-nav"></nav>
+<main class="main">
+
+<div class="card">
+  <div class="card-title">👥 인력 프로필 <span id="pfCnt" style="font-size:12px;color:var(--text3)"></span>
+    <button class="btn-gen" onclick="openForm()" style="margin-left:auto;font-size:12px;padding:6px 12px;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer">+ 인력 등록</button></div>
+  <div class="list-toolbar" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+    <input id="fKw" placeholder="검색: 이름·기술·고객사·업무·프로젝트" style="flex:2;min-width:170px;padding:7px;border:1px solid var(--border);border-radius:8px;font-size:12px" oninput="renderList()">
+    <select id="fGr" onchange="renderList()" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="">전체 등급</option><option>특급</option><option>고급</option><option>중급</option><option>초급</option></select>
+    <select id="fYr" onchange="renderList()" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="">연차 전체</option><option value="5">5년+</option><option value="10">10년+</option><option value="15">15년+</option><option value="20">20년+</option></select>
+    <select id="fTag" onchange="renderList()" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="">전체 태그</option></select>
+    <select id="fSt" onchange="renderList()" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="">전체 상태</option><option>가용</option><option>협의중</option><option>투입중</option><option>중단</option></select>
+    <input id="fAv" type="date" title="이 날짜 이전 가용" onchange="renderList()" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:12px">
+    <button class="tb-reset" onclick="resetF()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:12px;cursor:pointer">필터 초기화</button>
+  </div>
+  <div id="pfList"></div>
+</div>
+
+<!-- 상세 -->
+<div class="modal-overlay" id="dtModal"><div class="modal" style="max-width:760px">
+  <div class="modal-title"><span id="dtName">상세</span>
+    <span style="display:flex;gap:6px">
+      <button onclick="toast('PDF 출력은 Step4에서 제공됩니다')" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer">내부용 PDF</button>
+      <button onclick="toast('PDF 출력은 Step4에서 제공됩니다')" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer">제출용 PDF</button>
+      <button onclick="editFromDetail()" style="font-size:11px;padding:5px 10px;border:1px solid var(--blue);border-radius:7px;background:var(--blue-lt,#EFF6FF);color:var(--blue);cursor:pointer">수정</button>
+      <button onclick="document.getElementById('dtModal').classList.remove('open')" style="border:none;background:none;font-size:18px;cursor:pointer">✕</button></span></div>
+  <div id="dtBody" style="max-height:68dvh;overflow-y:auto;font-size:12px"></div>
+</div></div>
+
+<!-- 등록/수정 -->
+<div class="modal-overlay" id="fmModal"><div class="modal" style="max-width:860px">
+  <div class="modal-title"><span id="fmTitle">인력 등록</span><button onclick="document.getElementById('fmModal').classList.remove('open')" style="border:none;background:none;font-size:18px;cursor:pointer">✕</button></div>
+  <div style="max-height:70dvh;overflow-y:auto">
+  <div id="dropZone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;font-size:12px;color:var(--text3);margin-bottom:10px">
+    📄 이력서 파일을 여기에 끌어다 놓으세요 — <b>워드(docx)는 자동 채움</b> (Step3 예정) · 지금은 수동 입력</div>
+  <div class="sec-t">① 신상</div>
+  <div class="frow">
+    <input id="p_name" placeholder="성명 *" style="width:110px">
+    <select id="p_grade" style="width:90px"><option>특급</option><option>고급</option><option>중급</option><option>초급</option></select>
+    <input id="p_years" type="number" placeholder="연차 *" style="width:80px">
+    <input id="p_birth" placeholder="생년월일 (예: 1976.11.18)" style="width:150px">
+    <select id="p_gender" style="width:70px"><option value="">성별</option><option>남</option><option>여</option></select>
+    <input id="p_mil" placeholder="병역" style="width:80px">
+  </div>
+  <div class="frow">
+    <input id="p_phone" placeholder="연락처" style="width:130px">
+    <input id="p_email" placeholder="이메일" style="flex:1;min-width:160px">
+    <input id="p_addr" placeholder="주소" style="flex:2;min-width:200px">
+  </div>
+  <div class="frow">
+    <input id="p_skills" placeholder="대표 기술 태그 (콤마: Oracle,PM)" style="flex:2;min-width:180px" list="tagDL">
+    <datalist id="tagDL"></datalist>
+    <input id="p_buy" placeholder="희망 매입단가(원/MM)" style="width:150px" oninput="this.value=comma(this.value)">
+    <input id="p_last" placeholder="최근 거래단가" style="width:130px" oninput="this.value=comma(this.value)">
+  </div>
+  <div class="frow">
+    <select id="p_status" style="width:100px"><option>가용</option><option>협의중</option><option>투입중</option><option>중단</option></select>
+    <input id="p_avail" type="date" title="가용 시작일" style="width:140px">
+    <select id="p_source" style="width:110px"><option>잡코리아</option><option>지인</option><option>협력사</option><option>기타</option></select>
+    <input id="p_link" placeholder="원본 이력서 링크(드라이브)" style="flex:1;min-width:180px">
+  </div>
+  <div class="frow"><textarea id="p_memo" placeholder="메모" style="flex:1;height:40px"></textarea></div>
+  <div id="secEditors"></div>
+  <button id="fmSave" onclick="saveProfile()" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:9px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer">저장</button>
+  </div>
+</div></div>
+
+<div id="toast" class="toast"></div>
+</main>
+<nav class="tab-bar"></nav>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="js/common.js?v=2.7"></script>
+<script src="js/schema.js?v=2.7"></script>
+<script src="js/nav.js?v=2.7"></script>
+<script>
+let profiles=[],items=[],tags=[],editingId=null;
+// 섹션 정의: [코드, 라벨, 필드구성]  필드: [S16컬럼, placeholder, 넓이비율]
+const SECS=[
+ ['학력','② 학력',[['title','학교·전공',3],['end','졸업연월',1],['detail','구분(졸업 등)',1]]],
+ ['자격증','③ 자격증',[['title','자격증명',3],['end','취득일',1]]],
+ ['경력','④ 경력(회사)',[['title','회사명',2],['role','직위',1],['start','시작(YYYY.MM)',1],['end','종료',1],['detail','담당업무',2]]],
+ ['교육','⑤ 교육',[['title','교육명',3],['org','기관',1],['start','시작',1],['end','종료',1]]],
+ ['기술','⑥ 보유기술',[['title','기술명',2],['detail','숙련도(상/중/하)',1]]],
+ ['프로젝트','⑦ 참여 프로젝트',[['title','프로젝트명',2],['org','고객사',1],['role','역할(PM/PL/TA…)',1],['start','시작',1],['end','종료',1],['detail','업무 내용',3],['lang','언어',1],['dbms','DBMS',1],['tool','TOOL',1]]]
+];
+let secRows={}; // {섹션:[{title,org,...}]}
+
+async function loadAll(){
+  try{
+    const [pR,iR,sR]=await Promise.all([fetchSheet(...R.S07),fetchSheet(...R.S16),fetchSheet(...R.S10)]);
+    profiles=dedupe(toObj(pR).filter(p=>p.profile_id),'profile_id');
+    items=toObj(iR).filter(x=>x.item_id);
+    tags=toObj(sR).filter(r=>r.category==='skill_tag'&&(r.setting_key||r.key)).map(r=>({tag:r.setting_key||r.key,syn:((r.setting_value||r.value)||'').split(',').map(x=>x.trim()).filter(Boolean)}));
+    const sel=document.getElementById('fTag');
+    sel.innerHTML='<option value="">전체 태그</option>'+tags.map(t=>`<option>${t.tag}</option>`).join('');
+    document.getElementById('tagDL').innerHTML=tags.map(t=>`<option value="${t.tag}">`).join('');
+    renderList();
+  }catch(e){ toast('데이터 로드 실패: '+e.message,true); }
+}
+function tagWords(tag){ const t=tags.find(x=>x.tag===tag); return t?[t.tag,...t.syn].map(x=>x.toLowerCase()):[tag.toLowerCase()]; }
+function itemsOf(id){ return items.filter(x=>x.profile_id===id).sort((a,b)=>(parseInt(a.sort)||0)-(parseInt(b.sort)||0)); }
+function blobOf(p){ // 검색 대상 텍스트: 프로필 + 경력 상세 전체
+  const it=itemsOf(p.profile_id).map(x=>[x.title,x.org,x.role,x.detail,x.lang,x.dbms,x.tool].join(' ')).join(' ');
+  return (p.name+' '+(p.skills||'')+' '+(p.memo||'')+' '+it).toLowerCase();
+}
+function stBadge(st){ const c={'가용':['#DCFCE7','#16A34A'],'협의중':['#FEF9C3','#CA8A04'],'투입중':['#DBEAFE','#2563EB'],'중단':['#F1F5F9','#64748B']}[st]||['#F1F5F9','#64748B'];
+  return `<span class="st-b" style="background:${c[0]};color:${c[1]}">${st||'-'}</span>`; }
+function renderList(){
+  const kw=(document.getElementById('fKw').value||'').toLowerCase().trim();
+  const gr=document.getElementById('fGr').value, yr=parseInt(document.getElementById('fYr').value)||0;
+  const tg=document.getElementById('fTag').value, st=document.getElementById('fSt').value, av=document.getElementById('fAv').value;
+  const tw=tg?tagWords(tg):null;
+  const list=profiles.filter(p=>{
+    if(gr&&p.grade!==gr) return false;
+    if(yr&&(parseInt(p.career_years)||0)<yr) return false;
+    if(st&&p.status!==st) return false;
+    if(av&&(!p.avail_date||p.avail_date>av)) return false;
+    const blob=blobOf(p);
+    if(tw&&!tw.some(w=>blob.includes(w))) return false;
+    if(kw&&!blob.includes(kw)) return false;
+    return true;
+  }).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  document.getElementById('pfCnt').textContent=`(${list.length}명 / 전체 ${profiles.length}명)`;
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('pfList').innerHTML=list.length?list.map(p=>{
+    const stale=p.avail_date&&p.avail_date<today&&p.status==='가용';
+    return `<div style="padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openDetail('${p.profile_id}')">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <span><b style="font-size:13px;color:var(--blue)">${p.name}</b>
+        <span style="font-size:11px;color:var(--text2)"> ${p.grade||''} · ${p.career_years||'?'}년차</span>
+        ${(p.skills||'').split(',').filter(Boolean).slice(0,5).map(s=>`<span class="chip">${s.trim()}</span>`).join('')}</span>
+      <span style="display:flex;gap:8px;align-items:center;font-size:11px">
+        <span style="color:var(--text2)">${p.buy_price?comma(p.buy_price)+'원/MM':''}</span>
+        ${stBadge(p.status)}
+        <span style="color:${stale?'var(--amber)':'var(--text3)'}">${p.avail_date?('가용 '+p.avail_date+(stale?' ⚠확인 필요':'')):''}</span></span>
+    </div></div>`;}).join('')
+  :'<div style="text-align:center;padding:22px;color:var(--text3);font-size:13px">조건에 맞는 인력이 없습니다</div>';
+}
+function resetF(){ ['fKw','fGr','fYr','fTag','fSt','fAv'].forEach(id=>document.getElementById(id).value=''); renderList(); }
+// ── 상세 ──
+let dtId=null;
+function openDetail(id){
+  const p=profiles.find(x=>x.profile_id===id); if(!p) return; dtId=id;
+  document.getElementById('dtName').textContent=`${p.name} — ${p.grade||''} ${p.career_years||'?'}년차`;
+  const mask=(v,l)=>v?`<span class="mask" onclick="this.textContent='${String(v).replace(/'/g,'')}';this.classList.remove('mask')">${l} 표시</span>`:'-';
+  const it=itemsOf(id), sec=c=>it.filter(x=>x.section===c);
+  const tbl=(rows,cols)=>rows.length?`<table class="itbl"><tr>${cols.map(c=>`<th>${c[1]}</th>`).join('')}</tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${(r[c[0]]||'').replace(/\n/g,'<br>')}</td>`).join('')}</tr>`).join('')}</table>`:'<div style="color:var(--text3);font-size:11px">등록 없음</div>';
+  document.getElementById('dtBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:5px;font-size:12px">
+      <div>생년월일: ${p.birth||'-'} ${p.gender||''}</div><div>병역: ${p.military||'-'}</div>
+      <div>연락처: ${mask(p.phone,'📞')}</div><div>이메일: ${mask(p.email,'✉️')}</div>
+      <div style="grid-column:1/-1">주소: ${p.address||'-'}</div>
+      <div>매입단가: ${p.buy_price?comma(p.buy_price)+'원/MM':'-'} ${p.last_price?'(최근 '+comma(p.last_price)+')':''}</div>
+      <div>상태: ${p.status||'-'} · 가용 ${p.avail_date||'-'}</div>
+      <div>출처: ${p.source||'-'} ${p.resume_link?`· <a href="${p.resume_link}" target="_blank">원본 이력서</a>`:''}</div>
+      <div style="grid-column:1/-1">태그: ${(p.skills||'').split(',').filter(Boolean).map(s=>`<span class="chip">${s.trim()}</span>`).join('')||'-'}</div>
+      ${p.memo?`<div style="grid-column:1/-1;color:var(--text2)">메모: ${p.memo}</div>`:''}
+    </div>
+    ${SECS.map(([c,label,cols])=>`<div class="sec-t">${label} (${sec(c).length})</div>${tbl(sec(c),cols)}`).join('')}`;
+  document.getElementById('dtModal').classList.add('open');
+}
+function editFromDetail(){ document.getElementById('dtModal').classList.remove('open'); openForm(dtId); }
+// ── 등록/수정 ──
+function renderSecEditors(){
+  document.getElementById('secEditors').innerHTML=SECS.map(([c,label,cols])=>`
+    <div class="sec-t">${label} <button onclick="addItem('${c}')" style="font-size:10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:2px 8px;cursor:pointer;margin-left:6px">+ 행 추가</button></div>
+    <div id="se_${c}">${(secRows[c]||[]).map((r,i)=>secRowHtml(c,cols,r,i)).join('')}</div>`).join('');
+}
+function secRowHtml(c,cols,r,i){
+  const grid=cols.map(f=>f[2]+'fr').join(' ')+' 20px';
+  return `<div class="irow" style="grid-template-columns:${grid}">
+    ${cols.map(f=>f[0]==='detail'&&c==='프로젝트'
+      ?`<textarea placeholder="${f[1]}" style="height:34px" oninput="secRows['${c}'][${i}].${f[0]}=this.value">${r[f[0]]||''}</textarea>`
+      :`<input value="${(r[f[0]]||'').replace(/"/g,'&quot;')}" placeholder="${f[1]}" oninput="secRows['${c}'][${i}].${f[0]}=this.value">`).join('')}
+    <button onclick="secRows['${c}'].splice(${i},1);renderSecEditors()">✕</button></div>`;
+}
+function addItem(c){ (secRows[c]=secRows[c]||[]).push({}); renderSecEditors(); }
+function openForm(id){
+  editingId=id||null; secRows={};
+  document.getElementById('fmTitle').textContent=id?'인력 수정':'인력 등록';
+  const p=id?profiles.find(x=>x.profile_id===id):{};
+  const S=(k,v)=>{const el=document.getElementById(k); if(el) el.value=v||'';};
+  S('p_name',p.name);S('p_grade',p.grade||'중급');S('p_years',p.career_years);S('p_birth',p.birth);S('p_gender',p.gender);S('p_mil',p.military);
+  S('p_phone',p.phone);S('p_email',p.email);S('p_addr',p.address);S('p_skills',p.skills);
+  S('p_buy',p.buy_price?comma(p.buy_price):'');S('p_last',p.last_price?comma(p.last_price):'');
+  S('p_status',p.status||'가용');S('p_avail',p.avail_date);S('p_source',p.source||'잡코리아');S('p_link',p.resume_link);S('p_memo',p.memo);
+  if(id) SECS.forEach(([c])=>{ secRows[c]=itemsOf(id).filter(x=>x.section===c).map(x=>({...x})); });
+  renderSecEditors();
+  document.getElementById('fmModal').classList.add('open');
+}
+async function saveProfile(){
+  const V=k=>document.getElementById(k).value.trim();
+  if(!V('p_name')||!V('p_years')){toast('성명·연차는 필수입니다',true);return;}
+  if(!accessToken){toast('Google 로그인이 필요합니다',true);return;}
+  const btn=document.getElementById('fmSave');btn.disabled=true;
+  const snapshotP=[...profiles], snapshotI=[...items];
+  try{
+    const pid=editingId||('PF-'+new Date().getFullYear()+'-'+String(Math.max(0,...profiles.map(p=>parseInt((p.profile_id||'').split('-')[2])||0))+1).padStart(3,'0'));
+    const today=new Date().toISOString().slice(0,10);
+    const rec={profile_id:pid,name:V('p_name'),birth:V('p_birth'),gender:V('p_gender'),career_years:V('p_years'),grade:V('p_grade'),
+      military:V('p_mil'),address:V('p_addr'),phone:V('p_phone'),email:V('p_email'),skills:V('p_skills'),
+      buy_price:un(V('p_buy'))||'',last_price:un(V('p_last'))||'',source:V('p_source'),resume_link:V('p_link'),
+      status:V('p_status'),avail_date:V('p_avail'),memo:V('p_memo'),updated_at:today};
+    profiles=dedupe([...profiles.filter(p=>p.profile_id!==pid),rec],'profile_id');
+    // 아이템: 해당 프로필 전량 교체
+    const keep=items.filter(x=>x.profile_id!==pid);
+    let seq=0; const mine=[];
+    SECS.forEach(([c])=>{(secRows[c]||[]).forEach(r=>{ if(!(r.title||'').trim()) return;
+      mine.push({item_id:pid+'-I'+String(++seq).padStart(3,'0'),profile_id:pid,section:c,
+        title:r.title||'',org:r.org||'',role:r.role||'',start:r.start||'',end:r.end||'',
+        detail:r.detail||'',lang:r.lang||'',dbms:r.dbms||'',tool:r.tool||'',sort:seq});});});
+    items=[...keep,...mine];
+    const ok1=await clearAndWrite(...W.S07,[HEADERS.S07,...profiles.map(p=>HEADERS.S07.map(h=>p[h]??''))]);
+    const ok2=await clearAndWrite(...W.S16,[HEADERS.S16,...dedupe(items,'item_id').map(x=>HEADERS.S16.map(h=>x[h]??''))]);
+    if(ok1&&ok2){ toast('✓ 저장 완료'); editingId=null;
+      document.getElementById('fmModal').classList.remove('open'); renderList(); }
+    else { profiles=snapshotP; items=snapshotI; toast('저장 실패 — 변경 취소됨',true); }
+  }catch(e){ profiles=snapshotP; items=snapshotI; toast('저장 오류: '+e.message,true); }
+  btn.disabled=false;
+}
+window.addEventListener('load',async()=>{ initOAuth(); await loadAll(); });
+</script>
+</body>
+</html>

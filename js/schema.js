@@ -6,6 +6,8 @@ const R={ // 읽기 [시트명, 범위]
   S04:['S04_REVENUE','A1:M1000'],
   S05:['S05_COST','A1:O1000'],
   S06:['S06_FIXED_COST','A1:F300'],
+  S07:['S07_PROFILE','A1:S500'],
+  S16:['S16_PROFILE_ITEM','A1:M3000'],
   S08:['S08_CASHFLOW_ACT','A1:O24'],
   S08_DETAIL:['S08_DETAIL','A1:J2000'],
   S09:['S09_DASHBOARD','A1:H24'],
@@ -22,6 +24,8 @@ const W={ // 쓰기 [시트명, 범위]
   S04:['S04_REVENUE','A:M'],
   S05:['S05_COST','A:O'],
   S06:['S06_FIXED_COST','A:F'],
+  S07:['S07_PROFILE','A:S'],
+  S16:['S16_PROFILE_ITEM','A:M'],
   S08:['S08_CASHFLOW_ACT','A:O'],
   S08_DETAIL:['S08_DETAIL','A:J'],
   S09:['S09_DASHBOARD','A:H'],
@@ -32,6 +36,8 @@ const W={ // 쓰기 [시트명, 범위]
   S14:['S14_HISTORY','A:H'],
 };
 const HEADERS={
+  S07:['profile_id','name','birth','gender','career_years','grade','military','address','phone','email','skills','buy_price','last_price','source','resume_link','status','avail_date','memo','updated_at'],
+  S16:['item_id','profile_id','section','title','org','role','start','end','detail','lang','dbms','tool','sort'],
   S01:["pipeline_id", "opportunity", "client", "end_client", "probability", "contract_amount", "expected_start", "expected_end", "payment_cycle", "status", "memo", "created_at", "biz_type"],
   S04:["revenue_id", "project_id", "year_month", "tax_invoice_amt", "cash_recv_amt", "cash_recv_date", "is_received", "memo", "vat_amt", "invoice_plan_date", "invoice_date", "matched_txn_id", "recv_actual_date"],
   S05:["cost_id", "project_id", "year_month", "cost_type", "person_name", "unit_price", "mm", "amount", "payment_date", "memo", "vat_amt", "invoice_plan_date", "invoice_date", "matched_txn_id", "pay_actual_date"],
