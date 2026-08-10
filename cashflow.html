@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.5.8">
+<link rel="stylesheet" href="css/common.css?v=2.6">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -288,10 +288,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.5.8"></script>
-<script src="js/common.js?v=2.5.8"></script>
-<script src="js/calc.js?v=2.5.8"></script>
-<script src="js/nav.js?v=2.5.8"></script>
+<script src="js/schema.js?v=2.6"></script>
+<script src="js/common.js?v=2.6"></script>
+<script src="js/calc.js?v=2.6"></script>
+<script src="js/nav.js?v=2.6"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -803,7 +803,8 @@ async function saveToSheets(){
   // S09_DASHBOARD 업데이트 (실잔액·정합도)
   await updateDashboard();
 
-  if(ok1&&ok2){ toast('✓ Sheets 저장 완료'); await loadSheets(); await reconcile(); }
+  if(ok1&&ok2){ toast('✓ Sheets 저장 완료'); await loadSheets();
+  handleRecalcParam(); await reconcile(); }
   else toast('저장 실패. 로그인 상태를 확인하세요.', true);
 }
 
@@ -1075,17 +1076,47 @@ function auditDupMatches(){
     return Object.entries(by).filter(([,v])=>v.length>1).map(([tid,v])=>({tid,rows:v,idKey,dKey}));};
   return {rev:dup(s04All,'revenue_id','cash_recv_date'),cost:dup(s05All,'cost_id','payment_date')};
 }
+// v2.5.9: 매칭 정합 감사 확장 — 근거 없는 완료(Y·matched 無)와 유령 거래 참조(matched가 원장에 無)
+function auditOrphans(){
+  const tids=new Set(detailAll.map(t=>t.txn_id));
+  return {
+    revNoTx: s04All.filter(r=>r.is_received==='Y'&&!r.matched_txn_id),
+    revGhost: s04All.filter(r=>r.matched_txn_id&&!tids.has(r.matched_txn_id)),
+    costNoTx: s05All.filter(c=>c.pay_actual_date&&!c.matched_txn_id),
+    costGhost: s05All.filter(c=>c.matched_txn_id&&!tids.has(c.matched_txn_id))
+  };
+}
+async function fixOrphans(){
+  const o=auditOrphans();
+  const n=o.revNoTx.length+o.revGhost.length+o.costNoTx.length+o.costGhost.length;
+  if(!n){toast('정합 문제가 없습니다');return;}
+  if(!confirm(`근거 없는 완료 상태 ${n}건을 해제합니다.\n· 매출: 입금완료인데 매칭 거래 없음 ${o.revNoTx.length}건 · 원장에 없는 거래 참조 ${o.revGhost.length}건\n· 매입: ${o.costNoTx.length+o.costGhost.length}건\n(발행·수취 정보는 보존, 해당 건은 다시 대사 대상이 됩니다)`)) return;
+  const badR=new Set([...o.revNoTx,...o.revGhost].map(r=>r.revenue_id));
+  const badC=new Set([...o.costNoTx,...o.costGhost].map(c=>c.cost_id));
+  const n4=s04All.map(r=>badR.has(r.revenue_id)?{...r,is_received:'',recv_actual_date:'',matched_txn_id:''}:r);
+  const n5=s05All.map(c=>badC.has(c.cost_id)?{...c,pay_actual_date:'',matched_txn_id:''}:c);
+  let ok=true;
+  if(badR.size) ok=await saveS04(n4)&&ok;
+  if(badC.size) ok=await saveS05(n5)&&ok;
+  if(ok){ if(badR.size)s04All=dedupe(n4,'revenue_id'); if(badC.size)s05All=dedupe(n5,'cost_id');
+    toast('정합 정리 완료 ✓'); renderDupAudit(); renderRecon(); renderAging(); }
+  else toast('정리 저장 실패 — 데이터 변경 없음',true);
+}
 function renderDupAudit(){
   const el=document.getElementById('dupAudit'); if(!el) return;
   const {rev,cost}=auditDupMatches();
-  if(!rev.length&&!cost.length){el.style.display='none';el.innerHTML='';return;}
+  const o=auditOrphans();
+  const orn=o.revNoTx.length+o.revGhost.length+o.costNoTx.length+o.costGhost.length;
+  if(!rev.length&&!cost.length&&!orn){el.style.display='none';el.innerHTML='';return;}
   const txD=tid=>{const t=detailAll.find(x=>x.txn_id===tid);return t?`${String(t.txn_date).slice(0,10)} ${won(parseInt(t.inflow_amt)||parseInt(t.outflow_amt)||0)}`:tid;};
   const grp=(g,label)=>`<div style="padding:6px 0;border-bottom:1px dashed var(--border)"><b>${label}</b> 거래 ${g.tid} (${txD(g.tid)}) → <span style="color:var(--red)">${g.rows.length}건 중복 매칭</span>: ${g.rows.map(r=>r[g.idKey]+'('+(r.year_month||'')+')').join(', ')}</div>`;
   el.style.display='block';
-  el.innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">⚠ 중복 매칭 감사: 입금 ${rev.length}그룹 · 지급 ${cost.length}그룹</div>
+  el.innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">⚠ 매칭 정합 감사: 중복 입금 ${rev.length}·지급 ${cost.length}그룹, 근거 없는 완료 ${orn}건</div>
     <div style="font-size:11px">${rev.map(g=>grp(g,'입금')).join('')}${cost.map(g=>grp(g,'지급')).join('')}</div>
     <div style="font-size:11px;color:var(--text3);margin:6px 0">정리 시 각 거래는 예정일이 거래일에 가장 가까운 1건만 유지, 나머지는 해제됩니다(발행·수취 정보 보존).</div>
-    <button onclick="fixDupMatches()" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--red);color:#fff;cursor:pointer">중복 정리 실행</button>`;
+    ${(rev.length||cost.length)?`<button onclick="fixDupMatches()" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--red);color:#fff;cursor:pointer;margin-right:6px">중복 정리 실행</button>`:''}
+    ${orn?`<div style="font-size:11px;padding:6px 0;border-top:1px dashed var(--border);margin-top:6px"><b>근거 없는 완료 상태 ${orn}건</b> — ${[...o.revNoTx,...o.revGhost].map(r=>r.revenue_id+'('+r.year_month+(r.matched_txn_id?'·유령거래':'·매칭없음')+')').join(', ')}${(o.costNoTx.length+o.costGhost.length)?' · 매입 '+(o.costNoTx.length+o.costGhost.length)+'건':''}</div>
+    <button onclick="fixOrphans()" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">근거 없는 완료 일괄 해제</button>`:''}`;
 }
 async function fixDupMatches(){
   const {rev,cost}=auditDupMatches();
@@ -1223,6 +1254,13 @@ async function recalcEstimate(){
     } else toast('재계산 저장 실패',true);
   }catch(e){toast('재계산 오류: '+e.message,true);}
   btn.disabled=false;btn.textContent='추정 재계산 실행';
+}
+// v2.6: 부가세 화면에서 넘어온 재계산 요청 처리
+async function handleRecalcParam(){
+  if(new URLSearchParams(location.search).get('recalc')!=='1') return;
+  history.replaceState(null,'',location.pathname);
+  if(accessToken){ toast('부가세 반영분 추정 재계산 실행 중…'); await recalcEstimate(); }
+  else toast('부가세 반영분을 적용하려면 [추정 재계산 실행]을 눌러주세요 (로그인 필요)',true);
 }
 window.addEventListener('load',()=>{ loadSheets(); });
 </script>

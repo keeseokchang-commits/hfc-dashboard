@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.5.8">
+<link rel="stylesheet" href="css/common.css?v=2.6">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -102,10 +102,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.5.8"></script>
-<script src="js/common.js?v=2.5.8"></script>
-<script src="js/calc.js?v=2.5.8"></script>
-<script src="js/nav.js?v=2.5.8"></script>
+<script src="js/schema.js?v=2.6"></script>
+<script src="js/common.js?v=2.6"></script>
+<script src="js/calc.js?v=2.6"></script>
+<script src="js/nav.js?v=2.6"></script>
 <script>
 let vats=[],revs=[],costs=[],prjMap={},selQ=null;
 const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
@@ -210,20 +210,18 @@ async function reflectCashflow(){
   const v=vats.find(x=>x.quarter_code===selQ);
   const amt=un(document.getElementById('actualPay').value)||c.pay;
   if(!amt){toast('납부액이 0원입니다',true);return;}
-  if(!confirm(`${q.payYm}월 자금수지 유출에 ${wf(amt)}을 반영하시겠습니까?`))return;
+  if(!confirm(`${q.payYm}월(신고·납부 기한 월) 자금수지 유출에 ${wf(amt)}을 반영합니다.\n확정 후 자금수지의 [추정 재계산]이 실행되어야 추정 잔액에 반영됩니다.`))return;
   const btn=document.getElementById('btnReflect');btn.disabled=true;
   try{
-    // S09 해당월 est_balance 차감 방식이 아닌, S02 est_outflow/est_vat 반영
-    const rows=await fetchSheet(...R.S02);
-    const header=rows[0];const data=toObj(rows);
-    const t=data.find(r=>r.year_month===q.payYm);
-    if(t){t.est_vat=amt;
-      const dataRows=data.map(r=>header.map(h=>r[h]??''));
-      await clearAndWrite(...W.S02,[header,...dataRows]);}
-    upsertVat(selQ,{cashflow_reflected:'Y'});
+    // v2.6: 추정 산출자는 자금수지 recalc 하나(SSOT) — 여기서는 S13에 반영 확정만 기록.
+    // recalc는 S13의 납부기한 월에 실납부액(없으면 추정세액)을 유출로 집계한다.
+    upsertVat(selQ,{cashflow_reflected:'Y',estimated_payment:amt});
     const ok=await saveS13();
     btn.disabled=false;
-    if(ok){toast(`✓ ${q.payYm} 자금수지 반영 완료`);renderQuarters();}
+    if(ok){
+      toast(`✓ ${selQ} 반영 확정 (${q.payYm} 유출 ${wf(amt)})`);renderQuarters();
+      if(confirm('자금수지 화면으로 이동해 [추정 재계산]을 바로 실행할까요?')) location.href='cashflow.html?recalc=1';
+    }
   }catch(e){btn.disabled=false;toast('반영 실패: '+e.message,true);}
 }
 window.addEventListener('load',loadAll);
