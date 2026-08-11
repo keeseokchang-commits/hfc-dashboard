@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.2">
+<link rel="stylesheet" href="css/common.css?v=2.9.3">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -97,9 +97,9 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/common.js?v=2.9.2"></script>
-<script src="js/schema.js?v=2.9.2"></script>
-<script src="js/nav.js?v=2.9.2"></script>
+<script src="js/common.js?v=2.9.3"></script>
+<script src="js/schema.js?v=2.9.3"></script>
+<script src="js/nav.js?v=2.9.3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
@@ -137,7 +137,7 @@ function renderMissingBanner(){
     <button onclick="createProfileSheets()" style="margin-left:8px;font-size:11px;padding:5px 10px;border:none;border-radius:6px;background:#CA8A04;color:#fff;cursor:pointer">시트 자동 생성</button></div>`:'';
 }
 async function createProfileSheets(){
-  if(!accessToken){ toast('Google 로그인이 필요합니다',true); return; }
+  // v2.9.3: 선제 차단 제거 — ensureSheet가 로그인 안 되어 있으면 자동으로 팝업을 띄움
   toast('시트 생성 중…');
   const ok1=await ensureSheet(R.S07[0],HEADERS.S07);
   const ok2=await ensureSheet(R.S16[0],HEADERS.S16);
@@ -238,7 +238,7 @@ function openForm(id){
 async function saveProfile(){
   const V=k=>document.getElementById(k).value.trim();
   if(!V('p_name')||!V('p_years')){toast('성명·연차는 필수입니다',true);return;}
-  if(!accessToken){toast('Google 로그인이 필요합니다',true);return;}
+  // v2.9.3: 선제 차단 제거 — clearAndWrite가 로그인 안 되어 있으면 자동으로 팝업을 띄움
   const btn=document.getElementById('fmSave');btn.disabled=true;
   const snapshotP=[...profiles], snapshotI=[...items];
   try{
@@ -408,6 +408,7 @@ function applyMapped(m){
 
 window.addEventListener('load',async()=>{
   initOAuth(); await loadAll();
+  setInterval(()=>{ const b=document.getElementById('loginBtn'); if(b) b.textContent=accessToken?'✓ 로그인됨':'Google 로그인'; },800);
   // v2.9: 드롭존 — 브라우저 기본 동작(새 탭/다운로드) 방지 + 실제 파일 처리(handleResumeFile)는 change/드롭 핸들러로 연결
   const dz=document.getElementById('dropZone');
   if(dz){
