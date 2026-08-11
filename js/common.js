@@ -34,6 +34,23 @@ async function fetchSheet(sheet,range){
     throw new Error(sheet+' 읽기 오류 '+res.status);
   }
 }
+// v2.8.2: 존재하지 않는 시트를 안전하게 조회(400 → 빈 배열). 필요 시 자동 생성 후 헤더 기록.
+async function fetchSheetSafe(sheet,range){
+  try{ return await fetchSheet(sheet,range); }
+  catch(e){ if(String(e.message).includes('오류 400')) return null; throw e; }
+}
+async function ensureSheet(sheet,header){
+  if(!accessToken){ await signIn(); if(!accessToken) return false; }
+  try{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}:batchUpdate`,{
+      method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{addSheet:{properties:{title:sheet}}}]})});
+    if(!r.ok && r.status!==400) throw new Error('시트 생성 실패 '+r.status); // 400=이미 존재 가능성, 계속 진행
+  }catch(e){ /* 이미 존재하면 addSheet가 400 — 무시하고 헤더만 기록 */ }
+  const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!A1')}`;
+  const r2=await fetch(base+'?valueInputOption=RAW',{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:[header]})});
+  return r2.ok;
+}
 async function clearAndWrite(sheet,range,rows){
   if(!accessToken){ await signIn(); if(!accessToken) return false; }
   const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}`;

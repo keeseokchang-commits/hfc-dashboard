@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.8.1">
+<link rel="stylesheet" href="css/common.css?v=2.8.2">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -25,6 +25,7 @@
 <nav class="side-nav"></nav>
 <main class="main">
 
+<div id="missingBanner"></div>
 <div class="card">
   <div class="card-title">👥 인력 프로필 <span id="pfCnt" style="font-size:12px;color:var(--text3)"></span>
     <button class="btn-gen" onclick="openForm()" style="margin-left:auto;font-size:12px;padding:6px 12px;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer">+ 인력 등록</button></div>
@@ -93,9 +94,9 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/common.js?v=2.8.1"></script>
-<script src="js/schema.js?v=2.8.1"></script>
-<script src="js/nav.js?v=2.8.1"></script>
+<script src="js/common.js?v=2.8.2"></script>
+<script src="js/schema.js?v=2.8.2"></script>
+<script src="js/nav.js?v=2.8.2"></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
 // 섹션 정의: [코드, 라벨, 필드구성]  필드: [S16컬럼, placeholder, 넓이비율]
@@ -109,17 +110,35 @@ const SECS=[
 ];
 let secRows={}; // {섹션:[{title,org,...}]}
 
+let sheetsMissing=false;
 async function loadAll(){
   try{
-    const [pR,iR,sR]=await Promise.all([fetchSheet(...R.S07),fetchSheet(...R.S16),fetchSheet(...R.S10)]);
-    profiles=dedupe(toObj(pR).filter(p=>p.profile_id),'profile_id');
-    items=toObj(iR).filter(x=>x.item_id);
-    tags=toObj(sR).filter(r=>r.category==='skill_tag'&&(r.setting_key||r.key)).map(r=>({tag:r.setting_key||r.key,syn:((r.setting_value||r.value)||'').split(',').map(x=>x.trim()).filter(Boolean)}));
+    const [pR,iR,sR]=await Promise.all([fetchSheetSafe(...R.S07),fetchSheetSafe(...R.S16),fetchSheetSafe(...R.S10).catch(()=>[])]);
+    sheetsMissing=(pR===null||iR===null);
+    profiles=dedupe(toObj(pR||[]).filter(p=>p.profile_id),'profile_id');
+    items=toObj(iR||[]).filter(x=>x.item_id);
+    tags=toObj(sR||[]).filter(r=>r.category==='skill_tag'&&(r.setting_key||r.key)).map(r=>({tag:r.setting_key||r.key,syn:((r.setting_value||r.value)||'').split(',').map(x=>x.trim()).filter(Boolean)}));
     const sel=document.getElementById('fTag');
     sel.innerHTML='<option value="">전체 태그</option>'+tags.map(t=>`<option>${t.tag}</option>`).join('');
     document.getElementById('tagDL').innerHTML=tags.map(t=>`<option value="${t.tag}">`).join('');
+    renderMissingBanner();
     renderList();
   }catch(e){ toast('데이터 로드 실패: '+e.message,true); }
+}
+function renderMissingBanner(){
+  const el=document.getElementById('missingBanner'); if(!el) return;
+  el.style.display=sheetsMissing?'block':'none';
+  el.innerHTML=sheetsMissing?`<div style="background:#FEF9C3;border:1px solid #FDE68A;border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px">
+    ⚠ S07_PROFILE·S16_PROFILE_ITEM 시트가 아직 없습니다.
+    <button onclick="createProfileSheets()" style="margin-left:8px;font-size:11px;padding:5px 10px;border:none;border-radius:6px;background:#CA8A04;color:#fff;cursor:pointer">시트 자동 생성</button></div>`:'';
+}
+async function createProfileSheets(){
+  if(!accessToken){ toast('Google 로그인이 필요합니다',true); return; }
+  toast('시트 생성 중…');
+  const ok1=await ensureSheet(R.S07[0],HEADERS.S07);
+  const ok2=await ensureSheet(R.S16[0],HEADERS.S16);
+  if(ok1&&ok2){ toast('✓ 시트 생성 완료'); await loadAll(); }
+  else toast('시트 생성 실패 — 수동으로 만들어 주세요',true);
 }
 function tagWords(tag){ const t=tags.find(x=>x.tag===tag); return t?[t.tag,...t.syn].map(x=>x.toLowerCase()):[tag.toLowerCase()]; }
 function itemsOf(id){ return items.filter(x=>x.profile_id===id).sort((a,b)=>(parseInt(a.sort)||0)-(parseInt(b.sort)||0)); }
