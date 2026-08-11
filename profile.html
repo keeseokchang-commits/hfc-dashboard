@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.9">
+<link rel="stylesheet" href="css/common.css?v=2.9.2">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -97,9 +97,9 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/common.js?v=2.9"></script>
-<script src="js/schema.js?v=2.9"></script>
-<script src="js/nav.js?v=2.9"></script>
+<script src="js/common.js?v=2.9.2"></script>
+<script src="js/schema.js?v=2.9.2"></script>
+<script src="js/nav.js?v=2.9.2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
@@ -281,7 +281,16 @@ async function handleResumeFile(file){
     applyMapped(mapped);
     const pv=document.getElementById('mapPreview');
     pv.style.display='block';
-    pv.innerHTML=`✓ <b>${file.name}</b> 자동 채움 완료 — 신상 ${mapped.name?'인식':'미인식'}, 학력 ${mapped.sec.학력.length}·자격증 ${mapped.sec.자격증.length}·경력 ${mapped.sec.경력.length}·교육 ${mapped.sec.교육.length}·기술 ${mapped.sec.기술.length}·프로젝트 ${mapped.sec.프로젝트.length}건. <span style="color:var(--amber)">내용을 확인하고 틀린 부분만 고쳐 저장하세요.</span>`;
+    const secCnt=Object.values(mapped.sec).filter(a=>a.length>0).length; // 0건 이상인 섹션 수
+    const totalItems=Object.values(mapped.sec).reduce((s,a)=>s+a.length,0);
+    // v2.9.2: 인식 실패 감지 — 이름 미인식 또는 6섹션 중 4개 이상이 0건이면 처음 보는 양식으로 판단, 명확히 경고
+    if(!mapped.name||secCnt<=2){
+      pv.style.background='#FEF2F2'; pv.style.borderColor='#FECACA';
+      pv.innerHTML=`⚠ <b>${file.name}</b> — 이 이력서는 <b>처음 보는 양식</b>으로 보입니다(인식된 항목: 신상 ${mapped.name?'✓':'✗'}, 총 ${totalItems}건). 자동 채움이 부정확할 수 있으니 <b>아래 내용을 꼼꼼히 확인·직접 입력</b>해 주세요. 이 양식을 계속 쓰실 예정이면 원본 파일을 알려주시면 인식 규칙을 추가하겠습니다.`;
+    } else {
+      pv.style.background='var(--blue-lt,#EFF6FF)'; pv.style.borderColor='#BFDBFE';
+      pv.innerHTML=`✓ <b>${file.name}</b> 자동 채움 완료 — 신상 ${mapped.name?'인식':'미인식'}, 학력 ${mapped.sec.학력.length}·자격증 ${mapped.sec.자격증.length}·경력 ${mapped.sec.경력.length}·교육 ${mapped.sec.교육.length}·기술 ${mapped.sec.기술.length}·프로젝트 ${mapped.sec.프로젝트.length}건. <span style="color:var(--amber)">내용을 확인하고 틀린 부분만 고쳐 저장하세요.</span>`;
+    }
   }catch(e){ toast('파일 인식 실패: '+e.message+' — 폼에 직접 입력해 주세요',true); }
   dz.style.opacity='1';
 }
@@ -290,9 +299,49 @@ function mapResumeTables(tables){
   const out={name:'',birth:'',gender:'',years:'',dept:'',military:'',phone:'',email:'',address:'',
     sec:{학력:[],자격증:[],경력:[],교육:[],기술:[],프로젝트:[]}};
   const findCell=(row,label)=>{ const i=row.findIndex(c=>c.replace(/\s/g,'').includes(label)); return i>=0?(row[i+1]||''):''; };
+  // v2.9.1: '세로 나열형' 양식 감지(라벨-값 2열 행이 표 하나에 신상+학력+경력이슈 전부 이어지는 구조)
+  // 신호: 표1의 1열에 '성명'류 라벨 행 + '학력 사항'/'경력 사항' 구분 행이 같은 표 안에 존재
+  const vertTable=tables.find(t=>{
+    const c0=t.map(r=>(r[0]||'').replace(/\s/g,''));
+    return c0.some(c=>c.includes('성명')||c.includes('출생'))&&c0.some(c=>c.includes('학력사항')||c.includes('경력사항'));
+  });
+  if(vertTable){
+    let mode='';
+    vertTable.forEach((row,ri)=>{
+      const c0=(row[0]||'').replace(/\s/g,'');
+      // 라벨 없이 "이름 / 직위"만 있는 최상단 행 = 실명
+      if(ri===0&&row.length<=2&&/^[가-힣\s]+\/[가-힣\s]+$/.test((row[0]||row[1]||'').trim())){
+        out.name=(row[0]||row[1]).split('/')[0].trim(); return;
+      }
+      if(c0.includes('학력사항')){mode='학력'; return;}
+      if(c0.includes('경력사항')&&row.length===1){mode='경력'; return;}
+      if(!c0){return;}
+      const subHeaders=['학교','회사명','프로젝트명','기간','전공','소재지','직위','담당업무'];
+      if(subHeaders.includes((row[0]||'').trim())){ return; } // 서브헤더 행 스킵(학력/경력 섹션 내부 컬럼명 행)
+      if(mode==='학력'&&row.length>=3){ const [st,en]=(row[1]||'').split('~').map(x=>(x||'').trim());
+        out.sec.학력.push({title:row[0],start:st,end:en,detail:row[2]||''}); return; }
+      if(mode==='경력'&&row.length>=3){ const [st,en]=(row[1]||'').split('~').map(x=>(x||'').trim());
+        out.sec.경력.push({title:row[0],start:st,end:en,role:row[2]||'',detail:row[3]||''}); return; }
+      if(!out.name&&(c0.includes('성명')||c0==='성명')){ const v=(row[1]||'').replace(/영문명\s*:\s*/,'').trim(); if(v&&!/^[A-Za-z\s]+$/.test(v)) out.name=v; return; }
+      if(!out.birth&&c0.includes('출생')){ out.birth=row[1]||''; return; }
+      if(!out.years&&c0==='경력'){ const y=(row[1]||'').match(/(\d+)\s*년/); out.years=y?y[1]:''; return; }
+      if(!out.grade&&c0.includes('등급')){ const g=(row[1]||'').match(/[『]?(특급|고급|중급|초급)/); if(g) out.grade=g[1]; return; }
+      if(!out.address&&c0.includes('주소')){ out.address=row[1]||''; return; }
+      if(c0.includes('자격증')){ out.sec.자격증.push({title:(row[1]||'').replace(/^\*\s*/,''),end:''}); return; }
+      if(c0.includes('연락처')){ if(row[1]&&row[1]!=='☎') out.phone=row[1]; const ei=row.findIndex(c=>/e-?mail/i.test(c)); if(ei>=0&&row[ei+1]) out.email=row[ei+1]; return; }
+      if(!out.email&&/e-?mail/i.test(c0)){ out.email=row[1]||''; return; }
+    });
+  }
   tables.forEach(t=>{
     if(!t.length) return;
     const flat=t.map(r=>r.join('|')).join('\n');
+    // 세로형 양식의 '주요 프로젝트 경력 사항' 표: 헤더=프로젝트명/발주처/기간/역할/상세업무
+    if(/프로젝트명/.test(flat)&&/발주처/.test(flat)){
+      t.slice(2).forEach(row=>{ if(!row[0]||row.length<4) return;
+        const [st,en]=(row[2]||'').split('~').map(x=>(x||'').trim());
+        out.sec.프로젝트.push({title:row[0],org:row[1],start:st,end:en,role:row[3]||'',detail:row[4]||''});});
+      return;
+    }
     // 신상 표: 성명/생년월일/성별/경력 포함
     if(/성\s*명/.test(flat)&&/생년월일/.test(flat)){
       t.forEach(row=>{
@@ -352,6 +401,7 @@ function applyMapped(m){
   S('p_name',m.name); S('p_birth',m.birth); S('p_gender',m.gender);
   S('p_mil',m.military); S('p_phone',m.phone); S('p_email',m.email); S('p_addr',m.address);
   const yrs=(m.years.match(/\d+/)||[])[0]; if(yrs) document.getElementById('p_years').value=yrs;
+  if(m.grade) document.getElementById('p_grade').value=m.grade;
   secRows={}; SECS.forEach(([c])=>{ secRows[c]=(m.sec[c]||[]).map(r=>({...r})); });
   renderSecEditors();
 }
