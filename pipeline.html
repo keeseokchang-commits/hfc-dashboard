@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.7">
+<link rel="stylesheet" href="css/common.css?v=2.8.1">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -241,10 +241,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.7"></script>
-<script src="js/common.js?v=2.7"></script>
-<script src="js/calc.js?v=2.7"></script>
-<script src="js/nav.js?v=2.7"></script>
+<script src="js/schema.js?v=2.8.1"></script>
+<script src="js/common.js?v=2.8.1"></script>
+<script src="js/calc.js?v=2.8.1"></script>
+<script src="js/nav.js?v=2.8.1"></script>
 <script>
 let opps=[];
 let currentFilter='전체';
@@ -524,7 +524,8 @@ async function saveOpp(){
       o.contract_amount=String(amount||'');
       o.expected_start=document.getElementById('f_start').value;
       o.expected_end=document.getElementById('f_end').value;
-      o.probability=document.getElementById('f_prob').value;
+      // v2.8.1: 수주~종료 단계 진입 시 확도 100% 물리 확정(계산상 폴백이 아니라 시트 값 자체를 갱신)
+      o.probability=['수주','계약','종료'].includes(status)?'100':document.getElementById('f_prob').value;
       o.payment_cycle=document.getElementById('f_payment').value;
       o.biz_type=document.getElementById('f_biz_type').value;
       o.status=status;
@@ -537,7 +538,7 @@ async function saveOpp(){
       pipeline_id:`PL-2026-${String(maxNum+1).padStart(3,'0')}`,
       opportunity:name, client,
       end_client:document.getElementById('f_end_client').value,
-      probability:document.getElementById('f_prob').value,
+      probability:['수주','계약','종료'].includes(status)?'100':document.getElementById('f_prob').value,
       contract_amount:String(amount||''),
       expected_start:document.getElementById('f_start').value,
       expected_end:document.getElementById('f_end').value,

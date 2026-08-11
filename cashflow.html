@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.7">
+<link rel="stylesheet" href="css/common.css?v=2.8.1">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -288,10 +288,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.7"></script>
-<script src="js/common.js?v=2.7"></script>
-<script src="js/calc.js?v=2.7"></script>
-<script src="js/nav.js?v=2.7"></script>
+<script src="js/schema.js?v=2.8.1"></script>
+<script src="js/common.js?v=2.8.1"></script>
+<script src="js/calc.js?v=2.8.1"></script>
+<script src="js/nav.js?v=2.8.1"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -739,6 +739,10 @@ function openDetailModal(ym){
       planFix.filter(f=>f.year_month===ym).forEach(f=>{
         h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(parseInt(f.amount)||0)}</span></div>`;});
       if(vat) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
+      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0)
+        +planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(parseInt(f.amount)||0),0)+vat;
+      const outW=outF-outKnown;
+      if(outW>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
       h+=line('추정출금 소계',outF,'−');
       const calc=A+inF-outF, ok=calc===(parseInt(est.est_balance)||0);
       h+=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 2px;border-top:1px solid var(--border);font-weight:700"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(parseInt(est.est_balance)||0)}</span></div>`;
@@ -837,10 +841,10 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],detailAll=[],s10All=[];
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],detailAll=[],s10All=[],estAll=[];
 async function loadSheets(){
   try{
-    const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR]=await Promise.all([
+    const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR,esR]=await Promise.all([
       fetchSheet(...R.S02),
       fetchSheet(...R.S09),
       fetchSheet(...R.S10),
@@ -851,6 +855,7 @@ async function loadSheets(){
       fetchSheet(...R.S06),
       fetchSheet(...R.S13),
       fetchSheet(...R.S08_DETAIL).catch(()=>[]),
+      fetchSheet(...R.S12).catch(()=>[]),
     ]);
     estData=toObj(estRows);
     dashData=toObj(dashRows);
@@ -869,6 +874,7 @@ async function loadSheets(){
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
+    estAll=toObj(esR).filter(e=>e.estimate_id);
     // v2.5.4 SSOT: 실적 표시는 항상 원천(S08_DETAIL)에서 재파생 — 원천 삭제·수정이 즉시 반영. S08_ACT는 기록용.
     actData=deriveActFromDetail(detailAll);
     renderAll();
@@ -1217,10 +1223,19 @@ async function recalcEstimate(){
     let bal=un2(settings.param_base_balance)||20000000;
     const weighted=document.getElementById('probToggle').checked;
     const today=new Date().toISOString().slice(0,10);
-    // v1.2(#12): 기본=확정~종료 100% / 토글 ON 추가=기회×확도
+    // v2.8: 확도가중 정상화 — 실제 probability 사용(강제 100% 폐기), 매출·매입 대칭 반영
+    // '확정' 단계(스케줄 미생성)는 항상 반영 대상(확도 실값 사용, 없으면 100% 폴백) + weighted ON 시 '기회' 단계 추가(확도 실값)
     const confNoSch=pipelinesAll.filter(p=>p.status==='확정'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end
-      &&!prjAll.some(x=>x.pipeline_id===p.pipeline_id&&s04All.some(r=>r.project_id===x.project_id))).map(p=>({...p,probability:100}));
-    const wRows=[...(weighted?pipelinesAll.filter(p=>p.status==='기회'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end):[]),...confNoSch];
+      &&!prjAll.some(x=>x.pipeline_id===p.pipeline_id&&s04All.some(r=>r.project_id===x.project_id)));
+    const wRows=[...confNoSch,...(weighted?pipelinesAll.filter(p=>p.status==='기회'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end):[])];
+    // 파이프라인 연결 견적서(S12)의 매출/매입 합계비=원가율 — 매입도 같은 가중으로 대칭 반영
+    const estRatio=pl=>{
+      const rws=estAll.filter(e=>e.pipeline_id===pl.pipeline_id);
+      if(!rws.length) return 0;
+      const sell=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
+      const buy=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+      return sell>0?buy/sell:0;
+    };
     const okPl2=new Set(pipelinesAll.filter(p=>['확정','수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
     const okPrj2=new Set(prjAll.filter(p=>okPl2.has(p.pipeline_id)).map(p=>p.project_id));
     const rows=[];
@@ -1228,19 +1243,22 @@ async function recalcEstimate(){
       if(m<baseYm){ rows.push([m,'','','','','기산 전',today]); return; }
       const inf1=s04All.filter(r=>okPrj2.has(r.project_id)&&(r.cash_recv_date||'').slice(0,7)===m)
         .reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-      let inf2=0;
+      let inf2=0, out2=0;
       wRows.forEach(p=>{
         const ms=[]; let c=new Date(p.expected_start); const e=new Date(p.expected_end);
         c=new Date(c.getFullYear(),c.getMonth(),1);
         while(c<=e){ms.push(`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}`);c=new Date(c.getFullYear(),c.getMonth()+1,1);}
-        if(ms.includes(m)) inf2+=Math.round(un2(p.contract_amount)*1.1*(parseInt(p.probability)||0)/100/ms.length);
+        if(!ms.includes(m)) return;
+        const pr=p.status==='확정'?(parseInt(p.probability)||100):(parseInt(p.probability)||0);
+        const sellM=Math.round(un2(p.contract_amount)*1.1*pr/100/ms.length);
+        inf2+=sellM; out2+=Math.round(sellM*estRatio(p));
       });
       const outCost=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===m)
         .reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0);
       const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(parseInt(f.amount)||0),0);
       const vat=vatRows.filter(v=>(v.due_date||'').slice(0,7)===m)
         .reduce((s,v)=>s+(parseInt(v.actual_payment)||parseInt(v.estimated_payment)||0),0);
-      const inflow=inf1+inf2, outflow=outCost+outFix+vat;
+      const inflow=inf1+inf2, outflow=outCost+outFix+out2+vat;
       bal=bal+inflow-outflow;
       rows.push([m,inflow,outflow,vat,bal,(weighted?'확도가중 ON':'확정분만')+' · 계획 누적',today]);
     });
