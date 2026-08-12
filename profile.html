@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.5">
+<link rel="stylesheet" href="css/common.css?v=2.9.6">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -104,20 +104,47 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/common.js?v=2.9.5"></script>
-<script src="js/schema.js?v=2.9.5"></script>
-<script src="js/nav.js?v=2.9.5"></script>
+<script src="js/common.js?v=2.9.6"></script>
+<script src="js/schema.js?v=2.9.6"></script>
+<script src="js/nav.js?v=2.9.6"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
 // 섹션 정의: [코드, 라벨, 필드구성]  필드: [S16컬럼, placeholder, 넓이비율]
+// v2.9.6: 용어·포맷 표준(SSOT) — [컬럼키, 라벨, placeholder(입력 예시/포맷), 폭비율]
+// 규칙: 날짜류는 라벨에 '월/일' 단위 명시 + placeholder에 포맷 예시. title/org/role/detail은 실제 예시값을 placeholder로.
 const SECS=[
- ['학력','② 학력',[['title','학교·전공',3],['end','졸업연월',1],['detail','구분(졸업 등)',1]]],
- ['자격증','③ 자격증',[['title','자격증명',3],['end','취득일',1]]],
- ['경력','④ 경력(회사)',[['title','회사명',2],['role','직위',1],['start','시작(YYYY.MM)',1],['end','종료',1],['detail','담당업무',2]]],
- ['교육','⑤ 교육',[['title','교육명',3],['org','기관',1],['start','시작',1],['end','종료',1]]],
- ['기술','⑥ 보유기술',[['title','기술명',2],['detail','숙련도(상/중/하)',1]]],
- ['프로젝트','⑦ 참여 프로젝트',[['title','프로젝트명',2],['org','고객사',1],['role','역할(PM/PL/TA…)',1],['start','시작',1],['end','종료',1],['detail','업무 내용',3],['lang','언어',1],['dbms','DBMS',1],['tool','TOOL',1]]]
+ ['학력','② 학력',[
+   ['title','학교·전공','예: 경기대학교 전자계산학과',3],
+   ['end','졸업월','YYYY.MM',1],
+   ['detail','비고','예: 졸업, 수료 등',1]]],
+ ['자격증','③ 자격증',[
+   ['title','자격증명','예: 정보처리기사',3],
+   ['end','취득월','YYYY.MM',1]]],
+ ['경력','④ 경력(회사)',[
+   ['title','회사명','예: HFC컨설팅',2],
+   ['role','직위','예: 부장, 팀장',1],
+   ['start','시작월','YYYY.MM',1],
+   ['end','종료월','YYYY.MM (재직중이면 비움)',1],
+   ['detail','담당업무','예: PMO, 사업관리',2]]],
+ ['교육','⑤ 교육',[
+   ['title','교육명','예: 클라우드 아키텍처 과정',3],
+   ['org','기관명','예: 한국정보산업연합회',1],
+   ['start','시작월','YYYY.MM',1],
+   ['end','종료월','YYYY.MM',1]]],
+ ['기술','⑥ 보유기술',[
+   ['title','기술명','예: Oracle, Kubernetes',2],
+   ['detail','숙련도','상/중/하',1]]],
+ ['프로젝트','⑦ 참여 프로젝트',[
+   ['title','프로젝트명','예: 차세대 시스템 구축',2],
+   ['org','고객사','예: 포스코',1],
+   ['role','역할','예: PM, PL, TA',1],
+   ['start','시작월','YYYY.MM',1],
+   ['end','종료월','YYYY.MM (진행중이면 비움)',1],
+   ['detail','업무 내용','예: 일정관리, 요구사항 정의',3],
+   ['lang','언어','예: Java, Python',1],
+   ['dbms','DBMS','예: Oracle, PostgreSQL',1],
+   ['tool','TOOL','예: JIRA, Jenkins',1]]]
 ];
 let secRows={}; // {섹션:[{title,org,...}]}
 
@@ -218,15 +245,15 @@ function editFromDetail(){ document.getElementById('dtModal').classList.remove('
 function renderSecEditors(){
   document.getElementById('secEditors').innerHTML=SECS.map(([c,label,cols])=>`
     <div class="sec-t">${label} <button onclick="addItem('${c}')" style="font-size:10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:2px 8px;cursor:pointer;margin-left:6px">+ 행 추가</button></div>
-    ${(secRows[c]||[]).length?`<div class="sec-head" style="grid-template-columns:${cols.map(f=>f[2]+'fr').join(' ')} 20px">${cols.map(f=>`<span>${f[1]}</span>`).join('')}<span></span></div>`:''}
+    ${(secRows[c]||[]).length?`<div class="sec-head" style="grid-template-columns:${cols.map(f=>f[3]+'fr').join(' ')} 20px">${cols.map(f=>`<span>${f[1]}</span>`).join('')}<span></span></div>`:''}
     <div id="se_${c}">${(secRows[c]||[]).map((r,i)=>secRowHtml(c,cols,r,i)).join('')}</div>`).join('');
 }
 function secRowHtml(c,cols,r,i){
-  const grid=cols.map(f=>f[2]+'fr').join(' ')+' 20px';
+  const grid=cols.map(f=>f[3]+'fr').join(' ')+' 20px';
   return `<div class="irow" style="grid-template-columns:${grid}">
     ${cols.map(f=>f[0]==='detail'&&c==='프로젝트'
-      ?`<textarea placeholder="${f[1]}" style="height:34px" oninput="secRows['${c}'][${i}].${f[0]}=this.value">${r[f[0]]||''}</textarea>`
-      :`<input value="${(r[f[0]]||'').replace(/"/g,'&quot;')}" placeholder="${f[1]}" oninput="secRows['${c}'][${i}].${f[0]}=this.value">`).join('')}
+      ?`<textarea placeholder="${f[2]}" style="height:34px" oninput="secRows['${c}'][${i}].${f[0]}=this.value">${r[f[0]]||''}</textarea>`
+      :`<input value="${(r[f[0]]||'').replace(/"/g,'&quot;')}" placeholder="${f[2]}" oninput="secRows['${c}'][${i}].${f[0]}=this.value">`).join('')}
     <button onclick="secRows['${c}'].splice(${i},1);renderSecEditors()">✕</button></div>`;
 }
 function addItem(c){ (secRows[c]=secRows[c]||[]).push({}); renderSecEditors(); }
