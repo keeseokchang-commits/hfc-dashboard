@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.3">
+<link rel="stylesheet" href="css/common.css?v=2.9.4">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -97,9 +97,9 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/common.js?v=2.9.3"></script>
-<script src="js/schema.js?v=2.9.3"></script>
-<script src="js/nav.js?v=2.9.3"></script>
+<script src="js/common.js?v=2.9.4"></script>
+<script src="js/schema.js?v=2.9.4"></script>
+<script src="js/nav.js?v=2.9.4"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
@@ -342,14 +342,14 @@ function mapResumeTables(tables){
         out.sec.프로젝트.push({title:row[0],org:row[1],start:st,end:en,role:row[3]||'',detail:row[4]||''});});
       return;
     }
-    // 신상 표: 성명/생년월일/성별/경력 포함
-    if(/성\s*명/.test(flat)&&/생년월일/.test(flat)){
+    // 신상 표: 성명 + (생년월일 또는 주민등록번호) + 성별
+    if(/성\s*명/.test(flat)&&(/생년월일/.test(flat)||/주민등록번호/.test(flat))){
       t.forEach(row=>{
         if(!out.name) out.name=findCell(row,'성명')||findCell(row,'성 명');
-        if(!out.birth) out.birth=findCell(row,'생년월일');
+        if(!out.birth) out.birth=findCell(row,'생년월일')||(()=>{const j=findCell(row,'주민등록번호');const y=j.match(/^(\d{2})(\d{2})(\d{2})/);return y?`${parseInt(y[1])<30?'20':'19'}${y[1]}.${y[2]}.${y[3]}`:'';})();
         if(!out.gender) out.gender=findCell(row,'성별')||findCell(row,'성 별');
         if(!out.years) out.years=findCell(row,'경력');
-        if(!out.military) out.military=findCell(row,'병역');
+        if(!out.military) out.military=findCell(row,'병역')||findCell(row,'병 역');
       });
     }
     // 연락처 표: 주소/E-mail/전화
@@ -360,12 +360,15 @@ function mapResumeTables(tables){
         if(row[0]&&row[0].replace(/\s/g,'').includes('전화')) out.phone=row[1]||'';
       });
     }
-    // 학력/자격증 병렬 표 (헤더에 학력+자격증) — rowspan 병합 셀은 이후 행에서 열 수가 줄어드는 것으로 감지해 이전 그룹에 귀속
-    else if(/학\s*력/.test(flat)&&/자\s*격/.test(flat)){
-      t.slice(1).forEach(row=>{
-        if(row.length>=4&&row[0]&&row[0].trim()) out.sec.학력.push({title:row[0],end:row[1]||''});
+    // 학력/자격증 병렬 표 (헤더에 자격증명 — 학력 라벨 없이 자유텍스트인 양식도 커버)
+    else if(/자\s*격\s*증\s*명/.test(flat)){
+      t.forEach(row=>{
+        const c0=(row[0]||'').replace(/\s/g,'');
+        const isHeaderRow=['학력','자격증명'].includes(c0)||/학과졸업년월$/.test(c0); // 헤더/템플릿 빈줄 제외
         const qi=row.length>=4?2:0, di=row.length>=4?3:1;
-        if(row[qi]&&row[qi].trim()) out.sec.자격증.push({title:row[qi],end:row[di]||''});
+        if(!isHeaderRow&&row[0]&&row[0].trim()) out.sec.학력.push({title:row[0].trim(),end:''});
+        const q=(row[qi]||'').replace(/\s/g,'');
+        if(row[qi]&&row[qi].trim()&&q!=='자격증명'&&!q.startsWith('자격')) out.sec.자격증.push({title:row[qi],end:row[di]||''});
       });
     }
     // 회사 경력 표 (프로젝트 회사명 + 기간 + 직위 + 담당업무, 헤더에 '담당' 포함)
@@ -385,12 +388,22 @@ function mapResumeTables(tables){
         if(row[skillCol]&&row[skillCol].trim()) out.sec.기술.push({title:row[skillCol],detail:row[lvCol]||''});
       });
     }
-    // 참여 프로젝트 표 (헤더: 프로젝트명+고객사+직무)
+    // 참여 프로젝트 표 (헤더: 프로젝트명+고객사+직무) — 헤더 키워드 행을 명시적으로 판별해 제외(날짜 표기가 파일마다 달라 패턴 매칭 대신 사용)
     else if(/프로젝트명/.test(flat)&&/고객사/.test(flat)){
-      t.slice(1).forEach(row=>{
+      const headerWords=['프로젝트명','참여기간','기간','고객사','근무회사','역할','개발환경','시작일','종료일','언어','dbms','tool','기타','상세업무내용','업무내용'];
+      const isHeader=row=>row.every(c=>{ const cc=c.replace(/\s/g,'').toLowerCase(); return !cc||headerWords.some(h=>cc.includes(h.replace(/\s/g,'').toLowerCase())); });
+      // 헤더가 1~2행에 걸칠 수 있어 둘을 합쳐 컬럼 배치 판별(첫 데이터 행이 나올 때까지의 모든 헤더성 행을 합산)
+      let hEnd=0; while(hEnd<t.length&&isHeader(t[hEnd])) hEnd++;
+      const hCombined=t.slice(0,Math.max(hEnd,1)).map(r=>r.map(c=>c.replace(/\s/g,''))).flat();
+      const hasVendor=hCombined.some(c=>c.includes('근무회사'));
+      const hasSplitDate=hCombined.some(c=>c.includes('시작일'))&&hCombined.some(c=>c.includes('종료일'));
+      t.slice(hEnd).forEach(row=>{
         if(!row[0]||!row[0].trim()) return;
-        const [st,en]=(row[1]||'').split('~').map(x=>(x||'').trim());
-        out.sec.프로젝트.push({title:row[0],start:st||'',end:en||'',org:row[2]||'',role:row[3]||'',detail:row[4]||''});
+        let st,en,rest;
+        if(hasSplitDate){ st=row[1]||''; en=row[2]||''; rest=row.slice(3); }
+        else { [st,en]=(row[1]||'').split('~').map(x=>(x||'').trim()); rest=row.slice(2); }
+        const org=rest[0]||'', role=hasVendor?(rest[2]||''):(rest[1]||''), detail=hasVendor?(rest[3]||''):(rest[2]||'');
+        out.sec.프로젝트.push({title:row[0],start:st,end:en,org,role,detail});
       });
     }
   });
