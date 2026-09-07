@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 let selStatus=new Set(['기회','확정','수주','계약']);
@@ -142,26 +142,8 @@ let cur=null, labor=[], items={infra:[],sol:[],etc:[]};
 
 function wf(n){return comma(n)+'원';}
 let pendingAuth=null;
-function mmBetween(s,e){
-  // SI 관례(2026-07-25 승인): d일 투입 ~ (d-1)일 철수 = 정확히 1개월.
-  // 총MM = 대응 개월수 k + 잔여일/잔여월 총일수(소수 2자리)
-  if(!s||!e) return 0;
-  const a=new Date(s), b=new Date(e);
-  if(isNaN(a)||isNaN(b)||b<a) return 0;
-  let k=0;
-  while(k<240){
-    const cycEnd=new Date(addMonthsKeepDay(a,k+1).getTime()-86400000);
-    if(cycEnd<=b) k++; else break;
-  }
-  const anchor=addMonthsKeepDay(a,k);
-  let frac=0;
-  if(anchor<=b){
-    const dim=new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate();
-    const days=Math.round((b-anchor)/86400000)+1;
-    frac=Math.round(days/dim*100)/100;
-  }
-  return (k+frac).toFixed(2);
-}
+// v2.9.9: mmBetween 제거 — js/calc.js의 mmTotal과 완전히 동일한 로직이 중복 정의되어 있던 SSOT 위반(아키텍처 표준 위반).
+// 이후 이 화면의 MM 계산은 전부 calc.js의 mmTotal을 사용한다.
 
 // ── 로드 ──
 async function loadAll(){
@@ -214,11 +196,11 @@ function loadOpp(){
   // 저장된 견적 로드
   const saved=estimates.filter(e=>e.pipeline_id===pid);
   labor=saved.filter(e=>e.comp_type==='인건비').map(e=>({name:e.item_name,grade:e.grade,setId:e.grade_set_id,
-    sell:parseInt(e.unit_price)||0,buy:parseInt(e.buy_price)||0,start:e.start_date,end:e.end_date,mm:parseFloat(e.mm)||0}));
+    sell:num(e.unit_price)||0,buy:num(e.buy_price)||0,start:e.start_date,end:e.end_date,mm:numF(e.mm)||0}));
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
-    items[k]=saved.filter(e=>e.comp_type===ct).map(e=>({name:e.item_name,qty:parseInt(e.qty)||1,
-      price:parseInt(e.unit_price)||0,buy:parseInt(e.buy_price)||0,memo:e.memo||'',
+    items[k]=saved.filter(e=>e.comp_type===ct).map(e=>({name:e.item_name,qty:num(e.qty)||1,
+      price:num(e.unit_price)||0,buy:num(e.buy_price)||0,memo:e.memo||'',
       start:e.start_date||'',end:e.end_date||''}));
   });
   if(!labor.length&&cur.expected_start)addLabor(false);
@@ -233,8 +215,8 @@ function addLabor(re=true){
   const setId=document.getElementById('rateSetSel').value;
   const g=gradesOf(setId)[1]||gradesOf(setId)[0]||{};
   const s=cur?.expected_start||'',e=cur?.expected_end||'';
-  labor.push({name:'',grade:g.grade||'중급',setId,sell:parseInt(g.sell_price)||0,buy:parseInt(g.buy_price)||0,
-    start:s,end:e,mm:parseFloat(mmBetween(s,e))||0});
+  labor.push({name:'',grade:g.grade||'중급',setId,sell:num(g.sell_price)||0,buy:num(g.buy_price)||0,
+    start:s,end:e,mm:parseFloat(mmTotal(s,e))||0});
   if(re)renderLabor();recalc();
 }
 function renderLabor(){
@@ -257,7 +239,7 @@ function renderLabor(){
       <div class="fr3">
         <div><label class="fl">시작예정일</label><input class="fi" type="date" value="${p.start}" onchange="labor[${i}].start=this.value;autoMM(${i})"></div>
         <div><label class="fl">종료예정일</label><input class="fi" type="date" value="${p.end}" onchange="labor[${i}].end=this.value;autoMM(${i})"></div>
-        <div><label class="fl">MM (소수점 2자리)</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" oninput="labor[${i}].mm=parseFloat(this.value)||0;recalc()"></div>
+        <div><label class="fl">MM (소수점 2자리)</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
       </div>
       <div style="text-align:right;font-size:12px;color:var(--text2)">
         매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(Math.round(p.buy*p.mm))}</b>
@@ -268,10 +250,10 @@ function pickGrade(i,grade){
   const setId=document.getElementById('rateSetSel').value;
   const g=gradesOf(setId).find(x=>x.grade===grade);
   labor[i].grade=grade;labor[i].setId=setId;
-  if(g){labor[i].sell=parseInt(g.sell_price)||0;labor[i].buy=parseInt(g.buy_price)||0;}
+  if(g){labor[i].sell=num(g.sell_price)||0;labor[i].buy=num(g.buy_price)||0;}
   renderLabor();recalc();
 }
-function autoMM(i){const p=labor[i];p.mm=parseFloat(mmBetween(p.start,p.end))||0;
+function autoMM(i){const p=labor[i];p.mm=parseFloat(mmTotal(p.start,p.end))||0;
   document.getElementById('mm_'+i).value=p.mm;renderLabor();recalc();}
 
 // ── 인프라·솔루션·기타 ──
@@ -284,7 +266,7 @@ function renderItems(k){
         <div><label class="fl">비고</label><input class="fi" value="${it.memo}" oninput="items['${k}'][${i}].memo=this.value"></div>
       </div>
       <div class="fr3">
-        <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=parseInt(this.value)||0;recalc()"></div>
+        <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=num(this.value)||0;recalc()"></div>
         <div><label class="fl">매출 단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=comma(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
         <div><label class="fl">매입 단가 (원)</label><input class="fi" value="${comma(it.buy||0)}" oninput="this.value=comma(this.value);items['${k}'][${i}].buy=un(this.value);recalc()"></div>
       </div>
@@ -345,9 +327,9 @@ function renderAllSummary(){
   const sell=list.reduce((s,o)=>s+un(o.contract_amount),0);
   const pids=new Set(list.map(o=>o.pipeline_id));
   const cost=estimates.filter(e=>pids.has(e.pipeline_id)).reduce((s,e)=>{
-    if(e.comp_type==='인건비')return s+Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0));
-    const bp=parseInt(e.buy_price)||0;
-    return s+(bp?bp*(parseInt(e.qty)||1):(parseInt(e.amount)||0));},0);
+    if(e.comp_type==='인건비')return s+Math.round((num(e.buy_price)||0)*(numF(e.mm)||0));
+    const bp=num(e.buy_price)||0;
+    return s+(bp?bp*(num(e.qty)||1):(num(e.amount)||0));},0);
   const profit=sell-cost, rate=sell?(profit/sell*100).toFixed(1):0;
   document.getElementById('allScope').textContent=`[${[...selStatus].join('·')}] ${list.length}건`;
   document.getElementById('allSummary').innerHTML=`
@@ -363,8 +345,8 @@ async function saveEstimate(){
   const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='저장 중…';
   const today=new Date().toISOString().slice(0,10);
   const prevItems=estimates.filter(e=>e.pipeline_id===cur.pipeline_id);
-  const prevSell=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
-  const prevBuy=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+  const prevSell=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
+  const prevBuy=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
   const others=estimates.filter(e=>e.pipeline_id!==cur.pipeline_id);
   let n=estimates.reduce((m,e)=>{const x=parseInt((e.estimate_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,x);},0);
   const rows=[];
@@ -377,12 +359,12 @@ async function saveEstimate(){
       amount:it.qty*it.price,mm:'',start_date:it.start||'',end_date:it.end||'',memo:it.memo,created_at:today});});});
   const H=['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'];
   const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
-  const ok=await clearAndWrite(...W.S12,[H,...all.map(r=>H.map(h=>r[h]??''))]);
+  const ok=await clearAndWrite(...W.S12,[H,...rowsFor(H,all)]);
   btn.disabled=false;btn.textContent='견적 저장 (S12)';
   if(ok){estimates=all;toast('✓ 견적 저장 완료');renderAllSummary();
     const newItems=all.filter(e=>e.pipeline_id===cur.pipeline_id);
-    const newSell=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
-    const newBuy=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+    const newSell=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
+    const newBuy=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
     const hist=[];
     if(prevItems.length&&prevSell!==newSell)hist.push({pl:cur.pipeline_id,target:'견적매출합계',old:prevSell,newv:newSell,reason:'견적 수정',source:'estimate'});
     if(prevItems.length&&prevBuy!==newBuy)hist.push({pl:cur.pipeline_id,target:'견적매입합계',old:prevBuy,newv:newBuy,reason:'견적 수정',source:'estimate'});

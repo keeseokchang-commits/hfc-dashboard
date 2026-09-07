@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -241,10 +241,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 let opps=[];
 let currentFilter='전체';
@@ -578,7 +578,7 @@ async function saveOpp(){
 async function saveAll(successMsg){
   const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'];
   opps=dedupe(opps,'pipeline_id'); // PK 무결성 규칙
-  const rows=opps.map(o=>header.map(h=>o[h]||''));
+  const rows=rowsFor(header,opps);
   const ok=await clearAndWrite(...W.S01,[header,...rows]);
   if(ok){ toast(successMsg); renderFilter(); renderList(); }
   else toast('저장 실패. 로그인 상태를 확인하세요',true);
@@ -600,8 +600,8 @@ async function cleanupSchedules(plId,status){
   if(!confirm(`${status} 전환: 계획 스케줄을 삭제합니다.\n· 미발행 매출 ${delR.length}건 / 미수취 매입 ${delC.length}건\n(발행·수취·입금·지급 완료 건은 보존됩니다)`)) return;
   const dR=new Set(delR.map(r=>r.revenue_id)), dC=new Set(delC.map(c=>c.cost_id));
   const HR=HEADERS.S04, HC=HEADERS.S05;
-  const ok1=await clearAndWrite(...W.S04,[HR,...rv.filter(r=>!dR.has(r.revenue_id)).map(r=>HR.map(h=>r[h]??''))]);
-  const ok2=await clearAndWrite(...W.S05,[HC,...cs.filter(c=>!dC.has(c.cost_id)).map(c=>HC.map(h=>c[h]??''))]);
+  const ok1=await clearAndWrite(...W.S04,[HR,...rowsFor(HR,rv.filter(r=>!dR.has(r.revenue_id)))]);
+  const ok2=await clearAndWrite(...W.S05,[HC,...rowsFor(HC,cs.filter(c=>!dC.has(c.cost_id)))]);
   if(ok1&&ok2){
     toast(`계획 스케줄 삭제 완료 — 매출 ${delR.length}·매입 ${delC.length}건 ✓`);
     try{ await logHistory([{pl:plId,target:'청구 스케줄',old:`매출 ${delR.length}·매입 ${delC.length}건`,newv:'삭제',reason:status+' 전환 자동 정리',source:'pipeline'}]); }catch(e){}
@@ -629,7 +629,7 @@ async function ensureProject(plId,status){
       prjs.push(p);
     }
     const uniq=dedupe(prjs,'project_id');
-    const dataRows=uniq.map(x=>header.map(h=>x[h]||''));
+    const dataRows=rowsFor(header,uniq);
     const ok=await clearAndWrite(...W.S03,[header,...dataRows]);
     if(ok){ toast(`실행 프로젝트 ${p.project_id} 연결 완료 ✓`);
       if(status==='수주'){

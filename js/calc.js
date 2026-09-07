@@ -1,4 +1,13 @@
 // HFC calc.js v2.0 — MM 날짜대응·월할·라운딩 도메인 계산(SSOT, DOM 무관 순수 함수)
+// v2.9.9: pad2·ymList를 input.html에서 이전 — calc.js가 다른 화면 파일의 함수에 의존하던 모듈 독립성 결함 수정
+// (아키텍처 원칙: 도메인 계산 계층은 DOM 무관 순수 함수로, 자기 완결적이어야 함).
+function pad2(n){return String(n).padStart(2,'0');}
+function ymList(s,e){const a=new Date(s),b=new Date(e);const r=[];let c=new Date(a.getFullYear(),a.getMonth(),1);
+  while(c<=b){const dim=new Date(c.getFullYear(),c.getMonth()+1,0).getDate();
+    const f=(c.getFullYear()===a.getFullYear()&&c.getMonth()===a.getMonth())?a.getDate():1;
+    const t=(c.getFullYear()===b.getFullYear()&&c.getMonth()===b.getMonth())?b.getDate():dim;
+    r.push({y:c.getFullYear(),m:c.getMonth()+1,w:(t-f+1)/dim});
+    c=new Date(c.getFullYear(),c.getMonth()+1,1);} return r;}
 function addMonthsKeepDay(d,k){
   const y=d.getFullYear(),m=d.getMonth()+k,day=d.getDate();
   const nd=new Date(y,m,day);
@@ -42,14 +51,17 @@ function mmMonthly(sd,ed){
 }
 function monthlyProfile(items,priceField,defStart,defEnd){
   // 항목별 기간 기반 월별 원시 금액(실수) 합산 — 라운딩은 profileToRows에서 일괄 처리
+  // v2.9.9: calc.js는 common.js의 num()을 참조할 수 없는 순수 계산 모듈이므로 자체 안전 파싱을 사용
+  // (여기가 v2.9.7~8 "백만분의 1 축소" 결함의 실제 발생 지점이었음 — 콤마 포함 시트값 방어 누락).
+  const _n=v=>parseInt(String(v??'').replace(/,/g,''))||0;
   const byM={};
   items.forEach(e=>{
-    const p=parseInt(e[priceField])||0; if(!p)return;
+    const p=_n(e[priceField]); if(!p)return;
     if(e.comp_type==='인건비'){
       mmMonthly(e.start_date||defStart,e.end_date||defEnd).forEach(x=>{
         const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+p*x.mm;});
     } else {
-      const total=(parseInt(e.qty)||1)*p;
+      const total=(_n(e.qty)||1)*p;
       if(e.start_date&&e.end_date){
         const ms=ymList(e.start_date,e.end_date); const tw=ms.reduce((s,x)=>s+x.w,0)||1;
         ms.forEach(x=>{const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+total*x.w/tw;});

@@ -62,22 +62,39 @@ async function clearAndWrite(sheet,range,rows){
     return true;
   }catch(e){ console.error(e); return false; }
 }
-// v2.9.8: 시트→객체 변환 시 금액류 컬럼의 콤마를 제거해 순수 숫자 문자열로 정규화(SSOT).
-// 원인: 구글시트에 사용자가 셀을 직접 편집하며 "13,200,000"처럼 콤마 포함 텍스트로 저장하면,
-// 코드 전역의 parseInt(obj.field) 호출(콤마 제거 없이 파싱)이 첫 콤마에서 끊겨 자릿수가 크게 줄어든다(예: 13,200,000→13).
-// 화면 입력은 항상 un()/uncomma()로 안전하게 처리되지만, 시트 원본이 이미 콤마 포함이면 그 방어를 우회한다.
-// 해결: 읽기 시점 단일 관문(toObj)에서 알려진 금액/수량 컬럼만 정규화 — 날짜·ID·텍스트는 건드리지 않는다.
-const AMOUNT_KEYS=new Set(['contract_amount','tax_invoice_amt','cash_recv_amt','vat_amt','amount','unit_price','buy_price','qty',
-  'est_inflow','est_outflow','est_vat','est_balance','act_balance','act_inflow','act_outflow',
-  'inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc',
-  'inflow_amt','outflow_amt','balance','estimated_payment','actual_payment','sell_price','buy_price_x','diff_amount']);
+// v2.9.9: 객체 배열 → 시트 행 배열 변환의 단일 관문(설계서 결정1·4). 기존 각 화면의
+// `list.map(r=>H.map(h=>r[h]??''))` 패턴을 대체 — 숫자 컬럼은 항상 콤마 없는 순수 숫자로,
+// ZERO_DEFAULT_COLS는 공백일 때 0으로 채워 저장한다(그 외 숫자 컬럼은 공백을 그대로 보존 — mm·qty처럼
+// "값 없음"과 "0"이 다른 의미를 갖는 컬럼을 억지로 0으로 만들지 않기 위함). 화면에 콤마 텍스트로
+// 남아있던 기존 값도 다음 저장 시 이 관문을 지나며 자동으로 정규화된다(별도 마이그레이션 스크립트 불필요).
+function rowsFor(H,list){
+  return list.map(r=>H.map(h=>{
+    let v=r[h];
+    if(NUMERIC_COLS.has(h)){
+      if(v===undefined||v===null||v===''){ return ZERO_DEFAULT_COLS.has(h)?0:''; }
+      return num(v);
+    }
+    return v??'';
+  }));
+}
+// v2.9.9: 데이터 타입 표준화 설계서 Step2·3 적용.
+// 타입 메타(NUMERIC_COLS·ZERO_DEFAULT_COLS)는 js/schema.js에 SSOT로 이전(전 시트 공통 컬럼명 기준).
+// 원인 요약: 구글시트를 사용자가 직접 편집하며 콤마 포함 텍스트("13,200,000")로 저장하면,
+// 코드 전역의 parseInt(obj.field) 호출이 콤마에서 끊겨 자릿수가 크게 줄어든다(예: 13,200,000→13).
+// 화면 입력은 항상 un()/uncomma()로 안전하지만, 시트 원본이 이미 콤마 포함이면 그 방어를 우회한다.
+// 방어 2단계: ①toObj()가 읽기 즉시 알려진 숫자 컬럼의 콤마를 제거 ②계산부는 parseInt 대신 num()을 써서
+// toObj가 못 잡은 컬럼(스키마 미등재·오탈자 등)도 최종 계산 직전에 한 번 더 방어(설계서 결정3: 전체 적용, 화면별 순차 교체).
 function toObj(rows){ if(!rows||!rows.length) return []; const h=rows[0];
   return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>{
     let v=r[i]??'';
-    if(AMOUNT_KEYS.has(k)&&typeof v==='string'&&v.includes(',')) v=v.replace(/,/g,'');
+    if(NUMERIC_COLS.has(k)&&typeof v==='string'&&v.includes(',')) v=v.replace(/,/g,'');
     return [k,v];
   })));
 }
+// num(): parseInt(obj.field) 전면 교체용 안전 헬퍼 — 콤마·공백을 제거한 뒤 정수로 파싱, 실패 시 0.
+function num(v){ return parseInt(String(v??'').replace(/,/g,'').trim())||0; }
+// numF(): 소수(예: mm 공수)가 필요한 곳의 안전 헬퍼 — parseFloat(obj.field) 대체.
+function numF(v){ return parseFloat(String(v??'').replace(/,/g,'').trim())||0; }
 const toObjects=toObj;
 function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 function toast(msg,err=false){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }

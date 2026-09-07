@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -102,10 +102,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 let vats=[],revs=[],costs=[],prjMap={},selQ=null;
 const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
@@ -131,7 +131,7 @@ async function loadAll(){
     renderQuarters();
   }catch(e){toast('로드 실패: '+e.message,true);}
 }
-function vatOf(r,base){return parseInt(r.vat_amt)||Math.round((parseInt(r[base])||0)*.1);}
+function vatOf(r,base){return num(r.vat_amt)||Math.round((parseInt(r[base])||0)*.1);}
 function calcQ(code){
   const q=QINFO[code];
   const sRows=revs.filter(r=>q.months.includes(r.year_month));
@@ -182,7 +182,7 @@ function selectQ(code){
 const H13=['vat_id','year','quarter_code','period_start','period_end','due_date','sales_vat','purchase_vat','estimated_payment','actual_payment','paid_date','cashflow_reflected','status','memo'];
 async function saveS13(){
   vats=dedupe(vats,'vat_id'); // PK 무결성 규칙
-  const rows=vats.map(v=>H13.map(h=>v[h]??''));
+  const rows=rowsFor(H13,vats);
   return await clearAndWrite(...W.S13,[H13,...rows]);
 }
 function upsertVat(code,patch){

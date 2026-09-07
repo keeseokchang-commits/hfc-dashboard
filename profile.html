@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -104,9 +104,9 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
@@ -193,7 +193,7 @@ function renderList(){
   const tw=tg?tagWords(tg):null;
   const list=profiles.filter(p=>{
     if(gr&&p.grade!==gr) return false;
-    if(yr&&(parseInt(p.career_years)||0)<yr) return false;
+    if(yr&&(num(p.career_years))<yr) return false;
     if(st&&p.status!==st) return false;
     if(av&&(!p.avail_date||p.avail_date>av)) return false;
     const blob=blobOf(p);
@@ -292,8 +292,8 @@ async function saveProfile(){
         title:r.title||'',org:r.org||'',role:r.role||'',start:r.start||'',end:r.end||'',
         detail:r.detail||'',lang:r.lang||'',dbms:r.dbms||'',tool:r.tool||'',sort:seq});});});
     items=[...keep,...mine];
-    const ok1=await clearAndWrite(...W.S07,[HEADERS.S07,...profiles.map(p=>HEADERS.S07.map(h=>p[h]??''))]);
-    const ok2=await clearAndWrite(...W.S16,[HEADERS.S16,...dedupe(items,'item_id').map(x=>HEADERS.S16.map(h=>x[h]??''))]);
+    const ok1=await clearAndWrite(...W.S07,[HEADERS.S07,...rowsFor(HEADERS.S07,profiles)]);
+    const ok2=await clearAndWrite(...W.S16,[HEADERS.S16,...rowsFor(HEADERS.S16,dedupe(items,'item_id'))]);
     if(ok1&&ok2){ toast('✓ 저장 완료'); editingId=null;
       document.getElementById('fmModal').classList.remove('open'); renderList(); }
     else { profiles=snapshotP; items=snapshotI; toast('저장 실패 — 변경 취소됨',true); }

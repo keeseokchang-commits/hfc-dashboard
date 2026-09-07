@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -288,10 +288,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -484,7 +484,7 @@ function deriveActFromDetail(det){
   rows.forEach(t=>{
     const ym=t.year_month||String(t.txn_date).slice(0,7);
     const m=monthly[ym]=monthly[ym]||{year_month:ym,act_balance:0,act_inflow:0,act_outflow:0,inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,outflow_card:0,outflow_ai:0,outflow_etc:0,inflow_capital:0,inflow_etc:0,unclassified_cnt:0};
-    const inA=parseInt(t.inflow_amt)||0, outA=parseInt(t.outflow_amt)||0, bal=parseInt(t.balance)||0;
+    const inA=num(t.inflow_amt)||0, outA=num(t.outflow_amt)||0, bal=num(t.balance)||0;
     m.act_inflow+=inA; m.act_outflow+=outA;
     if(bal>0) m.act_balance=bal; // 정렬 확정 순서의 마지막 거래 잔액 = 월말 잔액
     switch(t.category){
@@ -611,7 +611,7 @@ function renderAll(){ renderKPI(); renderTable(); renderChart(); }
 function renderKPI(){
   // 자금수지 마감 기준: 은행 CSV는 익월 초 업로드 → 실잔액이 존재하는 최근 월(마감월) 기준, 없으면 전월
   let baseYm=null;
-  actData.forEach(a=>{ if(a.year_month&&(parseInt(a.act_balance)||0)&&(!baseYm||a.year_month>baseYm)) baseYm=a.year_month; });
+  actData.forEach(a=>{ if(a.year_month&&(num(a.act_balance)||0)&&(!baseYm||a.year_month>baseYm)) baseYm=a.year_month; });
   if(!baseYm){ const d=new Date(); d.setMonth(d.getMonth()-1); baseYm=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
   const ym=baseYm, mLabel=parseInt(ym.slice(5,7))+'월 말';
   const labels=document.querySelectorAll('#kpiGrid .kpi-label');
@@ -620,9 +620,9 @@ function renderKPI(){
   const est=estData.find(e=>e.year_month===ym);
   const act=actData.find(a=>a.year_month===ym);
   const dash=dashData.find(d=>d.year_month===ym);
-  const estBal=parseInt(est?.est_balance)||0;
-  const actBal=act?parseInt(act.act_balance)||0:null;
-  let acc=dash?.accuracy_pct?parseFloat(dash.accuracy_pct):null;
+  const estBal=est?num(est.est_balance):0;
+  const actBal=act?num(act.act_balance)||0:null;
+  let acc=dash?.accuracy_pct?numF(dash.accuracy_pct):null;
   if(acc===null&&actBal!==null&&estBal) acc=Math.max(0,100-Math.abs(actBal-estBal)/Math.max(Math.abs(actBal),1)*100);
 
   document.getElementById('kpiEst').textContent=won(estBal);
@@ -651,9 +651,9 @@ function renderTable(){
     const est=estData.find(e=>e.year_month===ym);
     const act=actData.find(a=>a.year_month===ym);
     const dash=dashData.find(d=>d.year_month===ym);
-    const estBal=est?parseInt(est.est_balance)||0:null;
-    const actBal=act?parseInt(act.act_balance)||0:null;
-    const acc=dash?.accuracy_pct?parseFloat(dash.accuracy_pct):null;
+    const estBal=est?num(est.est_balance)||0:null;
+    const actBal=act?num(act.act_balance)||0:null;
+    const acc=dash?.accuracy_pct?numF(dash.accuracy_pct):null;
     const diff=estBal!==null&&actBal!==null?actBal-estBal:null;
     const gc=gaugeColor(acc);
     const gw=gaugePct(acc);
@@ -672,8 +672,8 @@ function renderChart(){
   const yr=document.getElementById('yearSel').value;
   const labels=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
-  const estVals=months.map(m=>{ const e=estData.find(x=>x.year_month===`${yr}-${m}`); return e?parseInt(e.est_balance):null; });
-  const actVals=months.map(m=>{ const a=actData.find(x=>x.year_month===`${yr}-${m}`); return a?parseInt(a.act_balance):null; });
+  const estVals=months.map(m=>{ const e=estData.find(x=>x.year_month===`${yr}-${m}`); return e?num(e.est_balance):null; });
+  const actVals=months.map(m=>{ const a=actData.find(x=>x.year_month===`${yr}-${m}`); return a?num(a.act_balance):null; });
   if(cfChartObj) cfChartObj.destroy();
   cfChartObj=new Chart(document.getElementById('cfChart'),{
     type:'line',
@@ -694,8 +694,8 @@ function renderChart(){
 function openDetailModal(ym){
   const est=estData.find(e=>e.year_month===ym);
   const act=actData.find(a=>a.year_month===ym);
-  const estBal=est?parseInt(est.est_balance)||0:null;
-  const actBal=act?parseInt(act.act_balance)||0:null;
+  const estBal=est?num(est.est_balance)||0:null;
+  const actBal=act?num(act.act_balance)||0:null;
   const diff=estBal!==null&&actBal!==null?actBal-estBal:null;
   document.getElementById('detailTitle').textContent=`${ym} 상세`;
   const rows=[
@@ -727,31 +727,31 @@ function openDetailModal(ym){
       const prevYm=(d=>{const[y,mm]=ym.split('-').map(Number);const p=new Date(y,mm-2,1);return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}`;})();
       const pe=estData.find(e=>e.year_month===prevYm&&e.est_balance!=='');
       const isBase=!pe;
-      const A=pe?parseInt(pe.est_balance)||0:(parseInt(String(settings.param_base_balance||'').replace(/,/g,''))||20000000);
-      const inF=parseInt(est.est_inflow)||0, outF=parseInt(est.est_outflow)||0, vat=parseInt(est.est_vat)||0;
+      const A=pe?num(pe.est_balance):(num(settings.param_base_balance)||20000000);
+      const inF=num(est.est_inflow)||0, outF=num(est.est_outflow)||0, vat=num(est.est_vat)||0;
       const line=(l,v,sign)=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 2px"><span>${l}</span><b>${sign||''}${wonFull(Math.abs(v))}</b></div>`;
       h+=line(isBase?'기초 잔액 (기산월 자본금)':`전월(${prevYm}) 추정 잔액`,A);
       // 입금 낱개: 재무 미수 수금예정
       const inRows=s04All.filter(r=>okPrjSet.has(r.project_id)&&(r.cash_recv_date||'').slice(0,7)===ym);
       let inSum=0;
-      inRows.forEach(r=>{const a=parseInt(r.cash_recv_amt)||0;inSum+=a;
+      inRows.forEach(r=>{const a=num(r.cash_recv_amt)||0;inSum+=a;
         h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 수금예정 ${r.project_id} (${r.year_month}분)</span><span>${wonFull(a)}</span></div>`;});
       const wPart=inF-inSum;
       if(wPart>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
       h+=line('추정입금 소계',inF,'+');
       // 출금 낱개: 매입 + 고정비 + VAT
       planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).forEach(c=>{
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 지급예정 ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(Math.round((parseInt(c.amount)||0)*1.1))}</span></div>`;});
+        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 지급예정 ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(Math.round((num(c.amount)||0)*1.1))}</span></div>`;});
       planFix.filter(f=>f.year_month===ym).forEach(f=>{
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(parseInt(f.amount)||0)}</span></div>`;});
+        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(num(f.amount)||0)}</span></div>`;});
       if(vat) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
-      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0)
-        +planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(parseInt(f.amount)||0),0)+vat;
+      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0)
+        +planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0)+vat;
       const outW=outF-outKnown;
       if(outW>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
       h+=line('추정출금 소계',outF,'−');
-      const calc=A+inF-outF, ok=calc===(parseInt(est.est_balance)||0);
-      h+=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 2px;border-top:1px solid var(--border);font-weight:700"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(parseInt(est.est_balance)||0)}</span></div>`;
+      const calc=A+inF-outF, ok=calc===(num(est.est_balance)||0);
+      h+=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 2px;border-top:1px solid var(--border);font-weight:700"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(num(est.est_balance)||0)}</span></div>`;
       h+=`<div style="font-size:10px;color:var(--text3);padding:3px 2px">기준: ${est.pipeline_basis||''} · 산식 = 전월 추정 잔액(기산월은 기초 잔액) + 계획입금 − 계획출금(매입·고정비·VAT) · 실잔액 미혼합</div>`;
     }
     bx.innerHTML+=h;
@@ -796,7 +796,7 @@ async function saveToSheets(){
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
   // v2.4.3: 기존 거래(detailAll)와 병합(txn_id 기준, 신규 우선) — 과거 업로드분 보존
   // v2.5.2: 지문(fp)으로 기존 거래 식별 — 기존 txn_id 유지(대사 링크 보존), 신규만 새 ID. 일시는 txn_date에 시분초로 저장
-  const _fpOf=d=>String(d.txn_date)+'|'+(parseInt(d.inflow_amt)||0)+'|'+(parseInt(d.outflow_amt)||0)+'|'+(parseInt(d.balance)||0);
+  const _fpOf=d=>String(d.txn_date)+'|'+(num(d.inflow_amt)||0)+'|'+(num(d.outflow_amt)||0)+'|'+(num(d.balance)||0);
   const _oldByFp=new Map(detailAll.map(d=>[_fpOf(d),d]));
   const _newD=parsedTxns.map(t=>{
     const ex=_oldByFp.get(t.fp)||_oldByFp.get(t.date+'|'+t.inAmt+'|'+t.outAmt+'|'+t.bal); // 구(날짜만) 데이터 호환
@@ -804,7 +804,7 @@ async function saveToSheets(){
   });
   const _mergedD=dedupe([...detailAll,..._newD],'txn_id')
     .sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
-  const s08dRows=_mergedD.map(t=>s08dHeader.map(h=>t[h]??''));
+  const s08dRows=rowsFor(s08dHeader,_mergedD);
   const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
   if(ok2){ detailAll=_mergedD; actData=deriveActFromDetail(detailAll); }
   // S08_CASHFLOW_ACT = 병합 원장의 재파생본 기록 (원천과 항상 일치)
@@ -821,13 +821,8 @@ async function saveToSheets(){
 // v2.5.6: S08_ACT 시트를 원장(S08_DETAIL) 재파생본으로 재작성 — 파생 시트 동기화
 async function writeActFromDetail(today){
   const H=['year_month','act_balance','act_inflow','act_outflow','inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc','unclassified_cnt','csv_uploaded_at'];
-  const rows=deriveActFromDetail(detailAll).map(m=>[
-    m.year_month,m.act_balance,m.act_inflow,m.act_outflow,
-    m.inflow_revenue,m.outflow_cost,m.outflow_fixed,m.outflow_tax,
-    m.outflow_card||0,m.outflow_ai||0,m.outflow_etc||0,
-    m.inflow_capital||0,m.inflow_etc||0,m.unclassified_cnt||0,today||new Date().toISOString().slice(0,10)
-  ]);
-  return await clearAndWrite(...W.S08,[H,...rows]);
+  const derived=deriveActFromDetail(detailAll).map(m=>({...m,csv_uploaded_at:today||new Date().toISOString().slice(0,10)}));
+  return await clearAndWrite(...W.S08,[H,...rowsFor(H,derived)]);
 }
 async function updateDashboard(){
   // S02에서 추정잔액 읽기 (이미 estData에 있음)
@@ -835,8 +830,8 @@ async function updateDashboard(){
   const today=new Date().toISOString().slice(0,10);
   const s09Rows=estData.map(e=>{
     const act=actData.find(a=>a.year_month===e.year_month);
-    const estBal=parseInt(e.est_balance)||0;
-    const actBal=act?parseInt(act.act_balance)||0:null;
+    const estBal=num(e.est_balance)||0;
+    const actBal=act?num(act.act_balance)||0:null;
     const diff=actBal!==null?actBal-estBal:null;
     const acc=actBal!==null&&estBal?Math.max(0,(1-Math.abs(diff)/Math.abs(estBal))*100):null;
     const cause=diff!==null?(diff<0?'입금지연':'지출초과'):'';
@@ -898,15 +893,15 @@ function openPlanDetail(ym,dir){
   if(dir==='in'){
     t.textContent=`${ym} 계획입금 구성 (수금예정일 기준 · VAT 포함)`;
     planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym)
-      .forEach(r=>{const a=parseInt(r.cash_recv_amt)||0;tot+=a;
+      .forEach(r=>{const a=num(r.cash_recv_amt)||0;tot+=a;
         html+=row(pn(r.project_id),`발생 ${r.year_month} · 수금예정 ${r.cash_recv_date||'(미지정→발생월)'}`,a,r.is_received==='Y'?' · <span style="color:var(--green)">입금완료</span>':'');});
   }else{
     t.textContent=`${ym} 계획출금 구성 (지급예정일 기준 · VAT 포함)`;
     planCost.filter(c2=>(((c2.payment_date||'').slice(0,7))||c2.year_month)===ym)
-      .forEach(c2=>{const a=Math.round((parseInt(c2.amount)||0)*1.1);tot+=a;
+      .forEach(c2=>{const a=Math.round((num(c2.amount)||0)*1.1);tot+=a;
         html+=row(pn(c2.project_id)+(c2.person_name?' · '+c2.person_name:''),`발생 ${c2.year_month} · 지급예정 ${c2.payment_date||'(미지정→발생월)'}`,a,c2.pay_actual_date?' · <span style="color:var(--green)">지급완료</span>':'');});
     planFix.filter(f=>f.year_month===ym)
-      .forEach(f=>{const a=parseInt(f.amount)||0;tot+=a;html+=row('고정비 · '+(f.category||''),`지급예정 ${f.payment_date||ym}`,a);});
+      .forEach(f=>{const a=num(f.amount)||0;tot+=a;html+=row('고정비 · '+(f.category||''),`지급예정 ${f.payment_date||ym}`,a);});
   }
   html+=`<div style="display:flex;justify-content:space-between;padding:9px 2px;font-weight:700;border-top:2px solid var(--border)"><span>합계</span><span>${wonFull(tot)}</span></div>`;
   b.innerHTML=html||'<div style="color:var(--text3);padding:12px">해당 건 없음</div>';
@@ -917,13 +912,13 @@ function renderPlanAct(){
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
   document.getElementById('planActBody').innerHTML=months.map(m=>{
     const ym=`${yr}-${m}`;
-    const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0);
-    const pOutF=planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(parseInt(f.amount)||0),0);
+    const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0);
+    const pOutF=planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0);
     const pOut=pOutC+pOutF;
     const act=actData.find(a=>a.year_month===ym);
-    const aIn=act?parseInt(act.act_inflow)||0:null;
-    const aOut=act?parseInt(act.act_outflow)||0:null;
+    const aIn=act?num(act.act_inflow)||0:null;
+    const aOut=act?num(act.act_outflow)||0:null;
     if(!pIn&&!pOut&&aIn===null) return '';
     const dIn=aIn!==null?aIn-pIn:null, dOut=aOut!==null?aOut-pOut:null;
     return `<tr><td>${parseInt(m)}월</td>
@@ -935,11 +930,11 @@ function renderPlanAct(){
 }
 function renderVatBanner(){
   const today=new Date().toISOString().slice(0,10);
-  const next=vatRows.filter(v=>v.status!=='납부완료'&&v.due_date>=today&&(parseInt(v.estimated_payment)||0)>0)
+  const next=vatRows.filter(v=>v.status!=='납부완료'&&v.due_date>=today&&(num(v.estimated_payment)||0)>0)
     .sort((a,b)=>a.due_date.localeCompare(b.due_date))[0];
   if(next){
     document.getElementById('vatBanner').style.display='block';
-    document.getElementById('vatBannerText').innerHTML=`💡 부가세 납부 예정: <b>${next.due_date}</b> · <b>${won(parseInt(next.estimated_payment),false)}</b> (${next.memo||next.quarter_code})`;
+    document.getElementById('vatBannerText').innerHTML=`💡 부가세 납부 예정: <b>${next.due_date}</b> · <b>${won(num(next.estimated_payment),false)}</b> (${next.memo||next.quarter_code})`;
   }
 }
 
@@ -948,10 +943,10 @@ function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
 async function saveS05(next){
-  return await clearAndWrite(...W.S05,[H5C,...dedupe(next,'cost_id').map(c=>H5C.map(h=>c[h]??''))]);
+  return await clearAndWrite(...W.S05,[H5C,...rowsFor(H5C,dedupe(next,'cost_id'))]);
 }
 async function saveS04(next){
-  return await clearAndWrite(...W.S04,[H4C,...dedupe(next,'revenue_id').map(r=>H4C.map(h=>r[h]??''))]);
+  return await clearAndWrite(...W.S04,[H4C,...rowsFor(H4C,dedupe(next,'revenue_id'))]);
 }
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
@@ -963,7 +958,7 @@ async function reconcile(){
   deps.forEach(t=>{
     if(t.txnId&&usedTxnR.has(t.txnId)){return;} // 이미 다른 건에 매칭된 입금(재업로드) 스킵
     const cands=open.filter(r=>!used.has(r.revenue_id)
-      &&Math.abs((parseInt(r.cash_recv_amt)||0)-t.inAmt)<=1000
+      &&Math.abs((num(r.cash_recv_amt)||0)-t.inAmt)<=1000
       &&r.cash_recv_date&&Math.abs(dDiff(r.cash_recv_date,t.date))<=45);
     if(cands.length===1){used.add(cands[0].revenue_id);usedTxnR.add(t.txnId);matches.push([t,cands[0]]);}
     else unmatchedDep.push(t); // 0건 또는 동액 다건 → 수동(추천 후보 버튼)
@@ -984,7 +979,7 @@ async function reconcile(){
   outs.forEach(t=>{
     if(t.txnId&&usedTxnC.has(t.txnId)){return;} // v2.4.2: 재업로드 중복 매칭 방지
     const cands=eligible().filter(c=>!usedC.has(c.cost_id)
-      &&Math.abs(Math.round((parseInt(c.amount)||0)*1.1)-t.outAmt)<=1000
+      &&Math.abs(Math.round((num(c.amount)||0)*1.1)-t.outAmt)<=1000
       &&c.payment_date&&Math.abs(dDiff(c.payment_date,t.date))<=45);
     if(cands.length===1){usedC.add(cands[0].cost_id);cMatches.push([t,cands[0]]);}
     else unmatchedOut.push(t);
@@ -1003,10 +998,10 @@ function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 �
   if(!detailAll.length) return;
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
-  unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(parseInt(t.inflow_amt)||0)>0)
-    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:parseInt(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(parseInt(t.outflow_amt)||0)>0)
-    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:parseInt(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
+  unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
+    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:num(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
+  unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
 }
@@ -1015,9 +1010,9 @@ function _cands(list,amt){
   return list.filter(x=>x.a&&Math.abs(x.a-amt)<=1000)
     .sort((x,y)=>String(x.d||'9999').localeCompare(String(y.d||'9999')));
 }
-function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id&&r.invoice_date).map(r=>({id:r.revenue_id,a:parseInt(r.cash_recv_amt)||0,d:r.cash_recv_date,ym:r.year_month}));
+function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id&&r.invoice_date).map(r=>({id:r.revenue_id,a:num(r.cash_recv_amt)||0,d:r.cash_recv_date,ym:r.year_month}));
   return _cands(open,t.inAmt).map(c=>`<button onclick="quickPick('mr_${i}','${c.id}')" title="수금예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt);color:var(--blue);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
-function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&!c.matched_txn_id).map(c=>({id:c.cost_id,a:Math.round((parseInt(c.amount)||0)*1.1),d:c.payment_date,ym:c.year_month}));
+function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&!c.matched_txn_id).map(c=>({id:c.cost_id,a:Math.round((num(c.amount)||0)*1.1),d:c.payment_date,ym:c.year_month}));
   return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mc_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber-lt);color:var(--amber);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
 function quickPick(sel,val){const el=document.getElementById(sel);if(el)el.value=val;}
 async function saveReclass(){
@@ -1026,7 +1021,7 @@ async function saveReclass(){
     if(t&&el.value&&el.value!==t.category){t.category=el.value;n++;}});
   if(!n){toast('변경된 분류가 없습니다');return;}
   const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
-  const ok=await clearAndWrite(...W.S08_DETAIL,[H,...detailAll.map(t=>H.map(h=>t[h]??''))]);
+  const ok=await clearAndWrite(...W.S08_DETAIL,[H,...rowsFor(H,detailAll)]);
   toast(ok?`분류 재지정 ${n}건 저장 ✓`:'저장 실패',!ok);
   if(ok) rebuildRecon();
 }
@@ -1051,7 +1046,7 @@ function renderTx(){
   if(txMode==='sum'){ // v2.2: 유형별 집계 (월 필터 적용)
     const agg={};
     list.forEach(t=>{const c=t.category||'미분류'; const a=agg[c]=agg[c]||{n:0,i:0,o:0};
-      a.n++; a.i+=parseInt(t.inflow_amt)||0; a.o+=parseInt(t.outflow_amt)||0;});
+      a.n++; a.i+=num(t.inflow_amt)||0; a.o+=num(t.outflow_amt)||0;});
     const rows=Object.entries(agg).sort((x,y)=>(y[1].o+y[1].i)-(x[1].o+x[1].i));
     const ti=rows.reduce((s,[,a])=>s+a.i,0), to=rows.reduce((s,[,a])=>s+a.o,0), tn=rows.reduce((s,[,a])=>s+a.n,0);
     document.getElementById('txBody').innerHTML=(rows.length?rows.map(([c,a])=>`
@@ -1068,8 +1063,8 @@ function renderTx(){
   document.getElementById('txBody').innerHTML=list.length?list.map(t=>{
     const st=mR.has(t.txn_id)?'수금매칭':(mC.has(t.txn_id)?'지급매칭':'');
     return `<tr><td>${t.txn_date}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${t.description||t.recv||''}</td>
-    <td style="text-align:right;color:var(--green)">${(parseInt(t.inflow_amt)||0)?won(t.inflow_amt):''}</td>
-    <td style="text-align:right;color:var(--red)">${(parseInt(t.outflow_amt)||0)?won(t.outflow_amt):''}</td>
+    <td style="text-align:right;color:var(--green)">${(num(t.inflow_amt)||0)?won(t.inflow_amt):''}</td>
+    <td style="text-align:right;color:var(--red)">${(num(t.outflow_amt)||0)?won(t.outflow_amt):''}</td>
     <td>${t.category||'미분류'}</td><td style="color:var(--blue);font-size:11px">${st}</td></tr>`;}).join('')
    :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>';
 }
@@ -1120,7 +1115,7 @@ function renderDupAudit(){
   const o=auditOrphans();
   const orn=o.revNoTx.length+o.revGhost.length+o.costNoTx.length+o.costGhost.length;
   if(!rev.length&&!cost.length&&!orn){el.style.display='none';el.innerHTML='';return;}
-  const txD=tid=>{const t=detailAll.find(x=>x.txn_id===tid);return t?`${String(t.txn_date).slice(0,10)} ${won(parseInt(t.inflow_amt)||parseInt(t.outflow_amt)||0)}`:tid;};
+  const txD=tid=>{const t=detailAll.find(x=>x.txn_id===tid);return t?`${String(t.txn_date).slice(0,10)} ${won(num(t.inflow_amt)||num(t.outflow_amt)||0)}`:tid;};
   const grp=(g,label)=>`<div style="padding:6px 0;border-bottom:1px dashed var(--border)"><b>${label}</b> 거래 ${g.tid} (${txD(g.tid)}) → <span style="color:var(--red)">${g.rows.length}건 중복 매칭</span>: ${g.rows.map(r=>r[g.idKey]+'('+(r.year_month||'')+')').join(', ')}</div>`;
   el.style.display='block';
   el.innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">⚠ 매칭 정합 감사: 중복 입금 ${rev.length}·지급 ${cost.length}그룹, 근거 없는 완료 ${orn}건</div>
@@ -1160,7 +1155,7 @@ function renderRecon(autoCnt,costCnt){
       <span style="flex:1;min-width:150px">${t.date} <b>${(t.inAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
       <select id="mm_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
         <option value="">청구 건 선택…</option>
-        ${openRows.map(r=>`<option value="${r.revenue_id}">${r.year_month} ${r.project_id} ${(parseInt(r.cash_recv_amt)||0).toLocaleString()}원</option>`).join('')}
+        ${openRows.map(r=>`<option value="${r.revenue_id}">${r.year_month} ${r.project_id} ${(num(r.cash_recv_amt)||0).toLocaleString()}원</option>`).join('')}
       </select>
       ${revCands(t,i)} <button onclick="manualMatch(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer">매칭</button>
     </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">미매칭 입금이 없습니다.</div>';
@@ -1170,7 +1165,7 @@ function renderRecon(autoCnt,costCnt){
       <span style="flex:1;min-width:150px">${t.date} <b>${(t.outAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
       <select id="mc_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
         <option value="">수취완료 매입 건 선택…</option>
-        ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((parseInt(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
+        ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((num(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
       </select>
       ${costCands(t,i)} <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
     </div>`).join('')):'';
@@ -1178,7 +1173,7 @@ function renderRecon(autoCnt,costCnt){
   const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);
   document.getElementById('reconUnmatched').innerHTML+=rl.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미분류·기타 거래 재지정 <button onclick="saveReclass()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer;margin-left:6px">재지정 저장</button></div>'+rl.map(t=>`
     <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span style="flex:1;min-width:140px">${t.txn_date} ${t.description||t.recv||''} <b>${won(parseInt(t.inflow_amt)||parseInt(t.outflow_amt)||0)}</b></span>
+      <span style="flex:1;min-width:140px">${t.txn_date} ${t.description||t.recv||''} <b>${won(num(t.inflow_amt)||num(t.outflow_amt)||0)}</b></span>
       <select id="rc_${t.txn_id}" data-tid="${t.txn_id}" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface)">
         ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
       </select></div>`).join('')):'';
@@ -1206,13 +1201,13 @@ function renderAging(){
   document.getElementById('payAgingList').innerHTML=payList.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span>${c.project_id} · ${c.year_month} ${c.cost_type}<br><span style="color:var(--text3)">지급예정 ${c.payment_date}</span></span>
-      <span style="text-align:right"><b>${Math.round((parseInt(c.amount)||0)*1.1).toLocaleString()}원</b><br>
+      <span style="text-align:right"><b>${Math.round((num(c.amount)||0)*1.1).toLocaleString()}원</b><br>
       <span style="color:var(--amber);font-weight:700">D+${c.dd}</span></span></div>`).join('');
   if(!list.length&&payList.length){card.style.display='block';}
   document.getElementById('agingList').innerHTML=list.map(r=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span>${r.project_id} · ${r.year_month}<br><span style="color:var(--text3)">수금예정 ${r.cash_recv_date}</span></span>
-      <span style="text-align:right"><b>${(parseInt(r.cash_recv_amt)||0).toLocaleString()}원</b><br>
+      <span style="text-align:right"><b>${(num(r.cash_recv_amt)||0).toLocaleString()}원</b><br>
       <span style="color:${r.dd>30?'var(--red)':'var(--amber)'};font-weight:700">D+${r.dd}</span></span></div>`).join('');
   if(!list.length)document.getElementById('agingList').innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">경과 미수 해당 없음 ✓</div>';
 }
@@ -1238,8 +1233,8 @@ async function recalcEstimate(){
     const estRatio=pl=>{
       const rws=estAll.filter(e=>e.pipeline_id===pl.pipeline_id);
       if(!rws.length) return 0;
-      const sell=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
-      const buy=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+      const sell=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
+      const buy=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
       return sell>0?buy/sell:0;
     };
     const okPl2=new Set(pipelinesAll.filter(p=>['확정','수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
@@ -1248,22 +1243,22 @@ async function recalcEstimate(){
     months.forEach(m=>{
       if(m<baseYm){ rows.push([m,'','','','','기산 전',today]); return; }
       const inf1=s04All.filter(r=>okPrj2.has(r.project_id)&&(r.cash_recv_date||'').slice(0,7)===m)
-        .reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+        .reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
       let inf2=0, out2=0;
       wRows.forEach(p=>{
         const ms=[]; let c=new Date(p.expected_start); const e=new Date(p.expected_end);
         c=new Date(c.getFullYear(),c.getMonth(),1);
         while(c<=e){ms.push(`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}`);c=new Date(c.getFullYear(),c.getMonth()+1,1);}
         if(!ms.includes(m)) return;
-        const pr=p.status==='확정'?(parseInt(p.probability)||100):(parseInt(p.probability)||0);
+        const pr=p.status==='확정'?(num(p.probability)||100):(num(p.probability)||0);
         const sellM=Math.round(un2(p.contract_amount)*1.1*pr/100/ms.length);
         inf2+=sellM; out2+=Math.round(sellM*estRatio(p));
       });
       const outCost=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===m)
-        .reduce((s,c)=>s+Math.round((parseInt(c.amount)||0)*1.1),0);
-      const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(parseInt(f.amount)||0),0);
+        .reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0);
+      const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(num(f.amount)||0),0);
       const vat=vatRows.filter(v=>(v.due_date||'').slice(0,7)===m)
-        .reduce((s,v)=>s+(parseInt(v.actual_payment)||parseInt(v.estimated_payment)||0),0);
+        .reduce((s,v)=>s+(num(v.actual_payment)||num(v.estimated_payment)||0),0);
       const inflow=inf1+inf2, outflow=outCost+outFix+out2+vat;
       bal=bal+inflow-outflow;
       rows.push([m,inflow,outflow,vat,bal,(weighted?'확도가중 ON':'확정분만')+' · 계획 누적',today]);

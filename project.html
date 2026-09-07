@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 프로젝트 조회</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -136,10 +136,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 function wf(n){return comma(n)+'원';}
 const SC={'수주':['#ECFDF5','#059669'],'계약':['#F0FDFA','#0D9488'],'종료':['#F1F5F9','#64748B']};
@@ -182,8 +182,8 @@ function renderList(){
   document.getElementById('prjList').innerHTML=list.length?list.map(p=>{
     const pl=plOf(p)||{};
     const rv=revOf(p.project_id);
-    const tot=rv.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-    const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+    const tot=rv.reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+    const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
     const today=new Date().toISOString().slice(0,10);
     const od=rv.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today).length;
     const pct=tot?Math.round(done/tot*100):0;
@@ -218,8 +218,8 @@ function openDetail(pid){
       <span style="color:var(--text3)">${pid} · 사업기회 <a href="pipeline.html?pid=${curPrj.pipeline_id}" style="color:var(--blue);text-decoration:none">${curPrj.pipeline_id||'─'} ↗</a></span></div>`;
   const rv=revOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
   const cs=costOf(pid).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||''));
-  const revSum=rv.reduce((s,r)=>s+(parseInt(r.tax_invoice_amt)||0),0);
-  const costSum=cs.reduce((s,c)=>s+(parseInt(c.amount)||0),0);
+  const revSum=rv.reduce((s,r)=>s+(num(r.tax_invoice_amt)||0),0);
+  const costSum=cs.reduce((s,c)=>s+(num(c.amount)||0),0);
   const profit=revSum-costSum, margin=revSum?Math.round(profit/revSum*1000)/10:0;
   document.getElementById('dProfit').innerHTML=`
     <div class="box"><div class="l">계약금액</div><div class="v">${comma(curPrj.contract_amount)}원</div></div>
@@ -228,15 +228,15 @@ function openDetail(pid){
     <div class="box"><div class="l">추정 이익 (이익률 ${margin}%)</div><div class="v" style="color:${profit>=0?'var(--green)':'var(--red)'}">${wf(profit)}</div></div>`;
   const items=est.filter(e=>e.pipeline_id===curPrj.pipeline_id);
   if(items.length){
-    const eS=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.unit_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.unit_price)||0)),0);
-    const eB=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((parseInt(e.buy_price)||0)*(parseFloat(e.mm)||0)):(parseInt(e.qty)||1)*(parseInt(e.buy_price)||0)),0);
+    const eS=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
+    const eB=items.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
     document.getElementById('dEstNote').textContent=`견적: 매출 ${comma(eS)}원 · 매입 ${comma(eB)}원 (${items.length}개 항목)`;
   } else document.getElementById('dEstNote').textContent='저장된 견적 없음';
   const today=new Date().toISOString().slice(0,10);
-  const totV=rv.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
-  const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+  const totV=rv.reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+  const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
   const open=rv.filter(r=>r.is_received!=='Y');
-  const openAmt=open.reduce((s,r)=>s+(parseInt(r.cash_recv_amt)||0),0);
+  const openAmt=open.reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
   const od=open.filter(r=>r.cash_recv_date&&r.cash_recv_date<today);
   document.getElementById('dRecv').innerHTML=`
     <div class="box"><div class="l">수금 완료 (VAT포함)</div><div class="v" style="color:var(--green)">${wf(done)}</div></div>
@@ -252,8 +252,8 @@ function openDetail(pid){
       <td>${r.cash_recv_date||'─'}</td><td style="color:${st[1]};font-weight:600">${st[0]}</td><td>${r.recv_actual_date||'─'}</td></tr>`;}).join('')
     :'<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:14px 0">청구 스케줄 없음 — [⚡ 스케줄 생성]으로 만드세요</td></tr>';
   document.getElementById('dCostBody').innerHTML=cs.length?cs.map(c=>{
-    const amt=parseInt(c.amount)||0;
-    const vatTot=amt+(parseInt(c.vat_amt)||Math.round(amt*.1));
+    const amt=num(c.amount)||0;
+    const vatTot=amt+(num(c.vat_amt)||Math.round(amt*.1));
     const st=c.pay_actual_date?['지급완료','var(--green)']:(c.invoice_date?['수취완료','var(--blue)']:['수취예정','var(--amber)']);
     return `<tr><td>${c.year_month}</td><td>${c.invoice_plan_date||'─'}</td><td>${c.invoice_date||'─'}</td>
       <td style="text-align:right">${comma(amt)}</td><td style="text-align:right">${comma(vatTot)}</td>

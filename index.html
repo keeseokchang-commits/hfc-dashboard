@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 경영관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root {
     --bg:        #F2F4F7;
@@ -271,10 +271,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 // ── 설정 ──────────────────────────────────────────────────────
 
@@ -388,9 +388,9 @@ async function render() {
     const yrCosts = costs.filter(c => (c.year_month||'').startsWith(yr));
     const yrFixed = fixed.filter(f => (f.year_month||'').startsWith(yr));
 
-    const totalRevenue = yrRevs.reduce((s, r) => s + (parseInt(r.tax_invoice_amt)||0), 0);
-    const totalCost    = yrCosts.reduce((s, c) => s + (parseInt(c.amount)||0), 0);
-    const totalFixed   = yrFixed.reduce((s, f) => s + (parseInt(f.amount)||0), 0);
+    const totalRevenue = yrRevs.reduce((s, r) => s + (num(r.tax_invoice_amt)||0), 0);
+    const totalCost    = yrCosts.reduce((s, c) => s + (num(c.amount)||0), 0);
+    const totalFixed   = yrFixed.reduce((s, f) => s + (num(f.amount)||0), 0);
     const grossProfit  = totalRevenue - totalCost;
     const opProfit     = grossProfit - totalFixed;
     const opMargin     = totalRevenue ? (opProfit / totalRevenue * 100) : 0;
@@ -398,7 +398,7 @@ async function render() {
     const latestDash   = dashboard.filter(d => d.act_balance).slice(-1)[0] || {};
     const latestEst    = estimates.slice(-1)[0] || {};
     const cashBalance  = latestDash.act_balance || latestEst.est_balance || 0;
-    const accuracy     = parseFloat(latestDash.accuracy_pct) || null;
+    const accuracy     = numF(latestDash.accuracy_pct) || null;
 
     // ── 월별 매출 데이터 (12개월) ──
     const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -406,19 +406,19 @@ async function render() {
     const monthlyOp  = Array(12).fill(0);
     yrRevs.forEach(r => {
       const m = parseInt((r.year_month||'').split('-')[1]) - 1;
-      if (m >= 0 && m < 12) monthlyRev[m] += parseInt(r.tax_invoice_amt)||0;
+      if (m >= 0 && m < 12) monthlyRev[m] += num(r.tax_invoice_amt)||0;
     });
     yrCosts.forEach(c => {
       const m = parseInt((c.year_month||'').split('-')[1]) - 1;
-      if (m >= 0 && m < 12) monthlyOp[m] -= parseInt(c.amount)||0;
+      if (m >= 0 && m < 12) monthlyOp[m] -= num(c.amount)||0;
     });
     yrFixed.forEach(f => {
       const m = parseInt((f.year_month||'').split('-')[1]) - 1;
-      if (m >= 0 && m < 12) monthlyOp[m] -= parseInt(f.amount)||0;
+      if (m >= 0 && m < 12) monthlyOp[m] -= num(f.amount)||0;
     });
     yrRevs.forEach(r => {
       const m = parseInt((r.year_month||'').split('-')[1]) - 1;
-      if (m >= 0 && m < 12) monthlyOp[m] += parseInt(r.tax_invoice_amt)||0;
+      if (m >= 0 && m < 12) monthlyOp[m] += num(r.tax_invoice_amt)||0;
     });
 
     // ── 알림 판단 ──
@@ -430,7 +430,7 @@ async function render() {
         if (d >= 0 && d <= 7) addAlert('red', `마감 D-${d} ⚠️`, `${p.project_name} (${p.end_date} 종료)`);
       }
     });
-    vatList.filter(v => v.status !== '납부완료' && (parseInt(v.estimated_payment)||0) > 0).forEach(v => {
+    vatList.filter(v => v.status !== '납부완료' && (num(v.estimated_payment)||0) > 0).forEach(v => {
       const due = parseDate(v.due_date);
       if (due) {
         const d = diffDays(todayDate, due);
@@ -443,7 +443,7 @@ async function render() {
         addAlert('amber', '입금 미확인', `${r.project_id} ${r.year_month} ${won(r.cash_recv_amt)} — 예정일 초과`);
     });
     estimates.forEach(e => {
-      const bal = parseInt(e.est_balance)||0;
+      const bal = num(e.est_balance)||0;
       if (bal < 0) {
         const [, m] = (e.year_month||'').split('-');
         addAlert('red', `${m}월 현금 부족 예상`, `추정 잔액 ${won(bal)}`);
@@ -464,10 +464,10 @@ async function render() {
     if(!thisMon)thisMon=prevYmStr;
     const dashRow  = dashboard.find(d => d.year_month === thisMon) || {};
     const estRow   = estimates.find(e => e.year_month === thisMon) || {};
-    const estBal   = parseInt(estRow.est_balance)  || 0;
-    const actBal   = parseInt(dashRow.act_balance) || null;
+    const estBal   = num(estRow.est_balance)  || 0;
+    const actBal   = num(dashRow.act_balance) || null;
     const diff     = actBal !== null ? actBal - estBal : null;
-    const acc      = parseFloat(dashRow.accuracy_pct) || null;
+    const acc      = numF(dashRow.accuracy_pct) || null;
     const gaugeColor = acc === null ? 'amber' : acc >= 80 ? 'green' : acc >= 60 ? 'amber' : 'red';
     const gaugeW     = acc !== null ? Math.max(0, Math.min(100, acc)) : 0;
 
@@ -475,7 +475,7 @@ async function render() {
     const activeProjects = projects.filter(p => ['수주','계약'].includes(p.status)).slice(0, 4);
 
     // ── 경고 배너 ──
-    const negEst = estimates.find(e => parseInt(e.est_balance) < 0);
+    const negEst = estimates.find(e => num(e.est_balance) < 0);
     const bannerHtml = negEst
       ? `<div class="alert-banner">⚠️ ${negEst.year_month.split('-')[1]}월 현금 부족 예상 (추정 ${won(negEst.est_balance)}) — <a href="cashflow.html" style="color:inherit;text-decoration:underline;margin-left:4px">자금수지 확인</a></div>`
       : '';
@@ -486,18 +486,18 @@ async function render() {
     const invDue=revenues.filter(r=>r.invoice_plan_date&&r.invoice_plan_date.slice(0,7)<=thisYmStr&&!r.invoice_date&&r.is_received!=='Y');
     const costDue=costs.filter(c=>c.invoice_plan_date&&c.invoice_plan_date.slice(0,7)<=thisYmStr&&!c.invoice_date);
     // v2.4.1: 세금계산서 합계(공급+VAT) — S04 공급가=tax_invoice_amt, S05 공급가=amount, vat_amt 폴백 10%
-    const revTot=r=>{const su=parseInt(r.tax_invoice_amt)||0;return su+(parseInt(r.vat_amt)||Math.round(su*0.1));};
-    const costTot=c=>{const su=parseInt(c.amount)||0;return su+(parseInt(c.vat_amt)||Math.round(su*0.1));};
+    const revTot=r=>{const su=num(r.tax_invoice_amt)||0;return su+(num(r.vat_amt)||Math.round(su*0.1));};
+    const costTot=c=>{const su=num(c.amount)||0;return su+(num(c.vat_amt)||Math.round(su*0.1));};
     const carryR=invDue.filter(r=>r.invoice_plan_date.slice(0,7)<thisYmStr).length;
     const carryC=costDue.filter(c=>c.invoice_plan_date.slice(0,7)<thisYmStr).length;
     const dueLine=(o,su,tot,plan,carry)=>`<div style="font-size:11px;color:var(--text3);padding:2px 0 2px 22px">${carry?'<span style=\'color:var(--amber)\'>[이월]</span> ':''}${o} · 공급 ${wonFull(su)} + VAT = <b>${wonFull(tot)}</b> · 예정 ${plan}</div>`;
-    const revDetail=invDue.map(r=>dueLine(`${r.year_month} ${r.project_id}`,parseInt(r.tax_invoice_amt)||0,revTot(r),r.invoice_plan_date,r.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
-    const costDetail=costDue.map(c=>dueLine(`${c.year_month} ${c.project_id}`,parseInt(c.amount)||0,costTot(c),c.invoice_plan_date,c.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
+    const revDetail=invDue.map(r=>dueLine(`${r.year_month} ${r.project_id}`,num(r.tax_invoice_amt)||0,revTot(r),r.invoice_plan_date,r.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
+    const costDetail=costDue.map(c=>dueLine(`${c.year_month} ${c.project_id}`,num(c.amount)||0,costTot(c),c.invoice_plan_date,c.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
     const agingList=revenues.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<todayStr2);
     const agingCnt=agingList.length;
-    const agingAmt=agingList.reduce((t,r)=>t+(parseInt(r.cash_recv_amt)||0),0);
+    const agingAmt=agingList.reduce((t,r)=>t+(num(r.cash_recv_amt)||0),0);
     const csvDone=dashboard.some(d=>d.year_month===prevYmStr&&d.act_balance);
-    const vatSoonAll=vatList.filter(v=>v.status!=='납부완료'&&(parseInt(v.estimated_payment)||0)>0&&v.due_date>=todayStr2).sort((a,b)=>a.due_date.localeCompare(b.due_date));
+    const vatSoonAll=vatList.filter(v=>v.status!=='납부완료'&&(num(v.estimated_payment)||0)>0&&v.due_date>=todayStr2).sort((a,b)=>a.due_date.localeCompare(b.due_date));
     const vatSoon=vatSoonAll.length?vatSoonAll[0]:null;
     const vatD=vatSoon?diffDays(today(),parseDate(vatSoon.due_date)):null;
     const s02U=estimates.reduce((m,e)=>(e.updated_at||'')>m?e.updated_at:m,'');
@@ -508,7 +508,7 @@ async function render() {
         <span style="font-size:15px">${done?'✅':(warn?'⚠️':'☐')}</span><span style="flex:1">${txt}</span><span style="color:var(--text3);font-size:11px">›</span></a>`;
     let closeItems='';
     closeItems+=ci(csvDone,`${parseInt(prevYmStr.slice(5))}월 통장 CSV 업로드${csvDone?' 완료':' 필요'}`,'cashflow.html',!csvDone);
-    const costTot2=c=>{const su=parseInt(c.amount)||0;return su+(parseInt(c.vat_amt)||Math.round(su*0.1));};
+    const costTot2=c=>{const su=num(c.amount)||0;return su+(num(c.vat_amt)||Math.round(su*0.1));};
     const payDue=costs.filter(c=>c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<todayStr2);
     closeItems+=ci(payDue.length===0,payDue.length?`미지급금 <b>${payDue.length}건</b> (${wonFull(payDue.reduce((t,c)=>t+costTot2(c),0))} · VAT 포함) — 지급예정 경과`:'미지급금 없음 (누계)','cashflow.html',payDue.length>0);
     closeItems+=ci(agingCnt===0,agingCnt?`미수금 <b>${agingCnt}건</b> (${wonFull(agingAmt)} · VAT 포함) — 수금예정일 경과`:'미수금 없음 (누계)','cashflow.html',agingCnt>0);

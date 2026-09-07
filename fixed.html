@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.8">
+<link rel="stylesheet" href="css/common.css?v=2.9.9">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -109,10 +109,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.8"></script>
-<script src="js/common.js?v=2.9.8"></script>
-<script src="js/calc.js?v=2.9.8"></script>
-<script src="js/nav.js?v=2.9.8"></script>
+<script src="js/schema.js?v=2.9.9"></script>
+<script src="js/common.js?v=2.9.9"></script>
+<script src="js/calc.js?v=2.9.9"></script>
+<script src="js/nav.js?v=2.9.9"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -132,7 +132,7 @@ async function loadAll(){
 function renderFx(){
   const y=document.getElementById('fxYear').value;
   const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
-  document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(parseInt(x.amount)||0),0))}원)`;
+  document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(num(x.amount)),0))}원)`;
   document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
     <tr><td>${x.year_month}</td><td>${x.category}</td><td style="text-align:right">${comma(x.amount)}원</td>
     <td>${x.payment_date||'─'}</td><td style="color:var(--text3)">${x.memo||''}</td>
@@ -142,7 +142,7 @@ function renderFx(){
 function openFxModal(){resetFxEdit();const t=new Date().toISOString().slice(0,7);document.getElementById('fx_sm').value=t;document.getElementById('fx_em').value=t;document.getElementById('fxModal').classList.add('open');}
 async function writeFx(next){
   const H=['fixed_id','year_month','category','amount','payment_date','memo'];
-  const ok=await clearAndWrite(...W.S06,[H,...dedupe(next,'fixed_id').map(x=>H.map(h=>x[h]??''))]);
+  const ok=await clearAndWrite(...W.S06,[H,...rowsFor(H,dedupe(next,'fixed_id'))]);
   if(ok){fixedAll=dedupe(next,'fixed_id');renderFx();}
   return ok;
 }
