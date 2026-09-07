@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.6">
+<link rel="stylesheet" href="css/common.css?v=2.9.8">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -288,10 +288,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.6"></script>
-<script src="js/common.js?v=2.9.6"></script>
-<script src="js/calc.js?v=2.9.6"></script>
-<script src="js/nav.js?v=2.9.6"></script>
+<script src="js/schema.js?v=2.9.8"></script>
+<script src="js/common.js?v=2.9.8"></script>
+<script src="js/calc.js?v=2.9.8"></script>
+<script src="js/nav.js?v=2.9.8"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -366,8 +366,11 @@ async function parseXLSX(file){
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array'});
   const ws=wb.Sheets[wb.SheetNames[0]];
+  // v2.9.7: 서식 텍스트(raw:false)와 원본 숫자값(raw:true)을 함께 추출 — 금액 컬럼이 엑셀 커스텀 서식(예: #,##0,, 백만원 축약 표시)일 경우
+  // raw:false 문자열이 서식 적용값("20")으로 왜곡되므로, 숫자 셀은 항상 원본 값을 우선 사용해 왜곡을 방지한다.
   const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
-  processBankRows(raw);
+  const rawNum=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  processBankRows(raw,rawNum);
 }
 
 // CSV 파싱
@@ -386,7 +389,7 @@ async function parseCSV(file){
 }
 
 // 공통 파싱 처리
-function processBankRows(rows){
+function processBankRows(rows,rawNum){
   // 1~5행 메타 스킵 → 헤더 행 찾기
   let headerIdx = -1;
   for(let i=0;i<Math.min(10,rows.length);i++){
@@ -418,9 +421,12 @@ function processBankRows(rows){
     const date=dt.slice(0,10);
     const desc=String(r[colIdx.desc]||'').trim();
     const recv=String(r[colIdx.recv]||'').trim();
-    const inAmt=parseInt(String(r[colIdx.in]||'0').replace(/,/g,''))||0;
-    const outAmt=parseInt(String(r[colIdx.out]||'0').replace(/,/g,''))||0;
-    const bal=parseInt(String(r[colIdx.bal]||'0').replace(/,/g,''))||0;
+    // v2.9.7: 서식 문자열보다 원본 셀 숫자(rawNum)를 우선 신뢰 — XLSX 커스텀 표시서식(백만원 단위 축약 등)에 의한 값 왜곡 방지
+    const rn=rawNum&&rawNum[i];
+    const numOr=(idx,fallback)=>{ const v=rn&&rn[idx]; return (typeof v==='number')?v:fallback; };
+    const inAmt=numOr(colIdx.in, parseInt(String(r[colIdx.in]||'0').replace(/,/g,''))||0);
+    const outAmt=numOr(colIdx.out, parseInt(String(r[colIdx.out]||'0').replace(/,/g,''))||0);
+    const bal=numOr(colIdx.bal, parseInt(String(r[colIdx.bal]||'0').replace(/,/g,''))||0);
     const branch=String(r[colIdx.branch]||'').trim();
     // 더미 행 제거 (입출금 모두 0이고 잔액도 0)
     if(inAmt===0&&outAmt===0&&bal===0) continue;

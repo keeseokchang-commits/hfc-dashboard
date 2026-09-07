@@ -62,7 +62,22 @@ async function clearAndWrite(sheet,range,rows){
     return true;
   }catch(e){ console.error(e); return false; }
 }
-function toObj(rows){ if(!rows||!rows.length) return []; const h=rows[0]; return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??'']))); }
+// v2.9.8: 시트→객체 변환 시 금액류 컬럼의 콤마를 제거해 순수 숫자 문자열로 정규화(SSOT).
+// 원인: 구글시트에 사용자가 셀을 직접 편집하며 "13,200,000"처럼 콤마 포함 텍스트로 저장하면,
+// 코드 전역의 parseInt(obj.field) 호출(콤마 제거 없이 파싱)이 첫 콤마에서 끊겨 자릿수가 크게 줄어든다(예: 13,200,000→13).
+// 화면 입력은 항상 un()/uncomma()로 안전하게 처리되지만, 시트 원본이 이미 콤마 포함이면 그 방어를 우회한다.
+// 해결: 읽기 시점 단일 관문(toObj)에서 알려진 금액/수량 컬럼만 정규화 — 날짜·ID·텍스트는 건드리지 않는다.
+const AMOUNT_KEYS=new Set(['contract_amount','tax_invoice_amt','cash_recv_amt','vat_amt','amount','unit_price','buy_price','qty',
+  'est_inflow','est_outflow','est_vat','est_balance','act_balance','act_inflow','act_outflow',
+  'inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc',
+  'inflow_amt','outflow_amt','balance','estimated_payment','actual_payment','sell_price','buy_price_x','diff_amount']);
+function toObj(rows){ if(!rows||!rows.length) return []; const h=rows[0];
+  return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>{
+    let v=r[i]??'';
+    if(AMOUNT_KEYS.has(k)&&typeof v==='string'&&v.includes(',')) v=v.replace(/,/g,'');
+    return [k,v];
+  })));
+}
 const toObjects=toObj;
 function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 function toast(msg,err=false){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
