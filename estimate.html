@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.12">
+<link rel="stylesheet" href="css/common.css?v=2.9.13">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,12 +131,15 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.12"></script>
-<script src="js/common.js?v=2.9.12"></script>
-<script src="js/calc.js?v=2.9.12"></script>
-<script src="js/nav.js?v=2.9.12"></script>
+<script src="js/schema.js?v=2.9.13"></script>
+<script src="js/common.js?v=2.9.13"></script>
+<script src="js/calc.js?v=2.9.13"></script>
+<script src="js/nav.js?v=2.9.13"></script>
 <script>
 let opps=[],rates=[],estimates=[];
+// v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
+// estimates 배열만으로는 둘 다 0건이라 구분할 수 없어서, 저장 성공 시점을 별도로 기록해 판단 근거로 삼는다.
+const savedOnceThisSession=new Set();
 let selStatus=new Set(['기회','확정','수주','계약']);
 let cur=null, labor=[], items={infra:[],sol:[],etc:[]};
 
@@ -203,7 +206,11 @@ function loadOpp(){
       price:num(e.unit_price)||0,buy:num(e.buy_price)||0,memo:e.memo||'',
       start:e.start_date||'',end:e.end_date||''}));
   });
-  if(!labor.length&&cur.expected_start)addLabor(false);
+  // v2.9.13: "저장된 견적이 아예 없음(신규)"과 "저장했지만 인건비를 전부 지움(의도적 삭제)"을 구분.
+  // 이전에는 후자도 매번 빈 행이 자동 추가되어, 인력을 지우고 저장해도 다시 열면 등급단가가 채워진 빈 행이 부활했음.
+  // saved에 _EMPTY 마커가 있으면 "저장은 했지만 의도적으로 비움" — 새로고침 후에도 정확히 구분됨.
+  const hasEmptyMarker=saved.some(e=>e.comp_type==='_EMPTY');
+  if(!saved.length&&!hasEmptyMarker&&!labor.length&&!savedOnceThisSession.has(pid)&&cur.expected_start)addLabor(false);
   renderLabor();['infra','sol','etc'].forEach(renderItems);
   recalc();
   if(saved.length)toast(`저장된 견적 ${saved.length}건 불러옴`);
@@ -357,11 +364,17 @@ async function saveEstimate(){
     items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
       comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:it.buy||0,
       amount:it.qty*it.price,mm:'',start_date:it.start||'',end_date:it.end||'',memo:it.memo,created_at:today});});});
+  // v2.9.13: 항목을 전부 지우고 저장하면(의도적 삭제) 이 파이프라인에 남는 행이 0개가 되어, 다음 로드 때
+  // "저장 이력 없음(신규)"과 구분이 안 되고 빈 행이 부활함. 새로고침·재접속 후에도 구분 가능하도록
+  // 항목이 0개일 때는 계산에서 제외되는 빈 상태 마커 행을 하나 남긴다.
+  if(!rows.length){n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
+    comp_type:'_EMPTY',item_name:'',grade:'',grade_set_id:'',qty:'',unit_price:'',buy_price:'',
+    amount:'',mm:'',start_date:'',end_date:'',memo:'견적 항목 없음(의도적 삭제 표시)',created_at:today});}
   const H=['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'];
   const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
   const ok=await clearAndWrite(...W.S12,[H,...rowsFor(H,all)]);
   btn.disabled=false;btn.textContent='견적 저장 (S12)';
-  if(ok){estimates=all;toast('✓ 견적 저장 완료');renderAllSummary();
+  if(ok){estimates=all;savedOnceThisSession.add(cur.pipeline_id);toast('✓ 견적 저장 완료');renderAllSummary();
     const newItems=all.filter(e=>e.pipeline_id===cur.pipeline_id);
     const newSell=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
     const newBuy=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
