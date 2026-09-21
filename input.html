@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.14">
+<link rel="stylesheet" href="css/common.css?v=2.9.15">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -238,6 +238,16 @@
         <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genRevBase" value="contract" checked onchange="buildGen()"> 계약금액</label>
         <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genRevBase" value="est" id="revBaseEst" onchange="buildGen()"> 견적 매출 합계</label>
       </div>
+      <!-- v2.9.15: 매입도 매출과 대칭으로 "직접 입력 총액" 기준 추가 — 견적이 없거나 지워져도
+           이미 있는 매입 스케줄의 회차·비율·일자를 갱신할 방법이 아예 없던 사각지대를 해소.
+           매출은 계약금액이라는 항상 존재하는 기준이 있는데, 매입은 견적 기준 한 경로뿐이었음. -->
+      <div id="costBaseWrap" style="display:flex;gap:14px;font-size:12px;color:var(--text2);margin-top:6px">
+        <span>매입 기준:</span>
+        <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genCostBase" value="est" id="costBaseEst" checked onchange="buildGen()"> 견적 매입 합계</label>
+        <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="genCostBase" value="manual" onchange="buildGen()"> 직접 입력</label>
+        <input type="text" id="costBaseManual" inputmode="numeric" placeholder="총액(원)" style="width:130px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;display:none"
+          oninput="this.value=comma(this.value);buildGen()">
+      </div>
     </div>
     <div id="msArea" style="display:none;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -273,10 +283,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.14"></script>
-<script src="js/common.js?v=2.9.14"></script>
-<script src="js/calc.js?v=2.9.14"></script>
-<script src="js/nav.js?v=2.9.14"></script>
+<script src="js/schema.js?v=2.9.15"></script>
+<script src="js/common.js?v=2.9.15"></script>
+<script src="js/calc.js?v=2.9.15"></script>
+<script src="js/nav.js?v=2.9.15"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 
@@ -526,9 +536,16 @@ function genCtx(){
   const eBuy=hasEst?profileTotal(items,'buy_price',st0,en0):0;
   const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
   const amt=un(genPl.contract_amount||prj.contract_amount);
+  // v2.9.15: 매입 기준 — 견적 매입 합계 또는 직접 입력 총액. 견적이 없어도(hasEst=false) 직접 입력을 선택하면
+  // 매입 스케줄을 회차 방식으로 생성·갱신할 수 있어야 하므로, "매입 생성 가능 여부"를 견적 유무와 분리한다.
+  const costBase=(document.querySelector('input[name=genCostBase]:checked')||{}).value||'est';
+  const manualBuy=un(document.getElementById('costBaseManual').value);
+  const canCost=(costBase==='est')?(hasEst&&eBuy>0):manualBuy>0;
+  const applyBuy=(costBase==='est')?eBuy:manualBuy;
   return {pid,prj,biz:genPl.biz_type||'인력공급',pay:genPl.payment_cycle||'익월말',
     start:genPl.expected_start||prj.start_date,end:genPl.expected_end||prj.end_date,
-    amt,items,hasEst,eSell,eBuy,revAmt:(revBase==='est'&&hasEst)?eSell:amt};
+    amt,items,hasEst,eSell,eBuy,revAmt:(revBase==='est'&&hasEst)?eSell:amt,
+    costBase,canCost,applyBuy};
 }
 function onGenPrjChange(){
   // 견적이 있으면 기본 = 견적 매출(단가×월 그대로), 없으면 계약금액
@@ -546,13 +563,18 @@ function buildGen(){
   const c=genCtx(); if(!c)return;
   document.getElementById('genTargets').style.display='block';
   const doCostEl=document.getElementById('genDoCost');
-  document.getElementById('genCostHint').textContent=c.hasEst?`(견적 매입 합계 ${comma(c.eBuy)}원 → 월 합산)`:'(견적 없음 — 생성 불가)';
-  doCostEl.disabled=!c.hasEst; if(!c.hasEst)doCostEl.checked=false;
+  // v2.9.15: 매입 기준(견적/직접입력)에 따라 안내·활성화 조건을 canCost·applyBuy로 통일 — 견적이 없어도
+  // "직접 입력" 선택 시 기존 매입 스케줄을 갱신할 수 있어야 하므로 hasEst 하나로만 잠그지 않는다.
+  const cbEst=document.getElementById('costBaseEst'), cbManual=document.querySelector('input[name=genCostBase][value=manual]');
+  cbEst.disabled=!c.hasEst; if(!c.hasEst&&cbEst.checked){cbManual.checked=true;}
+  document.getElementById('costBaseManual').style.display=(document.querySelector('input[name=genCostBase]:checked')||{}).value==='manual'?'inline-block':'none';
+  document.getElementById('genCostHint').textContent=c.canCost?`(매입 기준 ${comma(c.applyBuy)}원 → 월 합산)`:'(견적·직접입력 금액 없음 — 생성 불가)';
+  doCostEl.disabled=!c.canCost; if(!c.canCost)doCostEl.checked=false;
   document.getElementById('revBaseEst').disabled=!c.hasEst;
   const info=document.getElementById('genInfo');
   info.style.display='block';
-  info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>`;
-  if(!c.start||!c.end||(!c.revAmt&&!c.eBuy)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
+  info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>${c.canCost?` · 적용 매입기준 <b>${comma(c.applyBuy)}원</b>`:''}`;
+  if(!c.start||!c.end||(!c.revAmt&&!c.canCost)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
     genRows=[];genCostRows=[];renderGenPreview();renderGenCostPreview();return;}
   const rb=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
   genScaleNote=(rb==='contract'&&c.hasEst&&c.amt&&c.eSell&&c.amt!==c.eSell)
@@ -577,12 +599,18 @@ function buildGen(){
           const plan=lastDayStr(x.y,x.m);return {plan,supply:sup,recv:recvDue(plan)};});
       }
     }
-    // ── 매입: 견적 항목 기간 기반 월별 합산 ──
+    // ── 매입: 견적 있으면 항목 기간 기반 정밀 분배, 직접입력이면 기간 균등 분배(매출의 견적없음 경로와 동일 방식) ──
     genCostRows=[];
-    if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
-      const buyByM=monthlyProfile(c.items,'buy_price',c.start,c.end);
-      genCostRows=profileToRows(buyByM,c.eBuy)
-        .map(r=>({plan:r.plan,name:r.name.replace('합산','매입 합산'),supply:r.supply,pay:r.pay}));
+    if(document.getElementById('genDoCost').checked&&c.canCost){
+      if(c.costBase==='est'&&c.hasEst){
+        const buyByM=monthlyProfile(c.items,'buy_price',c.start,c.end);
+        genCostRows=profileToRows(buyByM,c.applyBuy)
+          .map(r=>({plan:r.plan,name:r.name.replace('합산','매입 합산'),supply:r.supply,pay:r.pay}));
+      } else {
+        const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
+        genCostRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.applyBuy-acc:cut100(c.applyBuy*x.w/totW);acc+=sup;
+          const plan=lastDayStr(x.y,x.m);return {plan,name:'매입 합산',supply:sup,pay:nextMonthEnd(plan)};});
+      }
     }
     renderGenPreview(); renderGenCostPreview();
   }
@@ -622,8 +650,8 @@ function msCalc(){
     if(document.getElementById('genDoRev').checked&&c.revAmt){
       let sup=(i===n-1)?c.revAmt-acc:cut100(c.revAmt*r/100); acc+=sup;
       genRows.push({plan,supply:sup,recv:plan?recvDue(plan):''});}
-    if(document.getElementById('genDoCost').checked&&c.hasEst&&c.eBuy){
-      let supC=(i===n-1)?c.eBuy-accC:cut100(c.eBuy*r/100); accC+=supC;
+    if(document.getElementById('genDoCost').checked&&c.canCost){
+      let supC=(i===n-1)?c.applyBuy-accC:cut100(c.applyBuy*r/100); accC+=supC;
       genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):''});}
   });
   renderGenPreview(); renderGenCostPreview();
@@ -743,12 +771,12 @@ async function saveGen(){
     const next=dedupe([...base,...recs],'cost_id');
     const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
     if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
-  } else if(allOk&&!c.hasEst){
-    // v2.9.11: 견적이 삭제되어 매입 생성이 불가능한 상태(genDoCost 비활성)에서는
+  } else if(allOk&&!c.canCost){
+    // v2.9.11: 견적·직접입력 둘 다 없어 매입 생성이 불가능한 상태(genDoCost 비활성)에서는
     // 매입 체크박스가 꺼져 이 분기 자체를 건너뛰어 과거 매입 스케줄이 방치되던 결함.
-    // 견적 소실은 "매입 계획이 없어졌다"는 의미이므로, 이 프로젝트의 미수취 매입을 정리할지 사용자에게 확인한다.
+    // v2.9.15: canCost로 조건 교체 — "직접 입력"을 선택했다면 이 분기를 타지 않고 정상 갱신 경로로 간다.
     const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date);
-    if(existOpen.length&&confirm(`이 프로젝트는 매입 견적이 없어 매입 스케줄을 생성할 수 없습니다.\n기존 미수취 매입 ${existOpen.length}건이 남아 있습니다 — 삭제할까요?\n(취소 = 그대로 보존)`)){
+    if(existOpen.length&&confirm(`이 프로젝트는 매입 기준 금액이 없어 매입 스케줄을 생성할 수 없습니다.\n기존 미수취 매입 ${existOpen.length}건이 남아 있습니다 — 삭제할까요?\n(취소 = 그대로 보존)`)){
       const next=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
       const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
       if(ok){costs=next;msgs.push(`매입 ${existOpen.length}건 삭제`);}else allOk=false;
