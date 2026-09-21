@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.13">
+<link rel="stylesheet" href="css/common.css?v=2.9.14">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -273,10 +273,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.13"></script>
-<script src="js/common.js?v=2.9.13"></script>
-<script src="js/calc.js?v=2.9.13"></script>
-<script src="js/nav.js?v=2.9.13"></script>
+<script src="js/schema.js?v=2.9.14"></script>
+<script src="js/common.js?v=2.9.14"></script>
+<script src="js/calc.js?v=2.9.14"></script>
+<script src="js/nav.js?v=2.9.14"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 
@@ -486,7 +486,9 @@ function closeGenModal(){document.getElementById('genModal').classList.remove('o
   ['genPreviewWrap','genCostWrap','msArea','genInfo','genTargets'].forEach(i=>document.getElementById(i).style.display='none');
   document.getElementById('msRows').innerHTML='';
   document.getElementById('genSaveBtn').disabled=true;}
-function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId);}
+// v2.9.14: _EMPTY 마커(v2.9.13 — 견적을 의도적으로 비웠다는 표시)는 실제 견적 항목이 아니므로
+// 이 함수를 쓰는 모든 곳(신규 호출 포함)이 자동으로 안전하도록 여기서 한 번에 제외한다.
+function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId&&e.comp_type!=='_EMPTY');}
 function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round(num(e.unit_price)*numF(e.mm)):(num(e.qty)||1)*num(e.unit_price)),0);}
 function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round(num(e.buy_price)*numF(e.mm)):(num(e.qty)||1)*num(e.buy_price)),0);}
 function cut100(v){return Math.floor(v/100)*100;}
@@ -513,7 +515,10 @@ function genCtx(){
   const pid=document.getElementById('genPrj').value; if(!pid)return null;
   const prj=allPrjs.find(p=>p.project_id===pid); if(!prj)return null;
   genPl=pipelines.find(p=>p.pipeline_id===prj.pipeline_id); if(!genPl)return null;
-  const items=estOf(genPl.pipeline_id);
+  // v2.9.14: estimate.html이 견적을 의도적으로 비울 때 남기는 _EMPTY 마커(v2.9.13)는 실제 견적 항목이 아니므로 제외.
+  // 이 필터가 없으면 마커 1건만으로 hasEst=true가 되어 eSell·eBuy·revAmt가 전부 0으로 계산되고,
+  // "적용 매출기준 0원 · 기간·금액이 없어 생성할 수 없습니다"로 매출·매입 스케줄 생성이 막히는 결함이 발생한다.
+  const items=estOf(genPl.pipeline_id).filter(e=>e.comp_type!=='_EMPTY');
   const hasEst=items.length>0;
   const st0=genPl.expected_start||prj.start_date, en0=genPl.expected_end||prj.end_date;
   // 기준총액 = 항목 기간 기반 정밀 합 (mm 반올림 오차 배제 → 완전월=단가 그대로)

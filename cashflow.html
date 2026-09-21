@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.13">
+<link rel="stylesheet" href="css/common.css?v=2.9.14">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -288,10 +288,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.13"></script>
-<script src="js/common.js?v=2.9.13"></script>
-<script src="js/calc.js?v=2.9.13"></script>
-<script src="js/nav.js?v=2.9.13"></script>
+<script src="js/schema.js?v=2.9.14"></script>
+<script src="js/common.js?v=2.9.14"></script>
+<script src="js/calc.js?v=2.9.14"></script>
+<script src="js/nav.js?v=2.9.14"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1231,7 +1231,8 @@ async function recalcEstimate(){
     const wRows=[...confNoSch,...(weighted?pipelinesAll.filter(p=>p.status==='기회'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end):[])];
     // 파이프라인 연결 견적서(S12)의 매출/매입 합계비=원가율 — 매입도 같은 가중으로 대칭 반영
     const estRatio=pl=>{
-      const rws=estAll.filter(e=>e.pipeline_id===pl.pipeline_id);
+      // v2.9.14: _EMPTY 마커(견적 의도적 비움 표시, v2.9.13)는 실제 항목이 아니므로 제외
+      const rws=estAll.filter(e=>e.pipeline_id===pl.pipeline_id&&e.comp_type!=='_EMPTY');
       if(!rws.length) return 0;
       const sell=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
       const buy=rws.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
