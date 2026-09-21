@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.10">
+<link rel="stylesheet" href="css/common.css?v=2.9.11">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -273,10 +273,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.10"></script>
-<script src="js/common.js?v=2.9.10"></script>
-<script src="js/calc.js?v=2.9.10"></script>
-<script src="js/nav.js?v=2.9.10"></script>
+<script src="js/schema.js?v=2.9.11"></script>
+<script src="js/common.js?v=2.9.11"></script>
+<script src="js/calc.js?v=2.9.11"></script>
+<script src="js/nav.js?v=2.9.11"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
 
@@ -692,6 +692,14 @@ async function saveGen(){
     const next=dedupe([...base,...recs],'revenue_id');
     const ok=await clearAndWrite(...W.S04,[H4,...rowsFor(H4,next)]);
     if(ok){revenues=next;msgs.push(`매출 ${recs.length}건`);}else allOk=false;
+  } else if(allOk&&(!c.start||!c.end||!c.revAmt)){
+    // v2.9.11: 매출 측 대칭 방어 — 기간·계약금액 소실로 매출 생성이 불가능해진 경우도 과거 매출 스케줄 방치 위험
+    const existOpen=revenues.filter(r=>r.project_id===c.pid&&r.is_received!=='Y');
+    if(existOpen.length&&confirm(`이 프로젝트는 기간·계약금액 정보가 없어 매출 스케줄을 생성할 수 없습니다.\n기존 미수 청구 ${existOpen.length}건이 남아 있습니다 — 삭제할까요?\n(취소 = 그대로 보존)`)){
+      const next=revenues.filter(r=>!(r.project_id===c.pid&&r.is_received!=='Y'));
+      const ok=await clearAndWrite(...W.S04,[H4,...rowsFor(H4,next)]);
+      if(ok){revenues=next;msgs.push(`매출 ${existOpen.length}건 삭제`);}else allOk=false;
+    }
   }
   if(allOk&&doCost){
     let base=costs;
@@ -706,6 +714,16 @@ async function saveGen(){
     const next=dedupe([...base,...recs],'cost_id');
     const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
     if(ok){costs=next;msgs.push(`매입 ${recs.length}건`);}else allOk=false;
+  } else if(allOk&&!c.hasEst){
+    // v2.9.11: 견적이 삭제되어 매입 생성이 불가능한 상태(genDoCost 비활성)에서는
+    // 매입 체크박스가 꺼져 이 분기 자체를 건너뛰어 과거 매입 스케줄이 방치되던 결함.
+    // 견적 소실은 "매입 계획이 없어졌다"는 의미이므로, 이 프로젝트의 미수취 매입을 정리할지 사용자에게 확인한다.
+    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date);
+    if(existOpen.length&&confirm(`이 프로젝트는 매입 견적이 없어 매입 스케줄을 생성할 수 없습니다.\n기존 미수취 매입 ${existOpen.length}건이 남아 있습니다 — 삭제할까요?\n(취소 = 그대로 보존)`)){
+      const next=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
+      const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
+      if(ok){costs=next;msgs.push(`매입 ${existOpen.length}건 삭제`);}else allOk=false;
+    }
   }
   btn.disabled=false;btn.textContent='생성 저장';
   if(allOk){toast(`✓ 스케줄 생성 완료: ${msgs.join(' · ')}`);closeGenModal();renderLists();}
