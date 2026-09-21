@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.11">
+<link rel="stylesheet" href="css/common.css?v=2.9.12">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -273,12 +273,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.11"></script>
-<script src="js/common.js?v=2.9.11"></script>
-<script src="js/calc.js?v=2.9.11"></script>
-<script src="js/nav.js?v=2.9.11"></script>
+<script src="js/schema.js?v=2.9.12"></script>
+<script src="js/common.js?v=2.9.12"></script>
+<script src="js/calc.js?v=2.9.12"></script>
+<script src="js/nav.js?v=2.9.12"></script>
 <script>
-let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[];
+let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 
 function wf(n){return comma(n)+'원';}
 let pendingAuth=null;
@@ -296,11 +296,13 @@ function nextId(list,key,prefix){
 // ── 로드 (재무필터 적용) ──
 async function loadAll(){
   try{
-    const [plR,prR,rvR,csR,fxR,esR]=await Promise.all([
+    const [plR,prR,rvR,csR,fxR,esR,msR]=await Promise.all([
       fetchSheet(...R.S01),fetchSheet(...R.S03),
       fetchSheet(...R.S04),fetchSheet(...R.S05),fetchSheet(...R.S06),
-      fetchSheet(...R.S12).catch(()=>[])]);
+      fetchSheet(...R.S12).catch(()=>[]),
+      fetchSheetSafe(...R.S17).catch(()=>null)]);
     estAll=toObj(esR).filter(e=>e.estimate_id);
+    milestones=toObj(msR||[]).filter(m=>m.project_id);
     pipelines=toObj(plR); allPrjs=toObj(prR);
     const pls=pipelines, prjs=allPrjs;
     revenues=dedupe(toObj(rvR),'revenue_id'); costs=dedupe(toObj(csR),'cost_id'); fixed=dedupe(toObj(fxR),'fixed_id');
@@ -584,11 +586,16 @@ function buildGen(){
 function ensureMsRows(c){
   const n=parseInt(document.getElementById('genRounds').value);
   if(document.querySelectorAll('#msRows .ms-row').length===n)return;
-  const ratios=n===4?[30,30,20,20]:[30,40,30];
-  const labels=n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금'];
+  // v2.9.12: 이 프로젝트에 저장된 마일스톤 설정이 있고 회차 수가 일치하면 그 값으로 복원(설계 결함 수정 —
+  // 그 전에는 회차 수·비율·기준일이 어디에도 저장되지 않아 모달을 다시 열 때마다 항상 기본값으로 초기화됐음).
+  const saved=milestones.find(m=>m.project_id===c.pid);
+  let items=null;
+  if(saved&&saved.items_json){ try{ const arr=JSON.parse(saved.items_json); if(arr.length===n) items=arr; }catch(e){} }
+  const ratios=items?items.map(x=>x.ratio):(n===4?[30,30,20,20]:[30,40,30]);
+  const labels=items?items.map(x=>x.label):(n===4?['계약금','중도금1','중도금2','잔금']:['계약금','중도금','잔금']);
   const sd=new Date(c.start), ed=new Date(c.end), span=ed-sd;
   document.getElementById('msRows').innerHTML=labels.map((lb,i)=>{
-    const d=new Date(sd.getTime()+span*(i/(n-1)));
+    const d=items?new Date(items[i].date):new Date(sd.getTime()+span*(i/(n-1)));
     return `<div class="ms-row"><span>${lb}</span>
       <input type="number" id="msR_${i}" value="${ratios[i]}" oninput="msCalc()">
       <input type="date" id="msD_${i}" value="${d.toISOString().slice(0,10)}" onchange="msCalc()"></div>`;}).join('');
@@ -679,6 +686,23 @@ async function saveGen(){
   if(doCost&&genCostRows.some(g=>!g.plan||!g.supply)){toast('매입: 수취예정일·금액을 확인하세요',true);return;}
   const btn=document.getElementById('genSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
   let allOk=true, msgs=[];
+  // v2.9.12: 용역턴키(마일스톤 방식)의 회차 설정을 S17에 저장 — 다음에 이 프로젝트를 다시 열면 ensureMsRows가 복원
+  if(c.biz==='용역턴키'){
+    const n=parseInt(document.getElementById('genRounds').value);
+    const rows=document.querySelectorAll('#msRows .ms-row');
+    if(rows.length===n){
+      const items=[...rows].map((row,i)=>({
+        label:row.querySelector('span').textContent,
+        ratio:parseFloat((document.getElementById('msR_'+i)||{}).value)||0,
+        date:(document.getElementById('msD_'+i)||{}).value||''
+      }));
+      const rec={project_id:c.pid,rounds:n,items_json:JSON.stringify(items),updated_at:new Date().toISOString().slice(0,10)};
+      const next=[...milestones.filter(m=>m.project_id!==c.pid),rec];
+      let ok=await clearAndWrite(...W.S17,[HEADERS.S17,...rowsFor(HEADERS.S17,next)]);
+      if(!ok){ await ensureSheet(R.S17[0],HEADERS.S17); ok=await clearAndWrite(...W.S17,[HEADERS.S17,...rowsFor(HEADERS.S17,next)]); } // 시트 미생성 시 자동 생성 후 1회 재시도
+      if(ok) milestones=next; // 그래도 실패하면 청구 스케줄 본 저장은 계속 진행(부가 정보 손실은 치명적이지 않음)
+    }
+  }
   if(doRev){
     let base=revenues;
     const existOpen=revenues.filter(r=>r.project_id===c.pid&&r.is_received!=='Y');

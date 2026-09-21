@@ -16,6 +16,7 @@ const R={ // 읽기 [시트명, 범위]
   S12:['S12_ESTIMATE','A1:O500'],
   S13:['S13_VAT','A1:N20'],
   S14:['S14_HISTORY','A1:H999'],
+  S17:['S17_MILESTONE','A1:D300'],
 };
 const W={ // 쓰기 [시트명, 범위]
   S01:['S01_PIPELINE','A:M'],
@@ -34,8 +35,12 @@ const W={ // 쓰기 [시트명, 범위]
   S12:['S12_ESTIMATE','A:O'],
   S13:['S13_VAT','A:N'],
   S14:['S14_HISTORY','A:H'],
+  S17:['S17_MILESTONE','A:D'],
 };
 const HEADERS={
+  // v2.9.12: 프로젝트별 마일스톤(회차) 설정 저장 — 1프로젝트=1행, rounds(회차 수)와 각 회차의 [항목명,비율,기준일]을
+  // JSON 문자열로 압축 저장(회차 수가 프로젝트마다 달라 고정 컬럼으로는 표현이 어려움). project_id로 조회.
+  S17:['project_id','rounds','items_json','updated_at'],
   S07:['profile_id','name','birth','gender','career_years','grade','military','address','phone','email','skills','buy_price','last_price','source','resume_link','status','avail_date','memo','updated_at'],
   S16:['item_id','profile_id','section','title','org','role','start','end','detail','lang','dbms','tool','sort'],
   S01:["pipeline_id", "opportunity", "client", "end_client", "probability", "contract_amount", "expected_start", "expected_end", "payment_cycle", "status", "memo", "created_at", "biz_type"],
