@@ -1,4 +1,7 @@
 // HFC nav.js v2.0 — 사이드바·탭바 단일 렌더(메뉴 변경은 이 파일만 수정)
+// v2.9.28: 배포 버전 표시 — 실제 실행 중인 배포가 어느 버전인지 화면에서 바로 구분할 수 있게(사용자 요청).
+// 새 버전 배포 시 이 상수 하나만 갱신하면 전 화면(사이드바+모바일 탭바)에 자동 반영된다.
+const HFC_VERSION='v2.9.28';
 const NAV_ITEMS=[
   ['dash','🏠','대시보드','index.html',true],
   ['pipeline','📋','사업기회','pipeline.html',true],
@@ -14,7 +17,8 @@ const NAV_ITEMS=[
 function renderNav(active){
   const sn=document.querySelector('nav.side-nav');
   if(sn) sn.innerHTML=NAV_ITEMS.map(([k,ic,label,href])=>
-    `<button class="side-nav-item${k===active?' active':''}" ${k===active?'':`onclick="location.href='${href}'"`}><span class="sn-icon">${ic}</span>${label}</button>`).join('\n');
+    `<button class="side-nav-item${k===active?' active':''}" ${k===active?'':`onclick="location.href='${href}'"`}><span class="sn-icon">${ic}</span>${label}</button>`).join('\n')
+    +`<div style="margin-top:auto;padding:10px 14px;font-size:11px;color:var(--text3,#94A3B8);border-top:1px solid var(--border,#E2E8F0)">HFC 경영관리 ${HFC_VERSION}</div>`;
   const tb=document.querySelector('nav.tab-bar');
   if(tb){
     const moreKeys=NAV_ITEMS.filter(x=>!x[4]).map(x=>x[0]);
@@ -24,8 +28,22 @@ function renderNav(active){
       +`<button class="tab-item${moreActive?' active':''}" onclick="toggleMoreNav()"><span class="tab-icon">⋯</span>더보기</button>`;
   }
 }
-document.addEventListener('DOMContentLoaded',()=>{ const p=document.body.dataset.page; if(p) renderNav(p); });
-if(document.readyState!=='loading'){ const p=document.body&&document.body.dataset.page; if(p) renderNav(p); }
+// v2.9.28: 모바일(사이드바 숨김)에서도 버전이 보이도록 헤더의 .app-logo에도 작게 배지 주입.
+// 클래스 선택자로 붙여 10개 화면 HTML을 개별 수정할 필요 없이 이 파일만 갱신하면 전체 반영된다.
+function renderVersionBadge(){
+  // profile.html은 헤더 클래스가 app-logo가 아니라 app-title이라 함께 선택(화면마다 헤더 클래스명이 갈리는
+  // 기존 비일관성 — 근본 통일은 별도 작업으로 남기고, 여기서는 두 클래스 다 대응해 배지 누락만 방지).
+  document.querySelectorAll('.app-logo, .app-title').forEach(el=>{
+    if(el.querySelector('.hfc-ver-badge')) return; // 중복 주입 방지
+    const b=document.createElement('span');
+    b.className='hfc-ver-badge';
+    b.style.cssText='color:var(--text3,#94A3B8);font-weight:400;font-size:10px;margin-left:8px;opacity:.7';
+    b.textContent=HFC_VERSION;
+    el.appendChild(b);
+  });
+}
+document.addEventListener('DOMContentLoaded',()=>{ const p=document.body.dataset.page; if(p) renderNav(p); renderVersionBadge(); });
+if(document.readyState!=='loading'){ const p=document.body&&document.body.dataset.page; if(p) renderNav(p); renderVersionBadge(); }
 
 // v2.5.3: 모바일 하단 탭 [더보기] — 고정비·부가세·설정 진입 경로
 function toggleMoreNav(){
