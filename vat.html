@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.26">
+<link rel="stylesheet" href="css/common.css?v=2.9.27">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -102,10 +102,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.26"></script>
-<script src="js/common.js?v=2.9.26"></script>
-<script src="js/calc.js?v=2.9.26"></script>
-<script src="js/nav.js?v=2.9.26"></script>
+<script src="js/schema.js?v=2.9.27"></script>
+<script src="js/common.js?v=2.9.27"></script>
+<script src="js/calc.js?v=2.9.27"></script>
+<script src="js/nav.js?v=2.9.27"></script>
 <script>
 let vats=[],revs=[],costs=[],fixedTax=[],prjMap={},selQ=null;
 const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
@@ -133,7 +133,15 @@ async function loadAll(){
     renderQuarters();
   }catch(e){toast('로드 실패: '+e.message,true);}
 }
-function vatOf(r,base){return num(r.vat_amt)||Math.round((parseInt(r[base])||0)*.1);}
+// v2.9.27: vat_amt가 명시적으로 0인 경우(계산서 없음, 사업소득형·급여형 매입)를 "값 없음"으로 오인해
+// amount*10%로 폴백 계산하던 결함 수정 — 이 폴백은 vat_amt 필드 자체가 비어있을 때만 적용해야 한다.
+// (구 코드 `num(r.vat_amt)||...`는 0이 falsy라 항상 폴백을 태워, 계산서 없는 매입에도 부가세가 잡히는
+// 심각한 오류로 이어질 뻔했다 — 지급형태 3종 도입의 핵심 목적을 무력화하는 지점이었음.)
+function vatOf(r,base){
+  const raw=(r.vat_amt??'').toString().trim();
+  if(raw!=='') return num(r.vat_amt);
+  return Math.round((parseInt(r[base])||0)*.1);
+}
 function calcQ(code){
   const q=QINFO[code];
   const sRows=revs.filter(r=>q.months.includes(r.year_month));

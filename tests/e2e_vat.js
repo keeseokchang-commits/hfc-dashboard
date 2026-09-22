@@ -87,6 +87,35 @@ async function run() {
     s.check(c.pVatPrj === 700000, 'v2.9.24: 세금계산서형(외주) 매입만 S05에 존재 → 매입세액 정확히 반영');
   }
 
+  // ── v2.9.27: vatOf가 vat_amt=0(계산서없음, 의도된 값)을 falsy로 오인해 amount*10%로 폴백하던
+  //           결함 — 세금계산서형과 계산서없음 매입이 혼재할 때, 계산서없음 건이 매입세액에
+  //           잘못 잡히지 않아야 한다(자금수지는 전액 반영되지만 부가세는 세금계산서형만). ──
+  {
+    const sheetData = baseSheet(
+      [['revenue_id']],
+      [['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'],
+        ['C1','PRJ-1','2026-08','외주비','','','','7000000','2026-09-30','매입 스케줄 자동생성',700000,'2026-08-31','','',''],
+        ['C2','PRJ-1','2026-08','인건비(계산서없음)','','','','8000000','2026-09-30','매입 스케줄 자동생성(계산서없음, 월합산)',0,'','','','']],
+      [['vat_id']]
+    );
+    const { dom } = await openPage(ROOT, portFor('vatzero'), 'vat.html', sheetData, {});
+    const w = dom.window;
+    const c = w.eval("calcQ('2P')"); // 2026-08은 2P(7~9월)
+    s.check(c.pVatPrj === 700000,
+      'v2.9.27: vat_amt=0(계산서없음) 건이 amount*10%로 폴백되지 않고 정확히 0 처리(세금계산서형 70만원만 반영)');
+
+    // 회귀: vat_amt 필드 자체가 완전히 비어있는(v2.9.24 이전 구버전) 데이터는 여전히 폴백 계산되어야 함
+    const sheetDataOld = baseSheet(
+      [['revenue_id']],
+      [['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'],
+        ['C1','PRJ-1','2026-08','외주비','','','','7000000','2026-09-30','',  '','2026-08-31','','','']],
+      [['vat_id']]
+    );
+    const { dom: dom2 } = await openPage(ROOT, portFor('vatzero2'), 'vat.html', sheetDataOld, {});
+    const c2 = dom2.window.eval("calcQ('2P')");
+    s.check(c2.pVatPrj === 700000, 'v2.9.27 회귀: vat_amt 완전 공백인 구버전 데이터는 amount*10% 폴백 유지');
+  }
+
   return s;
 }
 
