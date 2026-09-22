@@ -109,6 +109,44 @@ async function run() {
       'v2.9.23: 저장된 JSON에 4개월 전부 명시(9월=오버라이드값, 나머지=단가)');
   }
 
+  // ── v2.9.26: 사업소득형 매입금액이 저장→재조회를 거쳐도 MM만큼 곱해지지 않아야 함(사용자 신고 버그) ──
+  // 원인: 저장 시 buy(단가)×mm으로 총액화한 값을 buy_price에 넣었는데, 재조회 시 이 총액을 다시 "단가"로
+  // 오인해 화면의 buy 필드에 복원 → 다음 저장 때 또 mm을 곱해 이중 반영됨. 해결: 단가(buy)와 금액(buyAmount)을
+  // 별도 필드로 분리해, 사업소득형은 항상 buyAmount만 사용(mm 곱셈 없음).
+  {
+    const sheetData = baseSheet([['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at']]);
+    const wc = {};
+    const { dom } = await openPage(ROOT, portFor('bizamount'), 'estimate.html', sheetData, { writeCapture: wc, confirm: () => true });
+    const w = dom.window, d = w.document;
+    w.eval('accessToken="t"');
+    d.getElementById('oppSel').value = 'PL-999';
+    w.eval('loadOpp()');
+    await new Promise(r => setTimeout(r, 100));
+    w.eval(`labor=[{name:'김기황',grade:'고급',setId:'',sell:0,buy:0,buyAmount:9369234,start:'',end:'',mm:0,payType:'사업소득형'}]`);
+    w.eval('renderLabor();');
+    await new Promise(r => setTimeout(r, 50));
+    const dateInputs = [...d.querySelectorAll('#laborList input[type=date]')];
+    dateInputs[0].value = '2026-08-03'; dateInputs[0].dispatchEvent(new w.Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    dateInputs[1].value = '2026-09-02'; dateInputs[1].dispatchEvent(new w.Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    s.check(w.eval('laborBuyTotal(labor[0])') === 9369234, 'v2.9.26: 사업소득형 매입금액은 MM(1)과 무관하게 그대로');
+    await w.eval('saveEstimate()');
+    await new Promise(r => setTimeout(r, 300));
+    const row = (wc.S12 || []).slice(1).find(r => r[3] === '김기황');
+    s.check(row && row[8] === 9369234, 'v2.9.26: 저장된 buy_price가 이중계산 없이 9,369,234 그대로');
+
+    // 재조회(새 세션) — 여기서 MM만큼 늘어나는 게 신고된 버그였음
+    const sheetData2 = baseSheet(wc.S12);
+    const { dom: dom2 } = await openPage(ROOT, portFor('bizamount2'), 'estimate.html', sheetData2, { confirm: () => true });
+    const w2 = dom2.window, d2 = w2.document;
+    d2.getElementById('oppSel').value = 'PL-999';
+    w2.eval('loadOpp()');
+    await new Promise(r => setTimeout(r, 100));
+    s.check(w2.eval('laborBuyTotal(labor[0])') === 9369234,
+      'v2.9.26: 재조회해도 매입금액이 9,369,234 그대로(MM만큼 늘어나지 않음 — 신고된 버그 재현 방지)');
+  }
+
   return s;
 }
 
