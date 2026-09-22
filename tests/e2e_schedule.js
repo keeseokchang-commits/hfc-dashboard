@@ -94,6 +94,46 @@ async function run() {
       'v2.9.15/16: 견적 없이 직접입력(70,000,000)으로 매입 3건 정상 저장');
   }
 
+  // ── v2.9.24: 급여형·사업소득형은 세금계산서가 없으므로 매입 스케줄(S05) 생성 대상에서 제외되어야 함.
+  //           세금계산서형(외주)만 매입 스케줄에 반영, 3종 혼합 시에도 매출은 전원 포함·매입은 세금계산서형만. ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
+        ['PL-999','테스트','고객','','80','30000000','2026-09-01','2027-03-31','기타','수주','','','인력공급']],
+      S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
+        ['PRJ-999','PL-999','테스트PJ','고객','30000000','2026-09-01','2027-03-31','수주']],
+      S04_REVENUE: [['revenue_id']], S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
+      // 외주업체(세금계산서형)+프리랜서(사업소득형)+정직원(급여형) 3인 혼합
+      S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
+        ['E1','PL-999','인건비','외주업체','특급','','','13000000','7000000','','7','2026-09-01','2027-03-31','',''],
+        ['E2','PL-999','인건비','프리랜서','고급','','','10000000','8000000','','7','2026-09-01','2027-03-31','사업소득형',''],
+        ['E3','PL-999','인건비','정직원','초급','','','0','2400000','','7','2026-09-01','2027-03-31',
+          '급여형|{"2026-09":2400000,"2026-10":2400000,"2026-11":2400000,"2026-12":2400000,"2027-01":2400000,"2027-02":2400000,"2027-03":2400000}','']],
+    };
+    const { dom } = await require('./_e2e_helpers').openPage(ROOT, portFor('salaried-sched'), 'input.html', sheetData, {});
+    const w = dom.window, d = w.document;
+    w.eval('openGenModal(true)');
+    d.getElementById('genPrj').value = 'PRJ-999';
+    w.eval('onGenPrjChange()');
+    await new Promise(r => setTimeout(r, 100));
+    const c = w.eval('genCtx()');
+    s.check(c.eSell === 161000000, 'v2.9.24: 매출은 지급형태 무관하게 3인 전원 포함(161,000,000)');
+    s.check(c.eBuy === 49000000, 'v2.9.24: 매입은 세금계산서형(외주업체)만 포함(49,000,000, 나머지 2인 제외)');
+
+    // 급여형만 단독으로 있으면 매입 생성 자체가 불가능해야 함(canCost=false)
+    const sheetData2 = { ...sheetData,
+      S12_ESTIMATE: [sheetData.S12_ESTIMATE[0], sheetData.S12_ESTIMATE[3]] };
+    const { dom: dom2 } = await require('./_e2e_helpers').openPage(ROOT, portFor('salaried-only'), 'input.html', sheetData2, {});
+    const w2 = dom2.window, d2 = w2.document;
+    w2.eval('openGenModal(true)');
+    d2.getElementById('genPrj').value = 'PRJ-999';
+    w2.eval('onGenPrjChange()');
+    await new Promise(r => setTimeout(r, 100));
+    const c2 = w2.eval('genCtx()');
+    s.check(c2.eBuy === 0 && c2.canCost === false, 'v2.9.24: 급여형만 있으면 매입 스케줄 생성 자체가 불가능(canCost=false)');
+    s.check(d2.getElementById('genDoCost').disabled === true, 'v2.9.24: 급여형만 있을 때 매입 체크박스 비활성화');
+  }
+
   return s;
 }
 

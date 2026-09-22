@@ -69,6 +69,24 @@ async function run() {
     s.check(c.pVat === 350000, 'v2.9.22: 총 매입세액=프로젝트+기타경비 합산(35만원)');
   }
 
+  // ── v2.9.24: 급여형·사업소득형은 S05(매입)에 애초에 생성되지 않으므로(input.html에서 필터),
+  //           부가세 계산(vat.html, S05만 조회)에도 자동으로 안 새어들어가야 함. 방어선이 근원(생성 단계)에
+  //           있으므로 vat.html 자체 로직 변경은 필요 없지만, S05에 실수로 그런 행이 들어간 경우까지 대비해
+  //           명시적으로 확인 — S05는 세금계산서 기반 매입만 들어온다는 전제가 깨지지 않는지 점검.
+  {
+    const sheetData = baseSheet(
+      [['revenue_id']],
+      // 정상 흐름이라면 S05에는 세금계산서형(외주)만 들어와야 한다 — 이 케이스는 그 정상 상태를 확인.
+      [['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'],
+        ['C1','PRJ-1','2026-02','외주비','','','','7000000','2026-02-28','매입 스케줄 자동생성','700000','2026-02-28','','','']],
+      [['vat_id']]
+    );
+    const { dom } = await openPage(ROOT, portFor('vatinvoice'), 'vat.html', sheetData, {});
+    const w = dom.window;
+    const c = w.eval("calcQ('1P')");
+    s.check(c.pVatPrj === 700000, 'v2.9.24: 세금계산서형(외주) 매입만 S05에 존재 → 매입세액 정확히 반영');
+  }
+
   return s;
 }
 

@@ -61,6 +61,18 @@ function monthlyProfile(items,priceField,defStart,defEnd){
   const _n=v=>parseInt(String(v??'').replace(/,/g,''))||0;
   const byM={};
   items.forEach(e=>{
+    // v2.9.23: 급여형 인건비(memo="급여형|{월별지급액 JSON}")는 회사 급여대장에서 이미 확정된 월별 금액을
+    // 그대로 반영해야 한다 — mmMonthly(시작~종료일 기준 일할계산)를 타면 여러 달에 걸친 단가가 다시
+    // 일할 분배되어 총액이 왜곡된다(사용자 지적으로 발견된 논리 오류). 매출(unit_price)에는 이 개념이
+    // 없으므로(매출 견적은 지급형태 무관하게 항상 일할계산) priceField가 buy_price일 때만 적용한다.
+    const isSalaried=e.comp_type==='인건비'&&(e.memo||'').startsWith('급여형')&&priceField==='buy_price';
+    if(isSalaried){
+      let monthlyOverride={};
+      const jsonPart=(e.memo||'').split('|').slice(1).join('|');
+      if(jsonPart){ try{ monthlyOverride=JSON.parse(jsonPart)||{}; }catch(err){ monthlyOverride={}; } }
+      Object.keys(monthlyOverride).forEach(k=>{ byM[k]=(byM[k]||0)+(_n(monthlyOverride[k])); });
+      return;
+    }
     const p=_n(e[priceField]); if(!p)return;
     if(e.comp_type==='인건비'){
       mmMonthly(e.start_date||defStart,e.end_date||defEnd).forEach(x=>{

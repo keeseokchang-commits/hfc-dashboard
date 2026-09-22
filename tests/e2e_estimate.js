@@ -64,7 +64,9 @@ async function run() {
     s.check(w.eval('labor.length') === 1, 'v2.9.13 회귀: 진짜 신규 견적은 빈 행 자동 추가 유지');
   }
 
-  // ── v2.9.17/18: 한 사람 두 행(사업소득형/급여형) + 급여형 MM=1 고정, 이중계산 없음 ──
+  // ── v2.9.17/18/23: 한 사람 두 행(사업소득형/급여형) + 급여형 월별 지급액(부분월 실정산+만근월 단가) ──
+  // v2.9.18(MM=1 고정)은 여러 달에 걸친 급여형 총액이 반영 안 되는 논리 오류였음(사용자 지적, 2026-09-14) —
+  // v2.9.23에서 "월별 지급액 편집" 방식으로 재설계. 이 테스트도 새 설계 기준으로 갱신.
   {
     const sheetData = baseSheet([['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at']]);
     const wc = {};
@@ -74,9 +76,9 @@ async function run() {
     d.getElementById('oppSel').value = 'PL-999';
     w.eval('loadOpp()');
     await new Promise(r => setTimeout(r, 100));
-    // 급여형: 9/15 입사(어중간한 날짜)인데 실지급액을 그대로 입력 — 이중 일할계산 없어야 함
+    // 급여형: 9/15 입사(부분월)~12/31, 월 240만원. 9월만 실정산액(120만)으로 오버라이드, 10~12월은 단가 그대로.
     w.eval(`labor=[
-      {name:'박신입',grade:'초급',setId:'',sell:0,buy:1200000,start:'',end:'',mm:0,payType:'급여형'},
+      {name:'박신입',grade:'초급',setId:'',sell:0,buy:2400000,start:'',end:'',mm:0,payType:'급여형',monthlyOverride:{}},
       {name:'이무헌',grade:'특급',setId:'',sell:13000000,buy:7000000,start:'2026-09-01',end:'2027-03-31',mm:7,payType:'사업소득형'}
     ]`);
     w.eval('renderLabor();');
@@ -84,20 +86,27 @@ async function run() {
     const dateInputs = [...d.querySelectorAll('#laborList input[type=date]')];
     dateInputs[0].value = '2026-09-15'; dateInputs[0].dispatchEvent(new w.Event('change', { bubbles: true }));
     await new Promise(r => setTimeout(r, 50));
-    dateInputs[1].value = '2026-09-30'; dateInputs[1].dispatchEvent(new w.Event('change', { bubbles: true }));
+    dateInputs[1].value = '2026-12-31'; dateInputs[1].dispatchEvent(new w.Event('change', { bubbles: true }));
     await new Promise(r => setTimeout(r, 50));
-    s.check(w.eval('labor[0].mm') === 1, 'v2.9.18: 급여형은 어중간한 입사일이어도 MM=1 고정');
-    s.check(d.getElementById('mm_0').disabled === true, 'v2.9.18: 급여형 MM 입력칸 비활성화');
-    s.check(Math.round(w.eval('labor[0].buy*labor[0].mm')) === 1200000, 'v2.9.18: 급여형 원가=실지급액 그대로(이중계산 없음)');
+    const ovInputs = [...d.querySelectorAll('#laborList .fr3 + div input')];
+    s.check(ovInputs.length === 4, 'v2.9.23: 급여형 월별 지급액 편집칸이 근무 개월수(4개월)만큼 렌더됨');
+    ovInputs[0].value = '1200000';
+    ovInputs[0].dispatchEvent(new w.Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    s.check(w.eval('laborBuyTotal(labor[0])') === 8400000, 'v2.9.23: 부분월(120만)+만근3개월(240만×3)=840만원 정확 합산');
 
     await w.eval('saveEstimate()');
     await new Promise(r => setTimeout(r, 300));
     const rows = (wc.S12 || []).slice(1).filter(r => r[2] === '인건비');
     const salaried = rows.find(r => r[3] === '박신입');
     const biz = rows.find(r => r[3] === '이무헌');
-    s.check(salaried && salaried[13] === '급여형', 'v2.9.17: 급여형은 memo="급여형"으로 저장');
-    s.check(biz && biz[13] === '', 'v2.9.17: 사업소득형은 memo=공백으로 저장(기존 데이터 호환)');
-    s.check(salaried && salaried[8] === 1200000, 'v2.9.17: 급여형 매입단가(buy_price) 실지급액 그대로 저장');
+    s.check(salaried && salaried[13].startsWith('급여형|'), 'v2.9.23: 급여형은 memo="급여형|{월별JSON}"으로 저장');
+    // v2.9.24: 세금계산서형(계산서 발행, memo=공백)과 구분하기 위해 사업소득형도 명시 태그 필요해짐
+    s.check(biz && biz[13] === '사업소득형', 'v2.9.24: 사업소득형은 memo="사업소득형"으로 명시 저장(세금계산서형과 구분)');
+    s.check(salaried && salaried[8] === 8400000, 'v2.9.23: 급여형 buy_price는 월별 지급액 합계(8,400,000)로 저장');
+    const savedJson = JSON.parse(salaried[13].split('|').slice(1).join('|'));
+    s.check(Object.keys(savedJson).length === 4 && savedJson['2026-09'] === 1200000,
+      'v2.9.23: 저장된 JSON에 4개월 전부 명시(9월=오버라이드값, 나머지=단가)');
   }
 
   return s;

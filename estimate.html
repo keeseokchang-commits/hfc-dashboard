@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.22">
+<link rel="stylesheet" href="css/common.css?v=2.9.24">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.22"></script>
-<script src="js/common.js?v=2.9.22"></script>
-<script src="js/calc.js?v=2.9.22"></script>
-<script src="js/nav.js?v=2.9.22"></script>
+<script src="js/schema.js?v=2.9.24"></script>
+<script src="js/common.js?v=2.9.24"></script>
+<script src="js/calc.js?v=2.9.24"></script>
+<script src="js/nav.js?v=2.9.24"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -201,10 +201,24 @@ function loadOpp(){
   // v2.9.17: 지급형태(사업소득형/급여형) — 한 인력이 두 형태로 나뉘어 지급되는 경우(예: 최저임금 급여+사업소득 인센티브)를
   // 각각 별도 행으로 등록하기 위한 구분값. 스키마 변경 없이 기존 memo 필드(인건비 행에서는 항상 빈 값이었음)를 재사용.
   labor=saved.filter(e=>e.comp_type==='인건비').map(e=>{
-    const payType=e.memo==='급여형'?'급여형':'사업소득형';
+    // v2.9.24: 지급형태 3종 — 세금계산서형(외주, memo 공백=기존 데이터 기본값)/사업소득형(memo="사업소득형")/
+    // 급여형(memo="급여형|{JSON}"). memo가 비어있으면 v2.9.17 이전 데이터이거나 세금계산서형으로 간주 —
+    // 이 유형만 청구 스케줄(S05 매입)에 실제로 생성되므로 "계산서 발행분이 견적에서 누락된다"는 문제를 해소.
+    const isSalaried=(e.memo||'').startsWith('급여형');
+    const isBiz=(e.memo||'')==='사업소득형';
+    let monthlyOverride={};
+    if(isSalaried){
+      const jsonPart=(e.memo||'').split('|').slice(1).join('|');
+      if(jsonPart){ try{ monthlyOverride=JSON.parse(jsonPart)||{}; }catch(err){ monthlyOverride={}; } }
+    }
+    const payType=isSalaried?'급여형':(isBiz?'사업소득형':'세금계산서형');
+    // 급여형의 buy_price는 저장 시 "월별 합계 총액"이었으므로, 대표 단가(화면 표시용)는 오버라이드 없는
+    // 달의 값이나, 오버라이드된 값이 있으면 그중 하나를 기준값으로 복원(정확한 개별월 값은 monthlyOverride가 근거).
+    const ovVals=Object.values(monthlyOverride);
+    const buyDisplay=isSalaried?(ovVals.length?ovVals[0]:0):(num(e.buy_price)||0);
     return {name:e.item_name,grade:e.grade,setId:e.grade_set_id,
-      sell:num(e.unit_price)||0,buy:num(e.buy_price)||0,start:e.start_date,end:e.end_date,
-      mm:payType==='급여형'?1:(numF(e.mm)||0),payType}; // 급여형은 로드 시에도 MM=1 강제(과거 오입력 방어)
+      sell:num(e.unit_price)||0,buy:buyDisplay,start:e.start_date,end:e.end_date,
+      mm:numF(e.mm)||0,payType,monthlyOverride};
   });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
@@ -228,8 +242,10 @@ function addLabor(re=true){
   const setId=document.getElementById('rateSetSel').value;
   const g=gradesOf(setId)[1]||gradesOf(setId)[0]||{};
   const s=cur?.expected_start||'',e=cur?.expected_end||'';
+  // v2.9.24: 기본 지급형태=세금계산서형(사업자 외주) — 청구 스케줄 자동 생성이 원래 이 유형을 전제로
+  // 설계되어 있었고(cost_type='외주비', invoice_plan_date, vat_amt 자동 계산), 실무상 가장 흔한 형태이기도 함.
   labor.push({name:'',grade:g.grade||'중급',setId,sell:num(g.sell_price)||0,buy:num(g.buy_price)||0,
-    start:s,end:e,mm:parseFloat(mmTotal(s,e))||0,payType:'사업소득형'});
+    start:s,end:e,mm:parseFloat(mmTotal(s,e))||0,payType:'세금계산서형'});
   if(re)renderLabor();recalc();
 }
 function renderLabor(){
@@ -248,11 +264,14 @@ function renderLabor(){
       <div class="fr">
         <div><label class="fl">지급형태</label>
           <select class="fi" onchange="setPayType(${i},this.value)">
-            <option value="사업소득형" ${p.payType!=='급여형'?'selected':''}>사업소득형 (3.3% 원천징수)</option>
-            <option value="급여형" ${p.payType==='급여형'?'selected':''}>급여형 (4대보험)</option>
+            <option value="세금계산서형" ${(!p.payType||p.payType==='세금계산서형')?'selected':''}>세금계산서형 (사업자 외주, 계산서 발행)</option>
+            <option value="사업소득형" ${p.payType==='사업소득형'?'selected':''}>사업소득형 (3.3% 원천징수, 계산서 없음)</option>
+            <option value="급여형" ${p.payType==='급여형'?'selected':''}>급여형 (4대보험, 계산서 없음)</option>
           </select></div>
         <div style="font-size:11px;color:var(--text3);align-self:flex-end;padding-bottom:8px">
-          ${p.payType==='급여형'?'매입 단가에 4대보험·소득세 포함 회사 실지급 총액을 직접 입력하세요':'매입 단가에 세금계산서 없이 지급하는 사업소득 금액을 입력하세요'}
+          ${p.payType==='급여형'?'매입 단가에 4대보험·소득세 포함 회사 실지급 총액을 직접 입력하세요(청구 스케줄 생성 시 매입 목록에 포함되지 않음)'
+            :p.payType==='사업소득형'?'매입 단가에 3.3% 원천징수 후 지급하는 사업소득 금액을 입력하세요(청구 스케줄 생성 시 매입 목록에 포함되지 않음)'
+            :'매입 단가에 세금계산서 공급가액을 입력하세요 — 청구 스케줄 생성 시 매입 목록(부가세 매입세액공제 대상)으로 자동 생성됩니다'}
         </div>
       </div>
       <div class="fr">
@@ -262,13 +281,45 @@ function renderLabor(){
       <div class="fr3">
         <div><label class="fl">시작예정일</label><input class="fi" type="date" value="${p.start}" onchange="labor[${i}].start=this.value;autoMM(${i})"></div>
         <div><label class="fl">종료예정일</label><input class="fi" type="date" value="${p.end}" onchange="labor[${i}].end=this.value;autoMM(${i})"></div>
-        <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 항상 1':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" ${p.payType==='급여형'?'disabled':''} oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
+        <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 월별 지급액 합계':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" disabled oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
       </div>
+      ${p.payType==='급여형'?monthlyOverrideHtml(p,i):''}
       <div style="text-align:right;font-size:12px;color:var(--text2)">
-        매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(Math.round(p.buy*p.mm))}</b>
+        매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(laborBuyTotal(p))}</b>
       </div>
     </div>`).join('')||'<div class="empty">인력을 추가하세요</div>';
 }
+// v2.9.23: 급여형 월별 지급액 편집 — 입사·퇴사가 월초·말일이 아닌 경우(만근 아닌 달) 실제 정산액을
+// 직접 입력할 수 있어야 함(사용자 확정, 2026-09-14). 기본은 "모든 달=매입단가 그대로", 오버라이드한
+// 달만 그 값을 사용. 청구 스케줄 생성(input.html)도 이 오버라이드를 그대로 반영해야 일할계산과 이중으로
+// 어긋나지 않는다 — genCtx가 이 값을 각 인건비 항목의 monthlyOverride로 넘겨받아 사용.
+function monthlyOverrideHtml(p,i){
+  if(!p.start||!p.end) return '<div style="font-size:11px;color:var(--text3);padding:4px 0">시작·종료일을 입력하면 월별 지급액을 편집할 수 있습니다</div>';
+  const months=ymList(p.start,p.end);
+  if(!months.length) return '';
+  p.monthlyOverride=p.monthlyOverride||{};
+  return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">월별 지급액(급여형) — 만근이 아닌 달(입사·퇴사월 등)은 실제 정산액으로 수정하세요</div>
+    ${months.map(m=>{
+      const key=`${m.y}-${pad2(m.m)}`;
+      const isFull=m.w>=0.999;
+      const val=(p.monthlyOverride[key]!==undefined)?p.monthlyOverride[key]:p.buy;
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:11px;width:56px;color:var(--text2)">${key}${isFull?'':' (부분월)'}</span>
+        <input class="fi" style="flex:1" value="${comma(val)}" oninput="this.value=comma(this.value);labor[${i}].monthlyOverride['${key}']=un(this.value);recalcLaborMM(${i});recalc()">
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+// 급여형 인력의 실제 원가(월별 오버라이드 합) — 미오버라이드 달은 매입단가 그대로 반영
+function laborBuyTotal(p){
+  if(p.payType!=='급여형') return Math.round(p.buy*p.mm);
+  if(!p.start||!p.end) return Math.round(p.buy*p.mm);
+  const months=ymList(p.start,p.end);
+  return months.reduce((s,m)=>{const key=`${m.y}-${pad2(m.m)}`; const v=(p.monthlyOverride&&p.monthlyOverride[key]!==undefined)?p.monthlyOverride[key]:p.buy; return s+v;},0);
+}
+// 급여형 MM 표시값을 "월별 지급액 합계 ÷ 단가"로 근사(견적 요약 화면의 대략적 개월수 표시용, 청구스케줄은 monthlyOverride를 직접 사용)
+function recalcLaborMM(i){const p=labor[i]; if(p.payType!=='급여형'||!p.buy) return; p.mm=Math.round((laborBuyTotal(p)/p.buy)*100)/100;}
 function pickGrade(i,grade){
   const setId=document.getElementById('rateSetSel').value;
   const g=gradesOf(setId).find(x=>x.grade===grade);
@@ -277,16 +328,16 @@ function pickGrade(i,grade){
   renderLabor();recalc();
 }
 function setPayType(i,v){const p=labor[i];p.payType=v;
-  // v2.9.18: 급여형으로 전환 시 MM을 즉시 1로 고정(이미 mmTotal로 계산해둔 소수 MM이 남아있으면 이중 일할 계산 위험).
-  // 사업소득형으로 되돌리면 시작·종료일이 있는 경우 다시 정밀 일할 계산을 적용.
-  if(v==='급여형') p.mm=1;
+  // v2.9.23: 급여형은 월별 지급액(monthlyOverride)을 합산하는 방식으로 재설계(v2.9.18의 MM=1 고정은
+  // 여러 달에 걸친 급여형 인력의 총액이 반영 안 되는 논리 오류였음 — 사용자 지적으로 확인·수정).
+  if(v==='급여형'){ p.monthlyOverride=p.monthlyOverride||{}; recalcLaborMM(i); }
   else if(p.start&&p.end) p.mm=parseFloat(mmTotal(p.start,p.end))||0;
   renderLabor();recalc();}
 function autoMM(i){const p=labor[i];
-  // v2.9.18: 급여형은 회사 급여대장에서 이미 일할 계산된 실지급액을 그대로 입력하는 방식(사용자 확정) —
-  // mmTotal(투입~철수 정밀 월할)을 여기서 다시 곱하면 이중 일할 계산이 되어 금액이 왜곡된다.
-  // 따라서 급여형은 시작·종료일을 입력해도 MM을 항상 1로 고정(입력 금액 자체가 이미 그 기간의 완결된 지급액).
-  p.mm=p.payType==='급여형'?1:(parseFloat(mmTotal(p.start,p.end))||0);
+  // v2.9.23: 급여형은 시작·종료일이 바뀌면 월별 지급액 목록도 다시 구성해야 하므로 monthlyOverride를
+  // 유지한 채(기존 입력값 보존) recalcLaborMM으로 합계만 갱신 — mmTotal의 소수 일할계산은 쓰지 않는다.
+  if(p.payType==='급여형'){ p.monthlyOverride=p.monthlyOverride||{}; recalcLaborMM(i); }
+  else p.mm=parseFloat(mmTotal(p.start,p.end))||0;
   document.getElementById('mm_'+i).value=p.mm;renderLabor();recalc();}
 
 // ── 인프라·솔루션·기타 ──
@@ -383,10 +434,23 @@ async function saveEstimate(){
   const others=estimates.filter(e=>e.pipeline_id!==cur.pipeline_id);
   let n=estimates.reduce((m,e)=>{const x=parseInt((e.estimate_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,x);},0);
   const rows=[];
-  labor.forEach(p=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
+  labor.forEach(p=>{n++;
+    // v2.9.23: 급여형은 월별 지급액이 실제 원가의 근거이므로 memo에 JSON으로 함께 저장. 저장 시점에
+    // 오버라이드 안 한 달도 전부 "기본 매입단가"로 명시적으로 채워 완전한 맵을 만든다 — 그래야 청구
+    // 스케줄 생성(input.html) 쪽에서 견적서의 p.buy(대표단가) 없이도 각 달 금액을 그대로 복원할 수 있다.
+    let fullOverride={};
+    if(p.payType==='급여형'&&p.start&&p.end){
+      ymList(p.start,p.end).forEach(m=>{const key=`${m.y}-${pad2(m.m)}`;
+        fullOverride[key]=(p.monthlyOverride&&p.monthlyOverride[key]!==undefined)?p.monthlyOverride[key]:p.buy;});
+    }
+    // v2.9.24: 사업소득형은 memo="사업소득형"으로 명시 태그(세금계산서형=memo 공백과 구분 필요 —
+    // 이전에는 태그가 없어 "사업소득형"과 "v2.9.17 이전 기존 데이터(=세금계산서형)"를 구분할 수 없었음).
+    const memo=p.payType==='급여형'?`급여형|${JSON.stringify(fullOverride)}`:(p.payType==='사업소득형'?'사업소득형':'');
+    const buyTotal=p.payType==='급여형'?Object.values(fullOverride).reduce((s,v)=>s+(parseInt(v)||0),0):Math.round(p.buy*p.mm);
+    rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
     comp_type:'인건비',item_name:p.name||`${p.grade} 인력`,grade:p.grade,grade_set_id:p.setId,qty:1,
-    unit_price:p.sell,buy_price:p.buy,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
-    memo:p.payType==='급여형'?'급여형':'',created_at:today});});
+    unit_price:p.sell,buy_price:buyTotal,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
+    memo,created_at:today});});
   [['infra','인프라'],['sol','솔루션'],['etc','기타']].forEach(([k,ct])=>{
     items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
       comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:it.buy||0,
