@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.15">
+<link rel="stylesheet" href="css/common.css?v=2.9.22">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -102,12 +102,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.15"></script>
-<script src="js/common.js?v=2.9.15"></script>
-<script src="js/calc.js?v=2.9.15"></script>
-<script src="js/nav.js?v=2.9.15"></script>
+<script src="js/schema.js?v=2.9.22"></script>
+<script src="js/common.js?v=2.9.22"></script>
+<script src="js/calc.js?v=2.9.22"></script>
+<script src="js/nav.js?v=2.9.22"></script>
 <script>
-let vats=[],revs=[],costs=[],prjMap={},selQ=null;
+let vats=[],revs=[],costs=[],fixedTax=[],prjMap={},selQ=null;
 const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
   '1F':{name:'1기 확정',months:['2026-04','2026-05','2026-06'],due:'2026-07-25',payYm:'2026-07'},
   '2P':{name:'2기 예정',months:['2026-07','2026-08','2026-09'],due:'2026-10-25',payYm:'2026-10'},
@@ -117,9 +117,10 @@ function wf(n){return comma(n)+'원';}
 let pendingAuth=null;
 async function loadAll(){
   try{
-    const [vtR,rvR,csR,plR,prR]=await Promise.all([
+    const [vtR,rvR,csR,plR,prR,fxR]=await Promise.all([
       fetchSheet(...R.S13),fetchSheet(...R.S04),
-      fetchSheet(...R.S05),fetchSheet(...R.S01),fetchSheet(...R.S03)]);
+      fetchSheet(...R.S05),fetchSheet(...R.S01),fetchSheet(...R.S03),
+      fetchSheetSafe(...R.S06).catch(()=>null)]); // v2.9.22: 기타경비(고정비) 세금계산서 매입세액 반영
     vats=dedupe(toObj(vtR).filter(v=>v.vat_id),'vat_id');
     const pls=toObj(plR),prjs=toObj(prR);
     // 재무 필터
@@ -128,6 +129,7 @@ async function loadAll(){
     prjs.forEach(p=>prjMap[p.project_id]=p.project_name);
     revs=toObj(rvR).filter(r=>r.revenue_id&&okPrj.has(r.project_id));
     costs=toObj(csR).filter(c=>c.cost_id&&okPrj.has(c.project_id));
+    fixedTax=toObj(fxR||[]).filter(f=>f.fixed_id&&f.has_tax_invoice==='Y');
     renderQuarters();
   }catch(e){toast('로드 실패: '+e.message,true);}
 }
@@ -136,25 +138,38 @@ function calcQ(code){
   const q=QINFO[code];
   const sRows=revs.filter(r=>q.months.includes(r.year_month));
   const pRows=costs.filter(c=>q.months.includes(c.year_month));
+  // v2.9.22: 프로젝트 매입(S05)에 안 걸리는 기타경비(임대료·통신비 등) 중 세금계산서 수취분을 매입세액에 합산.
+  const fxRows=(fixedTax||[]).filter(f=>q.months.includes(f.year_month));
   const sVat=sRows.reduce((s,r)=>s+vatOf(r,'tax_invoice_amt'),0);
-  const pVat=pRows.reduce((s,c)=>s+vatOf(c,'amount'),0);
-  return {sVat,pVat,pay:Math.max(0,sVat-pVat),sRows,pRows};
+  const pVatPrj=pRows.reduce((s,c)=>s+vatOf(c,'amount'),0);
+  const pVatFx=fxRows.reduce((s,f)=>s+(num(f.vat_amt)||0),0);
+  const pVat=pVatPrj+pVatFx;
+  return {sVat,pVat,pVatPrj,pVatFx,pay:Math.max(0,sVat-pVat),sRows,pRows,fxRows};
 }
 function renderQuarters(){
   document.getElementById('qList').innerHTML=Object.entries(QINFO).map(([code,q])=>{
     const c=calcQ(code);
     const v=vats.find(x=>x.quarter_code===code)||{};
+    // v2.9.21: "납부완료" 분기는 실제 신고·납부에 쓰인 확정값(v.sales_vat 등, S13 저장분)을 그대로 표시하고
+    // 이후 매출·매입 스케줄이 바뀌어 실시간 재계산값(c.sVat 등)과 달라지면 경고를 띄운다.
+    // 부가세는 실제로 세무서에 신고·납부하는 금액이라, 확정 후 화면 숫자가 조용히 바뀌어 보이면
+    // 신고 오류로 오인하거나 실제 오류를 놓칠 위험이 있어 자금수지보다 엄격하게 잠근다.
+    const locked=v.status==='납부완료';
+    const dSVat=locked?(num(v.sales_vat)||0):c.sVat, dPVat=locked?(num(v.purchase_vat)||0):c.pVat;
+    const dPay=locked?(num(v.actual_payment)||num(v.estimated_payment)||0):c.pay;
+    const changed=locked&&(dSVat!==c.sVat||dPVat!==c.pVat);
     const st=v.status==='납부완료'?'b-done':(c.sVat||c.pVat)?'b-wait':'b-calc';
     const stTxt=v.status==='납부완료'?'납부완료':(c.sVat||c.pVat)?'납부예정':'집계중';
     return `<div class="q-card ${selQ===code?'sel':''}" onclick="selectQ('${code}')">
       <div class="q-head"><span class="q-name">${q.name} <span style="font-weight:400;font-size:11px;color:var(--text3)">(${q.months[0].slice(5)}~${q.months[2].slice(5)}월)</span></span>
         <span class="badge ${st}">${stTxt}</span></div>
       <div class="q-nums">
-        <div><div class="lbl">매출 부가세</div><div class="val">${wf(c.sVat)}</div></div>
-        <div><div class="lbl">매입 부가세</div><div class="val">${wf(c.pVat)}</div></div>
-        <div><div class="lbl">납부 예정액</div><div class="val pay">${wf(c.pay)}</div></div>
+        <div><div class="lbl">매출 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dSVat)}</div></div>
+        <div><div class="lbl">매입 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dPVat)}</div>${!locked&&c.pVatFx?`<div style="font-size:10px;color:var(--text3);margin-top:2px">프로젝트 ${wf(c.pVatPrj)} + 기타경비 ${wf(c.pVatFx)}</div>`:''}</div>
+        <div><div class="lbl">${locked?'납부액':'납부 예정액'}</div><div class="val pay">${wf(dPay)}</div></div>
       </div>
       <div class="q-due" style="margin-top:8px">신고·납부 기한 ${q.due}${v.paid_date?' · 납부일 '+v.paid_date:''}${v.cashflow_reflected==='Y'?' · 자금수지 반영 ✓':''}</div>
+      ${changed?`<div style="margin-top:8px;padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:11px;color:#991B1B">⚠ 신고 이후 이 분기의 매출·매입 내역이 변경되었습니다(현재 기준 재계산 시 매출 ${wf(c.sVat)}·매입 ${wf(c.pVat)}). 실제 신고 내용과 다른 경우 수정신고 필요 여부를 확인하세요.</div>`:''}
     </div>`;}).join('');
 }
 function selectQ(code){

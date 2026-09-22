@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.15">
+<link rel="stylesheet" href="css/common.css?v=2.9.22">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.15"></script>
-<script src="js/common.js?v=2.9.15"></script>
-<script src="js/calc.js?v=2.9.15"></script>
-<script src="js/nav.js?v=2.9.15"></script>
+<script src="js/schema.js?v=2.9.22"></script>
+<script src="js/common.js?v=2.9.22"></script>
+<script src="js/calc.js?v=2.9.22"></script>
+<script src="js/nav.js?v=2.9.22"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -198,8 +198,14 @@ function loadOpp(){
   document.getElementById('editorArea').style.display='block';
   // 저장된 견적 로드
   const saved=estimates.filter(e=>e.pipeline_id===pid);
-  labor=saved.filter(e=>e.comp_type==='인건비').map(e=>({name:e.item_name,grade:e.grade,setId:e.grade_set_id,
-    sell:num(e.unit_price)||0,buy:num(e.buy_price)||0,start:e.start_date,end:e.end_date,mm:numF(e.mm)||0}));
+  // v2.9.17: 지급형태(사업소득형/급여형) — 한 인력이 두 형태로 나뉘어 지급되는 경우(예: 최저임금 급여+사업소득 인센티브)를
+  // 각각 별도 행으로 등록하기 위한 구분값. 스키마 변경 없이 기존 memo 필드(인건비 행에서는 항상 빈 값이었음)를 재사용.
+  labor=saved.filter(e=>e.comp_type==='인건비').map(e=>{
+    const payType=e.memo==='급여형'?'급여형':'사업소득형';
+    return {name:e.item_name,grade:e.grade,setId:e.grade_set_id,
+      sell:num(e.unit_price)||0,buy:num(e.buy_price)||0,start:e.start_date,end:e.end_date,
+      mm:payType==='급여형'?1:(numF(e.mm)||0),payType}; // 급여형은 로드 시에도 MM=1 강제(과거 오입력 방어)
+  });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
     items[k]=saved.filter(e=>e.comp_type===ct).map(e=>({name:e.item_name,qty:num(e.qty)||1,
@@ -223,7 +229,7 @@ function addLabor(re=true){
   const g=gradesOf(setId)[1]||gradesOf(setId)[0]||{};
   const s=cur?.expected_start||'',e=cur?.expected_end||'';
   labor.push({name:'',grade:g.grade||'중급',setId,sell:num(g.sell_price)||0,buy:num(g.buy_price)||0,
-    start:s,end:e,mm:parseFloat(mmTotal(s,e))||0});
+    start:s,end:e,mm:parseFloat(mmTotal(s,e))||0,payType:'사업소득형'});
   if(re)renderLabor();recalc();
 }
 function renderLabor(){
@@ -240,13 +246,23 @@ function renderLabor(){
           </select></div>
       </div>
       <div class="fr">
+        <div><label class="fl">지급형태</label>
+          <select class="fi" onchange="setPayType(${i},this.value)">
+            <option value="사업소득형" ${p.payType!=='급여형'?'selected':''}>사업소득형 (3.3% 원천징수)</option>
+            <option value="급여형" ${p.payType==='급여형'?'selected':''}>급여형 (4대보험)</option>
+          </select></div>
+        <div style="font-size:11px;color:var(--text3);align-self:flex-end;padding-bottom:8px">
+          ${p.payType==='급여형'?'매입 단가에 4대보험·소득세 포함 회사 실지급 총액을 직접 입력하세요':'매입 단가에 세금계산서 없이 지급하는 사업소득 금액을 입력하세요'}
+        </div>
+      </div>
+      <div class="fr">
         <div><label class="fl">매출 단가 (원/MM)</label><input class="fi" value="${comma(p.sell)}" oninput="this.value=comma(this.value);labor[${i}].sell=un(this.value);recalc()"></div>
-        <div><label class="fl">매입 단가 (원/MM)</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
+        <div><label class="fl">매입 단가 (원/MM)${p.payType==='급여형'?' — 4대보험·소득세 포함 총액':''}</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
       </div>
       <div class="fr3">
         <div><label class="fl">시작예정일</label><input class="fi" type="date" value="${p.start}" onchange="labor[${i}].start=this.value;autoMM(${i})"></div>
         <div><label class="fl">종료예정일</label><input class="fi" type="date" value="${p.end}" onchange="labor[${i}].end=this.value;autoMM(${i})"></div>
-        <div><label class="fl">MM (소수점 2자리)</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
+        <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 항상 1':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" ${p.payType==='급여형'?'disabled':''} oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
       </div>
       <div style="text-align:right;font-size:12px;color:var(--text2)">
         매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(Math.round(p.buy*p.mm))}</b>
@@ -260,7 +276,17 @@ function pickGrade(i,grade){
   if(g){labor[i].sell=num(g.sell_price)||0;labor[i].buy=num(g.buy_price)||0;}
   renderLabor();recalc();
 }
-function autoMM(i){const p=labor[i];p.mm=parseFloat(mmTotal(p.start,p.end))||0;
+function setPayType(i,v){const p=labor[i];p.payType=v;
+  // v2.9.18: 급여형으로 전환 시 MM을 즉시 1로 고정(이미 mmTotal로 계산해둔 소수 MM이 남아있으면 이중 일할 계산 위험).
+  // 사업소득형으로 되돌리면 시작·종료일이 있는 경우 다시 정밀 일할 계산을 적용.
+  if(v==='급여형') p.mm=1;
+  else if(p.start&&p.end) p.mm=parseFloat(mmTotal(p.start,p.end))||0;
+  renderLabor();recalc();}
+function autoMM(i){const p=labor[i];
+  // v2.9.18: 급여형은 회사 급여대장에서 이미 일할 계산된 실지급액을 그대로 입력하는 방식(사용자 확정) —
+  // mmTotal(투입~철수 정밀 월할)을 여기서 다시 곱하면 이중 일할 계산이 되어 금액이 왜곡된다.
+  // 따라서 급여형은 시작·종료일을 입력해도 MM을 항상 1로 고정(입력 금액 자체가 이미 그 기간의 완결된 지급액).
+  p.mm=p.payType==='급여형'?1:(parseFloat(mmTotal(p.start,p.end))||0);
   document.getElementById('mm_'+i).value=p.mm;renderLabor();recalc();}
 
 // ── 인프라·솔루션·기타 ──
@@ -359,7 +385,8 @@ async function saveEstimate(){
   const rows=[];
   labor.forEach(p=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
     comp_type:'인건비',item_name:p.name||`${p.grade} 인력`,grade:p.grade,grade_set_id:p.setId,qty:1,
-    unit_price:p.sell,buy_price:p.buy,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,memo:'',created_at:today});});
+    unit_price:p.sell,buy_price:p.buy,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
+    memo:p.payType==='급여형'?'급여형':'',created_at:today});});
   [['infra','인프라'],['sol','솔루션'],['etc','기타']].forEach(([k,ct])=>{
     items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
       comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:it.buy||0,

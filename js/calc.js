@@ -15,27 +15,32 @@ function addMonthsKeepDay(d,k){
   return nd;
 }
 function mmTotal(s,e){
-  // SI 관례(2026-07-25 승인): d일 투입 ~ (d-1)일 철수 = 정확히 1개월.
-  // 총MM = 대응 개월수 k + 잔여일/잔여월 총일수(소수 2자리)
+  // v2.9.19: 실무 방식으로 재정의(사용자 지정, 2026-09-14 확정) — 투입일 앵커 방식(구 SI 관례) 폐기.
+  // 캘린더 월(1일~말일)을 고정 단위로 삼는다:
+  //   ①완전월(월초~월말 만근)=1.00  ②시작월(중간투입)=(그 달 말일-투입일+1)/그 달 총일수
+  //   ③종료월(중간철수)=철수일/그 달 총일수  ④총MM=시작월+중간완전월 개수+종료월(각 항을 합산 후 소수 2자리 반올림)
+  // ymList()와 동일한 원칙(캘린더 월 기준 일할)이며, 시작월·종료월을 각각 독립 계산하므로
+  // 구 방식(투입일~투입일-1=1개월 고정)과 달리 시작월+종료월 합이 정수로 안 떨어질 수 있다(예: 6.01).
   if(!s||!e) return 0;
   const a=new Date(s), b=new Date(e);
   if(isNaN(a)||isNaN(b)||b<a) return 0;
-  let k=0;
-  while(k<240){
-    const cycEnd=new Date(addMonthsKeepDay(a,k+1).getTime()-86400000);
-    if(cycEnd<=b) k++; else break;
+  if(a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()){
+    const dim=new Date(a.getFullYear(),a.getMonth()+1,0).getDate();
+    return ((b.getDate()-a.getDate()+1)/dim).toFixed(2);
   }
-  const anchor=addMonthsKeepDay(a,k);
-  let frac=0;
-  if(anchor<=b){
-    const dim=new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate();
-    const days=Math.round((b-anchor)/86400000)+1;
-    frac=Math.round(days/dim*100)/100;
-  }
-  return (k+frac).toFixed(2);
+  const dimStart=new Date(a.getFullYear(),a.getMonth()+1,0).getDate();
+  const startFrac=(dimStart-a.getDate()+1)/dimStart;
+  const dimEnd=new Date(b.getFullYear(),b.getMonth()+1,0).getDate();
+  const endFrac=b.getDate()/dimEnd;
+  let mid=0, cy=a.getFullYear(), cm=a.getMonth()+1; // 0-based month+1 = 다음 달부터 카운트 시작
+  while(!(cy===b.getFullYear()&&cm===b.getMonth())){ mid++; cm++; if(cm>11){cm=0;cy++;} }
+  return (startFrac+mid+endFrac).toFixed(2);
 }
 function mmMonthly(sd,ed){
-  // 월별 MM 분해: 시작월=일할 소수2자리 반올림(1일 시작이면 1.00), 중간=1.00, 마지막월=총MM-앞선 합(잔여)
+  // v2.9.19: 시작월은 캘린더 월 기준 일할(실무 방식) 그대로 독립 계산하되, 마지막 달은 총MM에서
+  // 앞선 달들의 합을 뺀 잔여값으로 역산한다(사용자 확정, 2026-09-14) — 시작월·종료월을 각각 독립
+  // 반올림하면 총합이 mmTotal과 0.01 정도 어긋날 수 있어(예: 6.02 vs 6.01), 총 MM(견적서 표시값)과
+  // 월별 배분 합계가 항상 정확히 일치하도록 오차를 마지막 달에 흡수시킨다.
   const a=new Date(sd), b=new Date(ed);
   if(isNaN(a)||isNaN(b)||b<a) return [];
   const total=parseFloat(mmTotal(sd,ed));
@@ -43,7 +48,7 @@ function mmMonthly(sd,ed){
   while(c<=b){ list.push({y:c.getFullYear(),m:c.getMonth()+1,mm:0}); c=new Date(c.getFullYear(),c.getMonth()+1,1); }
   if(list.length===1){ list[0].mm=total; return list; }
   const dim0=new Date(a.getFullYear(),a.getMonth()+1,0).getDate();
-  let first=(a.getDate()===1)?1:Math.round((dim0-a.getDate()+1)/dim0*100)/100;
+  const first=Math.round((dim0-a.getDate()+1)/dim0*100)/100;
   list[0].mm=first; let acc=first;
   for(let i=1;i<list.length-1;i++){ list[i].mm=1; acc+=1; }
   list[list.length-1].mm=Math.max(0,Math.round((total-acc)*100)/100);

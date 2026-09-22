@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.15">
+<link rel="stylesheet" href="css/common.css?v=2.9.22">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -120,6 +120,12 @@
 <nav class="side-nav"></nav>
 
 <main class="main">
+
+  <!-- v2.9.20: 청구 스케줄 재생성 이후 추정 자금수지를 재계산하지 않은 경우 안내 -->
+  <div id="staleEstBanner" style="display:none;background:#FEF9C3;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <span>⚠ 매출·매입 청구 스케줄이 마지막 추정 재계산 이후 변경되었습니다 — 아래 "추정 자금수지" 수치가 최신 내역을 반영하지 못했을 수 있습니다.</span>
+    <button onclick="recalcEstimate()" style="white-space:nowrap;font-size:11px;padding:5px 10px;border:none;border-radius:6px;background:#CA8A04;color:#fff;cursor:pointer">지금 재계산</button>
+  </div>
 
   <!-- KPI -->
   <div class="kpi-grid" id="kpiGrid">
@@ -288,10 +294,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.15"></script>
-<script src="js/common.js?v=2.9.15"></script>
-<script src="js/calc.js?v=2.9.15"></script>
-<script src="js/nav.js?v=2.9.15"></script>
+<script src="js/schema.js?v=2.9.22"></script>
+<script src="js/common.js?v=2.9.22"></script>
+<script src="js/calc.js?v=2.9.22"></script>
+<script src="js/nav.js?v=2.9.22"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -880,6 +886,7 @@ async function loadSheets(){
     actData=deriveActFromDetail(detailAll);
     renderAll();
     renderPlanAct();
+    renderStaleEstBanner();
     renderVatBanner();
     renderAging();
   } catch(e){ toast('데이터 로드 실패: '+e.message,true); }
@@ -927,6 +934,16 @@ function renderPlanAct(){
       <td>${pOut?`<span style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" onclick="openPlanDetail('${ym}','out')">${won(pOut,false)}</span>`:'─'}</td>
       <td>${aOut!==null?`${won(aOut,false)}<br><span style="font-size:10px" class="${dOut<=0?'pos':'neg'}">${dOut>=0?'+':''}${won(dOut,false)}</span>`:'─'}</td></tr>`;
   }).join('')||'<tr><td colspan="5"><div class="empty-state">데이터 없음</div></td></tr>';
+}
+// v2.9.20: 마지막 청구 스케줄 변경 시각(S10.last_schedule_change_at, input.html이 청구 스케줄 재생성 성공 시 기록)과
+// 마지막 추정 재계산 시각(S02 각 행의 updated_at 중 최댓값)을 비교 — 스케줄 변경이 더 최근이면 재계산이 필요함을 안내.
+function renderStaleEstBanner(){
+  const el=document.getElementById('staleEstBanner'); if(!el) return;
+  const changedAt=settings.last_schedule_change_at;
+  if(!changedAt){ el.style.display='none'; return; } // 스케줄 변경 이력 자체가 없으면(구버전 데이터 등) 판단 보류
+  const estUpdated=estData.map(e=>e.updated_at).filter(Boolean).sort().pop(); // YYYY-MM-DD 문자열 정렬로 최댓값
+  const stale=!estUpdated||changedAt.slice(0,10)>estUpdated;
+  el.style.display=stale?'flex':'none';
 }
 function renderVatBanner(){
   const today=new Date().toISOString().slice(0,10);
@@ -1270,7 +1287,7 @@ async function recalcEstimate(){
     if(ok){
       const er=await fetchSheet(...R.S02); estData=toObj(er);
       document.getElementById('recalcInfo').textContent=`마지막 재계산 ${today} (${weighted?'확도가중 ON':'확정분만'})`;
-      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct();
+      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderStaleEstBanner();
     } else toast('재계산 저장 실패',true);
   }catch(e){toast('재계산 오류: '+e.message,true);}
   btn.disabled=false;btn.textContent='추정 재계산 실행';
