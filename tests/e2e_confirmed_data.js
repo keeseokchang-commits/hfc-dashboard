@@ -81,6 +81,45 @@ async function run() {
     s.check(r0 === '25' && d0 === '2026-09-10', 'v2.9.12: 재조회 시 커스텀 회차 설정(25%, 9/10) 정확히 복원');
   }
 
+  // ── v2.9.25: 지급형태를 세금계산서형→사업소득형으로 바꿔 견적 매입이 0이 된 경우,
+  //           매출 체크 해제+매입 체크만 있는 상태에서도 저장 버튼이 열려 과거 매입 스케줄을
+  //           정리할 수 있어야 함(사용자 반복 지적: "변경 사항이 업데이트가 안 된다"). ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
+        ['PL-105','부산은행','부산은행','','80','69500000','2026-09-03','2027-04-02','기타','수주','','','용역턴키']],
+      S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
+        ['PRJ-2026-007','PL-105','부산은행 모바일뱅킹','부산은행','69500000','2026-09-03','2027-04-02','수주']],
+      S04_REVENUE: [['revenue_id']],
+      // 과거 세금계산서형 기준으로 이미 생성된 매입 스케줄 3건
+      S05_COST: [['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'],
+        ['COST-2026-001','PRJ-2026-007','2026-09','외주비','','','','20850000','2026-10-31','매입 스케줄 자동생성','2085000','2026-09-03','','',''],
+        ['COST-2026-002','PRJ-2026-007','2026-12','외주비','','','','27800000','2027-01-31','매입 스케줄 자동생성','2780000','2026-12-17','','',''],
+        ['COST-2026-003','PRJ-2026-007','2027-04','외주비','','','','20850000','2027-05-31','매입 스케줄 자동생성','2085000','2027-04-02','','','']],
+      S06_FIXED_COST: [['fixed_id']],
+      // 이후 지급형태를 사업소득형으로 변경(세금계산서형 인력 없음 → 매입 스케줄 생성 대상 0)
+      S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
+        ['E1','PL-105','인건비','이무헌','특급','','','69500000','56000000','','7','2026-09-03','2027-04-02','사업소득형','']],
+    };
+    const wc = {};
+    const { dom } = await require('./_e2e_helpers').openPage(ROOT, portFor('paytype-switch'), 'input.html', sheetData, { writeCapture: wc, confirm: () => true });
+    const w = dom.window, d = w.document;
+    w.eval('accessToken="t"');
+    w.eval('openGenModal(true)');
+    d.getElementById('genPrj').value = 'PRJ-2026-007';
+    w.eval('onGenPrjChange()');
+    await new Promise(r => setTimeout(r, 100));
+    d.getElementById('genDoRev').checked = false;
+    d.getElementById('genDoRev').dispatchEvent(new w.Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    s.check(!d.getElementById('genSaveBtn').disabled,
+      'v2.9.25: 매출 체크 해제+매입 0건(지급형태 변경)이어도 저장 버튼 활성화(정리 가능 상태)');
+    await w.eval('saveGen()');
+    await new Promise(r => setTimeout(r, 400));
+    const remaining = (wc.S05 || []).slice(1);
+    s.check(remaining.length === 0, 'v2.9.25: 저장 시 과거 세금계산서형 매입 스케줄 3건이 정리됨');
+  }
+
   return s;
 }
 

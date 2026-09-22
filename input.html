@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.24">
+<link rel="stylesheet" href="css/common.css?v=2.9.25">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -283,10 +283,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.24"></script>
-<script src="js/common.js?v=2.9.24"></script>
-<script src="js/calc.js?v=2.9.24"></script>
-<script src="js/nav.js?v=2.9.24"></script>
+<script src="js/schema.js?v=2.9.25"></script>
+<script src="js/common.js?v=2.9.25"></script>
+<script src="js/calc.js?v=2.9.25"></script>
+<script src="js/nav.js?v=2.9.25"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 
@@ -715,9 +715,17 @@ function updGenCostTotal(){
   document.getElementById('genCostTotal').innerHTML=`매입 합계: 공급가액 <b>${comma(t)}원</b> / VAT포함 <b>${comma(Math.round(t*1.1))}원</b>`;
 }
 function syncSaveBtn(){
+  // v2.9.25: "새로 생성할 매출·매입이 있는가"만 보면, 지급형태 변경 등으로 매입이 0건이 되어
+  // "기존 스케줄을 정리해야 하는 상황"(v2.9.11의 정리 확인 경로)에서 저장 버튼 자체가 잠겨
+  // saveGen()이 호출되지 못하는 결함이 있었다(사용자 반복 지적: 세금계산서형→사업소득형으로
+  // 바꿔도 기존 매입 스케줄을 갱신할 방법이 없음). 매입 체크가 켜져 있고 canCost=false이면
+  // "정리할 게 있을 수 있는 상태"이므로 저장 버튼을 열어 saveGen()이 판단하게 한다.
   const r=document.getElementById('genDoRev').checked&&genRows.length;
   const co=document.getElementById('genDoCost').checked&&genCostRows.length;
-  document.getElementById('genSaveBtn').disabled=!(r||co);
+  const c=genCtx();
+  const costCleanupPossible=document.getElementById('genDoCost').checked&&c&&!c.canCost;
+  const revCleanupPossible=document.getElementById('genDoRev').checked&&c&&(!c.start||!c.end||!c.revAmt);
+  document.getElementById('genSaveBtn').disabled=!(r||co||costCleanupPossible||revCleanupPossible);
 }
 async function saveGen(){
   const c=genCtx(); if(!c)return;
