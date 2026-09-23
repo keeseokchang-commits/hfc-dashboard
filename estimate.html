@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.34">
+<link rel="stylesheet" href="css/common.css?v=2.9.35">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.34"></script>
-<script src="js/common.js?v=2.9.34"></script>
-<script src="js/calc.js?v=2.9.34"></script>
-<script src="js/nav.js?v=2.9.34"></script>
+<script src="js/schema.js?v=2.9.35"></script>
+<script src="js/common.js?v=2.9.35"></script>
+<script src="js/calc.js?v=2.9.35"></script>
+<script src="js/nav.js?v=2.9.35"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -224,9 +224,13 @@ function loadOpp(){
   });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
-    items[k]=saved.filter(e=>e.comp_type===ct).map(e=>({name:e.item_name,qty:num(e.qty)||1,
-      price:num(e.unit_price)||0,buy:num(e.buy_price)||0,memo:e.memo||'',
-      start:e.start_date||'',end:e.end_date||''}));
+    // v2.9.35: memo의 "_NOINVOICE_" 접두사로 세금계산서 미수취 여부 판별, 원래 비고는 접두사 제거 후 복원.
+    items[k]=saved.filter(e=>e.comp_type===ct).map(e=>{
+      const noInv=(e.memo||'').startsWith('_NOINVOICE_');
+      return {name:e.item_name,qty:num(e.qty)||1,
+        price:num(e.unit_price)||0,buy:num(e.buy_price)||0,memo:noInv?(e.memo||'').slice('_NOINVOICE_'.length):(e.memo||''),
+        start:e.start_date||'',end:e.end_date||'',hasTaxInvoice:!noInv};
+    });
   });
   // v2.9.13: "저장된 견적이 아예 없음(신규)"과 "저장했지만 인건비를 전부 지움(의도적 삭제)"을 구분.
   // 이전에는 후자도 매번 빈 행이 자동 추가되어, 인력을 지우고 저장해도 다시 열면 등급단가가 채워진 빈 행이 부활했음.
@@ -353,7 +357,12 @@ function autoMM(i){const p=labor[i];
   document.getElementById('mm_'+i).value=p.mm;renderLabor();recalc();}
 
 // ── 인프라·솔루션·기타 ──
-function addItem(k){items[k].push({name:'',qty:1,price:0,buy:0,memo:'',start:'',end:''});renderItems(k);recalc();}
+// v2.9.35: 인프라·솔루션·기타 항목도 매입 지급형태 구분 필요(사용자 지적) — 단, 인건비의 급여형·
+// 사업소득형(3.3%) 같은 "사람에게 근로 대가로 지급"하는 개념은 물품·인프라·솔루션 매입에 성립하지
+// 않는다. 조달 방법에 따라 세금계산서를 받는지 여부만 갈리므로(원격지 근무 기타경비 등 계산서 없이
+// 나가는 매입도 실무에 존재) "세금계산서 수취 여부" 단일 축으로 단순화 — 기본값은 수취(true, 기존 동작과
+// 완전 호환: 이전에는 이 구분 자체가 없어 전부 세금계산서형으로 취급되던 것과 동일).
+function addItem(k){items[k].push({name:'',qty:1,price:0,buy:0,memo:'',start:'',end:'',hasTaxInvoice:true});renderItems(k);recalc();}
 function renderItems(k){
   document.getElementById(k+'List').innerHTML=items[k].map((it,i)=>`
     <div class="item-card"><button class="item-del" onclick="items['${k}'].splice(${i},1);renderItems('${k}');recalc()">✕</button>
@@ -365,6 +374,10 @@ function renderItems(k){
         <div><label class="fl">수량</label><input class="fi" type="number" value="${it.qty}" oninput="items['${k}'][${i}].qty=num(this.value)||0;recalc()"></div>
         <div><label class="fl">매출 단가 (원)</label><input class="fi" value="${comma(it.price)}" oninput="this.value=comma(this.value);items['${k}'][${i}].price=un(this.value);recalc()"></div>
         <div><label class="fl">매입 단가 (원)</label><input class="fi" value="${comma(it.buy||0)}" oninput="this.value=comma(this.value);items['${k}'][${i}].buy=un(this.value);recalc()"></div>
+      </div>
+      <div class="fr" style="align-items:center">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" ${it.hasTaxInvoice!==false?'checked':''} onchange="items['${k}'][${i}].hasTaxInvoice=this.checked;renderItems('${k}')"> 매입 세금계산서 수취</label>
+        <div style="font-size:11px;color:var(--text3)">${it.hasTaxInvoice!==false?'매입 스케줄 생성 시 부가세 매입세액공제 대상으로 반영됩니다':'계산서 없이 지급되는 매입(예: 원격지 근무 기타경비 등) — 자금수지엔 반영되나 부가세 대상 아님'}</div>
       </div>
       <div class="fr">
         <div><label class="fl">시작일 (선택 — 기간 입력 시 월할 분배)</label><input class="fi" type="date" value="${it.start||''}" onchange="items['${k}'][${i}].start=this.value"></div>
@@ -475,10 +488,14 @@ async function saveEstimate(){
     comp_type:'인건비',item_name:p.name||`${p.grade} 인력`,grade:p.grade,grade_set_id:p.setId,qty:1,
     unit_price:p.sell,buy_price:buyToSave,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
     memo,created_at:today});});
+  // v2.9.35: 세금계산서 미수취 항목은 memo에 "_NOINVOICE_" 접두사로 표시(비고 텍스트는 그대로 뒤에 보존).
+  // 인건비의 급여형|{JSON}/사업소득형 태그와는 다른 네임스페이스라 comp_type이 인건비가 아닌 것으로
+  // 이미 구분되니 충돌 없음. 기본값(수취=true)은 태그를 붙이지 않아 기존 데이터와 완전 호환.
   [['infra','인프라'],['sol','솔루션'],['etc','기타']].forEach(([k,ct])=>{
-    items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
+    items[k].forEach(it=>{n++;const memo=it.hasTaxInvoice===false?`_NOINVOICE_${it.memo||''}`:(it.memo||'');
+      rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
       comp_type:ct,item_name:it.name,grade:'',grade_set_id:'',qty:it.qty,unit_price:it.price,buy_price:it.buy||0,
-      amount:it.qty*it.price,mm:'',start_date:it.start||'',end_date:it.end||'',memo:it.memo,created_at:today});});});
+      amount:it.qty*it.price,mm:'',start_date:it.start||'',end_date:it.end||'',memo,created_at:today});});});
   // v2.9.13: 항목을 전부 지우고 저장하면(의도적 삭제) 이 파이프라인에 남는 행이 0개가 되어, 다음 로드 때
   // "저장 이력 없음(신규)"과 구분이 안 되고 빈 행이 부활함. 새로고침·재접속 후에도 구분 가능하도록
   // 항목이 0개일 때는 계산에서 제외되는 빈 상태 마커 행을 하나 남긴다.

@@ -9,69 +9,9 @@ const ROOT = path.join(__dirname, '..');
 
 async function run() {
   const s = makeSuite('e2e_ui_symmetry');
-  const baseSheet = (rv) => ({
-    S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
-      ['PL-1','x','c','','80','10000000','2026-09-01','2026-12-31','기타','수주','','','인력공급']],
-    S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
-      ['PRJ-1','PL-1','테스트','고객','10000000','2026-09-01','2026-12-31','수주']],
-    S04_REVENUE: rv, S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
-  });
-
-  // ── 개별 등록 폼: 매출도 매입과 동일하게 유형·항목명·단가×MM 계산기를 갖춰야 함 ──
-  {
-    const sheetData = baseSheet([['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date']]);
-    const wc = {};
-    const { dom } = await openPage(ROOT, portFor('sym-form'), 'input.html', sheetData, { writeCapture: wc, confirm: () => true });
-    const w = dom.window, d = w.document;
-    w.eval('accessToken="t"');
-    s.check(!!d.getElementById('rev_type'), '매출 폼에 유형 선택 필드 존재(매입의 cost_type과 대칭)');
-    s.check(!!d.getElementById('rev_item'), '매출 폼에 항목명 필드 존재(매입의 person_name과 대칭)');
-    s.check(!!d.getElementById('rev_unit') && !!d.getElementById('rev_mm'), '매출 폼에 단가·MM 입력칸 존재(매입의 cost_unit·cost_mm과 대칭)');
-
-    d.getElementById('rev_project').value = 'PRJ-1';
-    d.getElementById('rev_ym').value = '2026-09';
-    d.getElementById('rev_type').value = '인건비';
-    d.getElementById('rev_item').value = '이무헌';
-    d.getElementById('rev_unit').value = '8500000';
-    d.getElementById('rev_mm').value = '2';
-    w.eval('calcRevAmt()');
-    s.check(d.getElementById('rev_supply').value === '17,000,000', '단가(8,500,000)×MM(2) 자동계산으로 공급가액 17,000,000 채워짐');
-
-    d.getElementById('rev_memo').value = '9월분';
-    await w.eval('saveRev()');
-    await new Promise(r => setTimeout(r, 300));
-    const row = (wc.S04 || []).slice(1)[0];
-    s.check(row && row[7] === '인건비|이무헌|8500000|2|9월분', '유형·항목명·단가·MM·메모가 하나의 memo로 정확히 인코딩되어 저장');
-    s.check(row && row[3] === 17000000, '공급가액이 정확히 저장(17,000,000)');
-  }
-
-  // ── 목록 카드 표시 + 수정 폼 복원 + 기존(순수 텍스트) 데이터 하위호환 ──
-  {
-    const sheetData = baseSheet([
-      ['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'],
-      ['REV-1','PRJ-1','2026-09','17000000','18700000','2026-10-31','N','인건비|이무헌|8500000|2|9월분','1700000','2026-09-30','','',''],
-      ['REV-2','PRJ-1','2026-08','5000000','5500000','2026-09-30','N','청구 스케줄 자동생성','500000','2026-08-31','','',''],
-    ]);
-    const { dom } = await openPage(ROOT, portFor('sym-list'), 'input.html', sheetData, {
-      confirm: () => true,
-    });
-    const w = dom.window, d = w.document;
-    w.window && (w.HTMLElement.prototype.scrollIntoView = function () {}); // jsdom 미구현 API 스텁
-
-    const html = d.getElementById('rev_list').innerHTML;
-    s.check(html.includes('인건비') && html.includes('이무헌') && html.includes('2MM'),
-      '목록 카드에 유형·항목명·MM이 매입 카드와 대칭 형식으로 표시(신규 포맷)');
-
-    w.eval("editRev('REV-1')");
-    const ok1 = d.getElementById('rev_type').value === '인건비' && d.getElementById('rev_item').value === '이무헌'
-      && d.getElementById('rev_unit').value === '8,500,000' && d.getElementById('rev_mm').value === '2'
-      && d.getElementById('rev_memo').value === '9월분';
-    s.check(ok1, '신규 포맷 데이터를 수정 폼에 정확히 분해 복원(유형·항목·단가·MM·메모)');
-
-    w.eval("editRev('REV-2')");
-    s.check(d.getElementById('rev_memo').value === '청구 스케줄 자동생성',
-      '기존(순수 텍스트) memo 데이터는 하위호환으로 메모란에 그대로 보존(파싱 오류로 깨지지 않음)');
-  }
+  // v2.9.35: 개별 등록 폼(유형·항목명·단가×MM 계산기, 목록카드 수정 버튼) 관련 케이스는 폼 자체가
+  // 삭제되어(사용자 결정: 예외 처리는 견적 재작성→스케줄 재생성으로 통일) 더 이상 유효하지 않아 제거.
+  // 아래는 폼과 무관하게 여전히 유효한 대칭 원칙(미리보기 표, 완료처리 동작, 목록 금액 표시)만 검증.
 
   // ── 청구 스케줄 미리보기 표: 매출·매입 헤더가 동일 컬럼 구조(항목 컬럼 포함)여야 함 ──
   {

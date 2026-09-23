@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.34">
+<link rel="stylesheet" href="css/common.css?v=2.9.35">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -111,51 +111,6 @@
         <button class="tb-reset" onclick="resetFilters('rev')">필터 초기화</button>
       </div>
       <div id="rev_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
-    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3);padding:6px 2px">➕ 매출 개별 추가 (예외용 — 펼치기)</summary><div class="form-card" style="margin-top:12px">
-      <div class="card-title"><span>➕ 매출 개별 추가 <small style="font-weight:400;color:var(--text3)">(예외용)</small></span>
-        </div>
-      <input type="hidden" id="rev_id">
-      <!-- v2.9.32: UI 표준(매출·매입 대칭, 사용자 확립) 적용 — 매입 개별 등록 폼(유형·항목명·단가×MM
-           계산기)과 동일한 구조로 매출도 재구성. S04 시트는 여전히 tax_invoice_amt(공급가액) 하나만
-           저장하므로(그 프로젝트·월의 세금계산서 1건 단위 — 인력별로 쪼개지지 않음), 유형·항목명·단가·MM은
-           memo에 함께 기록하고 단가×MM은 공급가액을 채우는 계산 보조로만 쓴다(매입 폼과 동일 패턴). -->
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
-          <select class="form-input" id="rev_project"><option value="">선택</option></select></div>
-        <div class="form-group"><label class="form-label">년월 <span class="req">*</span></label>
-          <input class="form-input" id="rev_ym" type="month"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">유형 <span class="req">*</span></label>
-          <select class="form-input" id="rev_type"><option>인건비</option><option>외주비</option><option>기타원가</option></select></div>
-        <div class="form-group"><label class="form-label">항목명</label><input class="form-input" id="rev_item" placeholder="예: 7월분 기성"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">단가 (원/MM)</label>
-          <input class="form-input" id="rev_unit" inputmode="numeric" oninput="this.value=comma(this.value);calcRevAmt()"></div>
-        <div class="form-group"><label class="form-label">MM</label>
-          <input class="form-input" id="rev_mm" type="number" step="0.01" oninput="calcRevAmt()"></div>
-      </div>
-      <div class="form-group"><label class="form-label">공급가액 (VAT 제외) <span class="req">*</span></label>
-        <input class="form-input" id="rev_supply" inputmode="numeric" placeholder="단가×MM 자동 또는 직접입력" oninput="this.value=comma(this.value);calcRevVat()"></div>
-      <div class="vat-box">
-        <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="rev_vat_disp">0원</span></div>
-        <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="rev_total_disp">0원</span></div>
-        <div class="vat-note">※ 합계 금액이 자금수지 비교 기준(입금 예정액)입니다</div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">발행 예정일</label><input class="form-input" id="rev_invplan" type="date"></div>
-        <div class="form-group"><label class="form-label">발행일 (완료 시)</label><input class="form-input" id="rev_invdate" type="date"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">입금 예정일</label><input class="form-input" id="rev_date" type="date"></div>
-        <div class="form-group"><label class="form-label">입금 여부</label>
-          <select class="form-input" id="rev_received"><option value="N">미입금</option><option value="Y">입금완료</option></select></div>
-      </div>
-      <div class="form-group"><label class="form-label">메모</label><input class="form-input" id="rev_memo" placeholder="추가 메모(선택)"></div>
-      <div class="btn-row"><button class="btn btn-secondary" onclick="closeForm('rev')">취소</button>
-        <button class="btn btn-secondary" style="margin-right:8px" onclick="resetRev()">초기화</button><button class="btn btn-primary" id="rev_btn" onclick="saveRev()">저장하기</button></div>
-    </div></details>
   </div>
 
   <!-- 계획 매입 -->
@@ -169,45 +124,6 @@
         <button class="tb-reset" onclick="resetFilters('cost')">필터 초기화</button>
       </div>
       <div id="cost_list"><div class="loading-wrap"><div class="spinner"></div></div></div></div>
-    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3);padding:6px 2px">➕ 매입 개별 추가 (예외용 — 펼치기)</summary><div class="form-card" style="margin-top:12px">
-      <div class="card-title"><span>➕ 매입 개별 추가 <small style="font-weight:400;color:var(--text3)">(예외용)</small></span>
-        </div>
-      <input type="hidden" id="cost_id">
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">프로젝트 <span class="req">*</span></label>
-          <select class="form-input" id="cost_project"><option value="">선택</option></select></div>
-        <div class="form-group"><label class="form-label">년월 <span class="req">*</span></label>
-          <input class="form-input" id="cost_ym" type="month"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">유형 <span class="req">*</span></label>
-          <select class="form-input" id="cost_type"><option>인건비</option><option>외주비</option><option>기타원가</option></select></div>
-        <div class="form-group"><label class="form-label">인력명</label><input class="form-input" id="cost_person"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">단가 (원/MM)</label>
-          <input class="form-input" id="cost_unit" inputmode="numeric" oninput="this.value=comma(this.value);calcCostAmt()"></div>
-        <div class="form-group"><label class="form-label">MM</label>
-          <input class="form-input" id="cost_mm" type="number" step="0.01" oninput="calcCostAmt()"></div>
-      </div>
-      <div class="form-group"><label class="form-label">공급가액 (VAT 제외) <span class="req">*</span></label>
-        <input class="form-input" id="cost_supply" inputmode="numeric" placeholder="단가×MM 자동 또는 직접입력" oninput="this.value=comma(this.value);calcCostVat()"></div>
-      <div class="vat-box">
-        <div class="vat-row"><span class="vl">부가세 (VAT 10%)</span><span class="vv" id="cost_vat_disp">0원</span></div>
-        <div class="vat-row total"><span class="vl">합계 (VAT 포함)</span><span class="vv" id="cost_total_disp">0원</span></div>
-        <div class="vat-note">※ 합계 금액이 자금수지 비교 기준(지급 예정액)입니다</div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">계산서 수취 예정일</label><input class="form-input" id="cost_invplan" type="date"></div>
-        <div class="form-group"><label class="form-label">수취일 (완료 시)</label><input class="form-input" id="cost_invdate" type="date"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">지급 예정일</label><input class="form-input" id="cost_date" type="date"></div>
-        <div class="form-group"><label class="form-label">메모</label><input class="form-input" id="cost_memo"></div>
-      </div>
-      <div class="btn-row"><button class="btn btn-secondary" onclick="closeForm('cost')">취소</button>
-        <button class="btn btn-secondary" style="margin-right:8px" onclick="resetCost()">초기화</button><button class="btn btn-primary" id="cost_btn" onclick="saveCost()">저장하기</button></div>
-    </div></details>
   </div>
 
   <!-- 고정비 -->
@@ -299,10 +215,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.34"></script>
-<script src="js/common.js?v=2.9.34"></script>
-<script src="js/calc.js?v=2.9.34"></script>
-<script src="js/nav.js?v=2.9.34"></script>
+<script src="js/schema.js?v=2.9.35"></script>
+<script src="js/common.js?v=2.9.35"></script>
+<script src="js/calc.js?v=2.9.35"></script>
+<script src="js/nav.js?v=2.9.35"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 
@@ -335,9 +251,10 @@ async function loadAll(){
     // 재무 반영 필터: S01 수주·계약·종료 → 연결 PRJ
     const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
     financePrjs=prjs.filter(p=>okPl.has(p.pipeline_id));
-    const opts=financePrjs.map(p=>`<option value="${p.project_id}">${p.project_id} ${p.project_name}</option>`).join('');
-    document.getElementById('rev_project').innerHTML='<option value="">선택</option>'+opts;
-    document.getElementById('cost_project').innerHTML='<option value="">선택</option>'+opts;
+    // v2.9.35: 개별 입력 폼 삭제로 rev_project/cost_project 드롭다운(그 폼의 프로젝트 선택칸)이
+    // 사라졌는데, 이 초기화 코드가 남아 null.innerHTML에서 예외가 발생 — loadAll()의 try/catch에
+    // 걸려 renderLists() 자체가 실행되지 못하고 "로드 실패" 토스트만 뜨던 심각한 결함이었다(회귀
+    // 테스트로 발견). 폼이 없어졌으니 이 초기화 코드도 함께 제거.
     fillPrjFilters();
     renderLists();
   }catch(e){toast('로드 실패: '+e.message,true);}
@@ -381,8 +298,7 @@ function renderLists(){
       <span style="display:flex;gap:6px">
         ${!r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markInvoiced('${r.revenue_id}')">발행 완료</button>`:''}
         ${r.is_received==='Y'?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkRecv('${r.revenue_id}')">입금 해제</button>`:''}
-        ${r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelInvoice('${r.revenue_id}')">발행 취소</button>`:''}
-        <button class="btn-edit" onclick="editRev('${r.revenue_id}')">수정</button></span></div></div>`;}).join('')
+        ${r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelInvoice('${r.revenue_id}')">발행 취소</button>`:''}</span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
   const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
@@ -401,8 +317,7 @@ function renderLists(){
       <span style="display:flex;gap:6px">
         ${!c.invoice_date?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markCostInvoiced('${c.cost_id}')">수취 완료</button>`:''}
         ${c.pay_actual_date?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkPay('${c.cost_id}')">지급 해제</button>`:''}
-        ${c.invoice_date&&!c.pay_actual_date?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelReceipt('${c.cost_id}')">수취 취소</button>`:''}
-        <button class="btn-edit" onclick="editCost('${c.cost_id}')">수정</button></span></div></div>`;}).join('')
+        ${c.invoice_date&&!c.pay_actual_date?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelReceipt('${c.cost_id}')">수취 취소</button>`:''}</span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
   const fx=fixed.filter(f=>f.fixed_id).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('fix_cnt').textContent=`(${fx.length}건)`;
@@ -415,119 +330,15 @@ function renderLists(){
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
 }
 
-// ── VAT 계산 ──
-function calcRevVat(){const s=un(document.getElementById('rev_supply').value);
-  document.getElementById('rev_vat_disp').textContent=wf(Math.round(s*.1));
-  document.getElementById('rev_total_disp').textContent=wf(Math.round(s*1.1));}
-// v2.9.32: UI 표준(매출·매입 대칭) — 매입의 calcCostAmt와 동일한 단가×MM 계산 보조. 계산 결과를
-// 공급가액 칸에 채워 넣을 뿐, 저장은 여전히 공급가액(tax_invoice_amt) 하나로 이루어진다.
-function calcRevAmt(){const u=un(document.getElementById('rev_unit').value),m=parseFloat(document.getElementById('rev_mm').value)||0;
-  if(u&&m){document.getElementById('rev_supply').value=comma(Math.round(u*m));calcRevVat();}}
-function calcCostAmt(){const u=un(document.getElementById('cost_unit').value),m=parseFloat(document.getElementById('cost_mm').value)||0;
-  if(u&&m){document.getElementById('cost_supply').value=comma(Math.round(u*m));calcCostVat();}}
-function calcCostVat(){const s=un(document.getElementById('cost_supply').value);
-  document.getElementById('cost_vat_disp').textContent=wf(Math.round(s*.1));
-  document.getElementById('cost_total_disp').textContent=wf(Math.round(s*1.1));}
-
-// ── 저장 (S04 9컬럼 / S05 11컬럼 / S06 6컬럼 — 전체 재작성) ──
+// v2.9.35: 개별 입력 폼 삭제로 저장 로직(saveRev/saveCost)은 사라졌지만, 상태 변경 함수들
+// (markInvoiced·cancelInvoice·unmarkRecv 등)이 여전히 이 헤더 상수로 시트 전체를 재작성하므로 보존.
 const H4=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
-const H6=['fixed_id','year_month','category','amount','payment_date','memo'];
-
-// v2.9.32: UI 표준(매출·매입 대칭) — S04에는 cost_type/person_name/unit_price/mm 컬럼이 없어(S05만 있음),
-// 유형·항목명·단가·MM을 memo 하나에 구분자로 압축 인코딩한다("유형|항목명|단가|MM|사용자메모").
-// 기존 데이터(순수 텍스트 메모)는 이 포맷이 아니므로 파싱 시 안전하게 원문 그대로 취급(하위호환).
-function encodeRevMemo(){
-  const type=document.getElementById('rev_type').value, item=document.getElementById('rev_item').value;
-  const unit=document.getElementById('rev_unit').value, mm=document.getElementById('rev_mm').value;
-  const note=document.getElementById('rev_memo').value;
-  return `${type}|${item}|${unit}|${mm}|${note}`;
-}
-async function saveRev(){
-  const pj=document.getElementById('rev_project').value, ym=document.getElementById('rev_ym').value, sup=un(document.getElementById('rev_supply').value);
-  if(!pj||!ym||!sup){toast('프로젝트·년월·공급가액은 필수입니다',true);return;}
-  const btn=document.getElementById('rev_btn');btn.disabled=true;btn.textContent='저장 중…';
-  const id=document.getElementById('rev_id').value||nextId(revenues,'revenue_id','REV');
-  const old=revenues.find(r=>r.revenue_id===id)||{};
-  const rec={revenue_id:id,project_id:pj,year_month:ym,tax_invoice_amt:sup,
-    cash_recv_amt:Math.round(sup*1.1),cash_recv_date:document.getElementById('rev_date').value,
-    is_received:document.getElementById('rev_received').value,memo:encodeRevMemo(),
-    vat_amt:Math.round(sup*.1),
-    invoice_plan_date:document.getElementById('rev_invplan').value||old.invoice_plan_date||'',
-    invoice_date:document.getElementById('rev_invdate').value||old.invoice_date||'',
-    matched_txn_id:old.matched_txn_id||'',recv_actual_date:old.recv_actual_date||''};
-  const next=dedupe([...revenues.filter(r=>r.revenue_id&&r.revenue_id!==id),rec],'revenue_id');
-  const ok=await clearAndWrite(...W.S04,[H4,...rowsFor(H4,next)]);
-  btn.disabled=false;btn.textContent='저장하기';
-  if(ok){revenues=next;toast('계획 매출 저장 ✓');resetRev();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
-async function saveCost(){
-  const pj=document.getElementById('cost_project').value, ym=document.getElementById('cost_ym').value, sup=un(document.getElementById('cost_supply').value);
-  if(!pj||!ym||!sup){toast('프로젝트·년월·공급가액은 필수입니다',true);return;}
-  const btn=document.getElementById('cost_btn');btn.disabled=true;btn.textContent='저장 중…';
-  const id=document.getElementById('cost_id').value||nextId(costs,'cost_id','COST');
-  const oldc=costs.find(c=>c.cost_id===id)||{};
-  const rec={cost_id:id,project_id:pj,year_month:ym,cost_type:document.getElementById('cost_type').value,
-    person_name:document.getElementById('cost_person').value,unit_price:un(document.getElementById('cost_unit').value)||0,
-    mm:document.getElementById('cost_mm').value||0,amount:sup,payment_date:document.getElementById('cost_date').value,
-    memo:document.getElementById('cost_memo').value,vat_amt:Math.round(sup*.1),
-    invoice_plan_date:document.getElementById('cost_invplan').value||oldc.invoice_plan_date||'',
-    invoice_date:document.getElementById('cost_invdate').value||oldc.invoice_date||'',
-    matched_txn_id:oldc.matched_txn_id||'',pay_actual_date:oldc.pay_actual_date||''};
-  const next=dedupe([...costs.filter(c=>c.cost_id&&c.cost_id!==id),rec],'cost_id');
-  const ok=await clearAndWrite(...W.S05,[H5,...rowsFor(H5,next)]);
-  btn.disabled=false;btn.textContent='저장하기';
-  if(ok){costs=next;toast('계획 매입 저장 ✓');resetCost();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
-async function saveFix(){
-  const ym=document.getElementById('fix_ym').value, amt=un(document.getElementById('fix_amount').value);
-  if(!ym||!amt){toast('년월·금액은 필수입니다',true);return;}
-  const btn=document.getElementById('fix_btn');btn.disabled=true;btn.textContent='저장 중…';
-  const id=document.getElementById('fix_id').value||nextId(fixed,'fixed_id','FX');
-  const rec={fixed_id:id,year_month:ym,category:document.getElementById('fix_category').value,
-    amount:amt,payment_date:document.getElementById('fix_date').value,memo:document.getElementById('fix_memo').value};
-  const next=dedupe([...fixed.filter(f=>f.fixed_id&&f.fixed_id!==id),rec],'fixed_id');
-  const ok=await clearAndWrite(...W.S06,[H6,...next.map(f=>H6.map(h=>f[h]??''))]);
-  btn.disabled=false;btn.textContent='저장하기';
-  if(ok){fixed=next;toast('고정비 저장 ✓');resetFix();renderLists();}else toast('저장 실패 — 데이터는 변경되지 않았습니다',true);}
-
-// ── 수정·초기화 ──
-// v2.4.9: 수정 시 접힌 개별 폼을 자동으로 펼치고 그 위치로 이동
-function openFormFor(pref){
-  const det=document.querySelector('#tab-'+pref+' details');
-  if(det){det.open=true;det.scrollIntoView({behavior:'smooth',block:'start'});}
-}
-// v2.9.33: "취소"·"초기화" 버튼이 둘 다 reset*()만 호출해 완전히 중복이었던 결함 수정(매출·매입 공통).
-// "취소"는 폼을 접고 내용을 비우는 동작, "초기화"는 펼친 채로 내용만 비우는 동작으로 역할을 분리.
-function closeForm(pref){
-  if(pref==='rev')resetRev(); else resetCost();
-  const det=document.querySelector('#tab-'+pref+' details');
-  if(det)det.open=false;
-}
-function editRev(id){const r=revenues.find(x=>x.revenue_id===id);if(!r)return;
-  const rm=decodeRevMemo(r.memo);
-  document.getElementById('rev_id').value=id;document.getElementById('rev_project').value=r.project_id;
-  document.getElementById('rev_ym').value=r.year_month;document.getElementById('rev_type').value=rm.type||'인건비';
-  document.getElementById('rev_item').value=rm.item||'';document.getElementById('rev_unit').value=rm.unit?comma(rm.unit):'';
-  document.getElementById('rev_mm').value=rm.mm||'';document.getElementById('rev_supply').value=comma(r.tax_invoice_amt);
-  document.getElementById('rev_date').value=r.cash_recv_date;document.getElementById('rev_received').value=r.is_received||'N';
-  document.getElementById('rev_memo').value=rm.note||'';
-  document.getElementById('rev_invplan').value=r.invoice_plan_date||'';
-  document.getElementById('rev_invdate').value=r.invoice_date||'';calcRevVat();openFormFor('rev');}
-function editCost(id){const c=costs.find(x=>x.cost_id===id);if(!c)return;
-  document.getElementById('cost_id').value=id;document.getElementById('cost_project').value=c.project_id;
-  document.getElementById('cost_ym').value=c.year_month;document.getElementById('cost_type').value=c.cost_type||'인건비';
-  document.getElementById('cost_person').value=c.person_name||'';document.getElementById('cost_unit').value=c.unit_price?comma(c.unit_price):'';
-  document.getElementById('cost_mm').value=c.mm||'';document.getElementById('cost_supply').value=comma(c.amount);
-  document.getElementById('cost_date').value=c.payment_date||'';document.getElementById('cost_memo').value=c.memo||'';
-  document.getElementById('cost_invplan').value=c.invoice_plan_date||'';document.getElementById('cost_invdate').value=c.invoice_date||'';
-  calcCostVat();openFormFor('cost');}
 function editFix(id){const f=fixed.find(x=>x.fixed_id===id);if(!f)return;
   document.getElementById('fix_id').value=id;document.getElementById('fix_ym').value=f.year_month;
   document.getElementById('fix_category').value=f.category||'기타비용';document.getElementById('fix_amount').value=comma(f.amount);
   document.getElementById('fix_date').value=f.payment_date||'';document.getElementById('fix_memo').value=f.memo||'';
   window.scrollTo({top:0,behavior:'smooth'});}
-function resetRev(){['rev_id','rev_item','rev_unit','rev_mm','rev_supply','rev_date','rev_memo','rev_invplan','rev_invdate'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('rev_received').value='N';document.getElementById('rev_type').value='인건비';calcRevVat();}
-function resetCost(){['cost_id','cost_person','cost_unit','cost_mm','cost_supply','cost_date','cost_memo','cost_invplan','cost_invdate'].forEach(i=>document.getElementById(i).value='');calcCostVat();}
 function resetFix(){['fix_id','fix_amount','fix_date','fix_memo'].forEach(i=>document.getElementById(i).value='');}
 
 // ═══ 청구 스케줄 자동 생성 (v2.3) ═══
@@ -592,7 +403,12 @@ function genCtx(){
   const eBuy=hasEst?profileTotal(items,'buy_price',st0,en0):0; // 매입도 지급형태 무관하게 전 인력 포함(자금유출 추적)
   // v2.9.27: 부가세 매입세액공제 대상(세금계산서형)과 대상이 아닌 것(사업소득형·급여형)을 분리 계산 —
   // 매입 스케줄 생성 시 두 갈래로 나눠 각각 정확한 vat_amt·invoice_plan_date를 부여하기 위함.
-  const isInvoiceType=e=>e.comp_type!=='인건비'||!e.memo||e.memo==='';
+  // v2.9.35: 인프라·솔루션·기타(기타원가)도 매입 지급형태 구분 대상 — memo가 "_NOINVOICE_"로 시작하면
+  // 세금계산서 미수취(계산서 없이 나가는 매입, 예: 원격지 근무 기타경비)로 취급해 인건비와 동일 원칙 적용.
+  const isInvoiceType=e=>{
+    if(e.comp_type==='인건비') return !e.memo||e.memo==='';
+    return !(e.memo||'').startsWith('_NOINVOICE_');
+  };
   const itemsInvoice=items.filter(isInvoiceType);
   const itemsNonInvoice=items.filter(e=>!isInvoiceType(e));
   const eBuyInvoice=hasEst?profileTotal(itemsInvoice,'buy_price',st0,en0):0;
