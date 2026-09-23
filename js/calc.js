@@ -73,23 +73,10 @@ function monthlyProfile(items,priceField,defStart,defEnd){
       Object.keys(monthlyOverride).forEach(k=>{ byM[k]=(byM[k]||0)+(_n(monthlyOverride[k])); });
       return;
     }
-    // v2.9.27: 사업소득형 인건비(memo="사업소득형")의 buy_price는 v2.9.26부터 "이미 확정된 지급 총액"이지
-    // "월 단가"가 아니다 — mmMonthly(단가×개월비중)로 계산하면 그 총액에 다시 개월수를 곱하는 이중계산이 된다.
-    // 매출(unit_price)에는 이 구분이 없으므로 priceField가 buy_price일 때만 적용, 총액을 근무기간에 걸쳐
-    // 균등 일할 배분한다(비인건비 항목과 동일한 기간 배분 방식 — 그 사람이 실제 그 기간에 지급받는 돈이므로).
-    const isBizIncome=e.comp_type==='인건비'&&(e.memo||'')==='사업소득형'&&priceField==='buy_price';
-    if(isBizIncome){
-      const total=_n(e.buy_price); if(!total) return;
-      if(e.start_date&&e.end_date){
-        const ms=ymList(e.start_date,e.end_date); const tw=ms.reduce((s,x)=>s+x.w,0)||1;
-        ms.forEach(x=>{const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+total*x.w/tw;});
-      } else {
-        const sd=new Date(e.start_date||defStart);
-        const k=`${sd.getFullYear()}-${pad2(sd.getMonth()+1)}`;
-        byM[k]=(byM[k]||0)+total;
-      }
-      return;
-    }
+    // v2.9.30: UI 표준(단가×MM=총액 대칭 구조, 사용자 확립)에 따라 사업소득형의 buy_price도 다시
+    // "단가"로 되돌아왔으므로(v2.9.26~27의 총액 직접입력 방식은 폐기), 세금계산서형과 완전히 동일한
+    // mmMonthly(단가×월별 근무비중) 경로를 그대로 탄다 — 별도 분기가 불필요해졌다(v2.9.27의 isBizIncome
+    // 분기를 유지했다면 이제 "단가"를 "총액"으로 오인해 이중으로 나누는 반대 방향의 결함이 재발했을 것).
     const p=_n(e[priceField]); if(!p)return;
     if(e.comp_type==='인건비'){
       mmMonthly(e.start_date||defStart,e.end_date||defEnd).forEach(x=>{

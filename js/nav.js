@@ -1,7 +1,7 @@
 // HFC nav.js v2.0 — 사이드바·탭바 단일 렌더(메뉴 변경은 이 파일만 수정)
 // v2.9.28: 배포 버전 표시 — 실제 실행 중인 배포가 어느 버전인지 화면에서 바로 구분할 수 있게(사용자 요청).
 // 새 버전 배포 시 이 상수 하나만 갱신하면 전 화면(사이드바+모바일 탭바)에 자동 반영된다.
-const HFC_VERSION='v2.9.29';
+const HFC_VERSION='v2.9.34';
 const NAV_ITEMS=[
   ['dash','🏠','대시보드','index.html',true],
   ['pipeline','📋','사업기회','pipeline.html',true],

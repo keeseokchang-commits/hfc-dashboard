@@ -105,10 +105,12 @@ async function run() {
       S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
         ['PRJ-999','PL-999','테스트PJ','고객','30000000','2026-09-01','2027-03-31','수주']],
       S04_REVENUE: [['revenue_id']], S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
-      // 외주업체(세금계산서형)+프리랜서(사업소득형, buy_price=총액)+정직원(급여형) 3인 혼합
+      // v2.9.31: 근본 결함 수정 후 — 세금계산서형·사업소득형 모두 buy_price는 "단가"(mm과 곱해질 값).
+      // 외주업체(세금계산서형, 단가7,000,000×7=49,000,000)+프리랜서(사업소득형, 단가8,000,000×7=56,000,000)
+      // +정직원(급여형, 월별 확정 총액 합계 16,800,000) 3인 혼합
       S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
         ['E1','PL-999','인건비','외주업체','특급','','','13000000','7000000','','7','2026-09-01','2027-03-31','',''],
-        ['E2','PL-999','인건비','프리랜서','고급','','','10000000','56000000','','7','2026-09-01','2027-03-31','사업소득형',''],
+        ['E2','PL-999','인건비','프리랜서','고급','','','10000000','8000000','','7','2026-09-01','2027-03-31','사업소득형',''],
         ['E3','PL-999','인건비','정직원','초급','','','0','16800000','','7','2026-09-01','2027-03-31',
           '급여형|{"2026-09":2400000,"2026-10":2400000,"2026-11":2400000,"2026-12":2400000,"2027-01":2400000,"2027-02":2400000,"2027-03":2400000}','']],
     };
@@ -122,20 +124,46 @@ async function run() {
     await new Promise(r => setTimeout(r, 100));
     const c = w.eval('genCtx()');
     s.check(c.eSell === 161000000, 'v2.9.27: 매출은 지급형태 무관하게 3인 전원 포함(161,000,000)');
-    s.check(c.eBuy === 121800000, 'v2.9.27: 매입(자금유출)도 3인 전원 포함(49,000,000+56,000,000+16,800,000)');
+    s.check(c.eBuy === 121800000, 'v2.9.31: 매입(자금유출)도 3인 전원 포함(49,000,000+56,000,000+16,800,000) — 단가 저장 방식 수정 후에도 정확');
     s.check(c.eBuyInvoice === 49000000, 'v2.9.27: 세금계산서형 매입만 별도 집계(49,000,000)');
-    s.check(c.eBuyNonInvoice === 72800000, 'v2.9.27: 사업소득형+급여형(계산서없음) 매입 별도 집계(72,800,000)');
+    s.check(c.eBuyNonInvoice === 72800000, 'v2.9.31: 사업소득형+급여형(계산서없음) 매입 별도 집계(72,800,000)');
 
     await w.eval('saveGen()');
     await new Promise(r => setTimeout(r, 400));
     const saved = (wc.S05 || []).slice(1);
     const totalAmount = saved.reduce((sum, r) => sum + r[7], 0);
     const totalVat = saved.reduce((sum, r) => sum + r[10], 0);
-    s.check(totalAmount === 121800000, 'v2.9.27: 저장된 매입 총액이 3인 전원 반영(121,800,000)');
+    s.check(totalAmount === 121800000, 'v2.9.31: 저장된 매입 총액이 3인 전원 반영(121,800,000)');
     s.check(totalVat === 4900000, 'v2.9.27: 저장된 부가세는 세금계산서형만 반영(4,900,000, 나머지는 0)');
     const nonInvoiceRows = saved.filter(r => r[10] === 0);
     s.check(nonInvoiceRows.reduce((sum, r) => sum + r[7], 0) === 72800000,
       'v2.9.27: 부가세 0원인 행(계산서없음)의 금액 합계가 정확히 72,800,000');
+  }
+
+  // ── v2.9.31: 근본 결함 회귀 방지 — S12.buy_price는 시스템 전체(project.html·cashflow.html·input.html의
+  //           monthlyProfile)가 "단가"로 취급해 mm을 곱한다. 세금계산서형 견적을 저장할 때(estimate.html)
+  //           buy_price에 실수로 "이미 계산된 총액"이 들어가면, 청구 스케줄 생성 시 그 총액에 mm이
+  //           다시 곱해져 정확히 mm배만큼 부풀려진다 — 이 왜곡이 재발하지 않는지 직접 확인한다. ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
+        ['PL-U','x','c','','80','30000000','2026-09-03','2026-11-02','기타','수주','','','인력공급']],
+      S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
+        ['PRJ-U','PL-U','p','c','30000000','2026-09-03','2026-11-02','수주']],
+      S04_REVENUE: [['revenue_id']], S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
+      // 단가 7,000,000원, MM 2 → 정확한 총액은 14,000,000원(단가 그대로 저장된 정상 케이스)
+      S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
+        ['E1','PL-U','인건비','외주인력','고급','','','8500000','7000000','','2','2026-09-03','2026-11-02','','']],
+    };
+    const { dom } = await require('./_e2e_helpers').openPage(ROOT, portFor('unitprice-guard'), 'input.html', sheetData, {});
+    const w = dom.window, d = w.document;
+    w.eval('openGenModal(true)');
+    d.getElementById('genPrj').value = 'PRJ-U';
+    w.eval('onGenPrjChange()');
+    await new Promise(r => setTimeout(r, 100));
+    const c = w.eval('genCtx()');
+    s.check(c.eBuy === 14000000,
+      'v2.9.31: 단가(7,000,000)×MM(2)=14,000,000 정확 — buy_price를 총액으로 오인해 2배 부풀려지지 않음');
   }
 
   return s;

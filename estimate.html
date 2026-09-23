@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.29">
+<link rel="stylesheet" href="css/common.css?v=2.9.34">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.29"></script>
-<script src="js/common.js?v=2.9.29"></script>
-<script src="js/calc.js?v=2.9.29"></script>
-<script src="js/nav.js?v=2.9.29"></script>
+<script src="js/schema.js?v=2.9.34"></script>
+<script src="js/common.js?v=2.9.34"></script>
+<script src="js/calc.js?v=2.9.34"></script>
+<script src="js/nav.js?v=2.9.34"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -212,15 +212,15 @@ function loadOpp(){
       if(jsonPart){ try{ monthlyOverride=JSON.parse(jsonPart)||{}; }catch(err){ monthlyOverride={}; } }
     }
     const payType=isSalaried?'급여형':(isBiz?'사업소득형':'세금계산서형');
-    // v2.9.26: 급여형의 buy_price는 저장 시 "월별 합계 총액"이었으므로, 대표 단가(화면 표시용)는 오버라이드
-    // 없는 달의 값이나, 오버라이드된 값이 있으면 그중 하나를 기준값으로 복원(정확한 개별월 값은 monthlyOverride가 근거).
-    // 사업소득형은 buy_price가 이미 확정 총액이므로 buyAmount로 로드(buy는 0 — 단가 개념 자체가 없음),
-    // 세금계산서형만 buy_price를 그대로 "단가"로 로드(MM과 곱해질 값).
+    // v2.9.31: S12.buy_price는 이제 세금계산서형·사업소득형 모두 "단가" 그대로 저장되므로(위 저장부 수정)
+    // 역산이 필요 없다 — num(e.buy_price) 그대로가 단가다. 급여형만 저장 형식이 다르므로(월별 합계 총액)
+    // 대표 단가(화면 표시용)를 오버라이드 없는 달의 값이나 오버라이드된 값 중 하나로 복원.
     const ovVals=Object.values(monthlyOverride);
+    const mmVal=numF(e.mm)||0;
     const buyDisplay=isSalaried?(ovVals.length?ovVals[0]:0):(num(e.buy_price)||0);
     return {name:e.item_name,grade:e.grade,setId:e.grade_set_id,
-      sell:num(e.unit_price)||0,buy:isBiz?0:buyDisplay,buyAmount:isBiz?(num(e.buy_price)||0):0,
-      start:e.start_date,end:e.end_date,mm:numF(e.mm)||0,payType,monthlyOverride};
+      sell:num(e.unit_price)||0,buy:buyDisplay,
+      start:e.start_date,end:e.end_date,mm:mmVal,payType,monthlyOverride};
   });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
@@ -280,20 +280,17 @@ function renderLabor(){
             :'매입 단가에 세금계산서 공급가액(월/MM)을 입력하세요 — 청구 스케줄 생성 시 매입 목록(부가세 매입세액공제 대상)으로 자동 생성됩니다'}
         </div>
       </div>
-      <!-- v2.9.26: 단가(월/MM 곱셈 대상)와 금액(이미 확정된 총액)을 별도 필드로 분리 — 사업소득형이 저장 시
-           단가×MM로 총액화된 값을 재조회 때 다시 단가로 오인해 또 곱해지는 이중계산 사고(사용자 신고) 방지.
-           세금계산서형=매입 단가(p.buy, MM과 곱해짐). 급여형=월별 기본단가(p.buy, monthlyOverride로 개별월 예외
-           처리 — 기존 구조 그대로 유지). 사업소득형만 신규 매입 금액(p.buyAmount, 총액 그대로 사용)으로 분리. -->
+      <!-- v2.9.30: UI 표준(사용자 확립) — 매출·매입은 항상 [단가] × [MM] = [총액] 대칭 구조로 나열한다.
+           세금계산서형·사업소득형 모두 매입 단가(p.buy) 입력 → MM과 곱해 총액이 계산되어 표시된다.
+           급여형만 예외(월별로 이미 확정된 금액을 나열하는 구조 자체가 다름) — 월별 지급액 표에서 단가/총액 구분. -->
       <div class="fr">
         <div><label class="fl">매출 단가 (원/MM)</label><input class="fi" value="${comma(p.sell)}" oninput="this.value=comma(this.value);labor[${i}].sell=un(this.value);recalc()"></div>
-        ${p.payType==='사업소득형'
-          ?`<div><label class="fl">매입 금액 (원, 총액) — 3.3% 원천징수 후 지급액</label><input class="fi" value="${comma(p.buyAmount||0)}" oninput="this.value=comma(this.value);labor[${i}].buyAmount=un(this.value);recalc()"></div>`
-          :`<div><label class="fl">매입 단가 (원/MM)${p.payType==='급여형'?' — 월별 기본단가(개별월은 아래에서 조정)':''}</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>`}
+        <div><label class="fl">매입 단가 (원/MM)${p.payType==='사업소득형'?' — 3.3% 원천징수 후 지급 기준':p.payType==='급여형'?' — 월별 기본단가(개별월은 아래에서 조정)':''}</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
       </div>
       <div class="fr3">
         <div><label class="fl">시작예정일</label><input class="fi" type="date" value="${p.start}" onchange="labor[${i}].start=this.value;autoMM(${i})"></div>
         <div><label class="fl">종료예정일</label><input class="fi" type="date" value="${p.end}" onchange="labor[${i}].end=this.value;autoMM(${i})"></div>
-        <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 월별 지급액 합계':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" disabled oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
+        <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 월별 지급액 합계':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" ${p.payType==='급여형'?'disabled':''} oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
       </div>
       ${p.payType==='급여형'?monthlyOverrideHtml(p,i):''}
       <div style="text-align:right;font-size:12px;color:var(--text2)">
@@ -323,10 +320,11 @@ function monthlyOverrideHtml(p,i){
     }).join('')}
   </div>`;
 }
-// v2.9.26: 지급형태별 실제 매입 원가 — 세금계산서형=단가×MM, 사업소득형=금액 필드 그대로(이중계산 방지),
-// 급여형=월별 오버라이드 합(미오버라이드 달은 기본단가 그대로).
+// v2.9.30: UI 표준 확립(사용자 지적) — 매출·매입은 화면에서 항상 "단가 × 수량/MM = 총액" 대칭 구조로
+// 나열되어야 한다. v2.9.26에서 사업소득형을 별도 필드(buyAmount, 총액 직접입력)로 분리한 것은
+// 이중계산은 막았지만 매출 칸과 비대칭인 UI를 만드는 설계 미스였다 — 되돌리고, 세금계산서형과 동일하게
+// p.buy(단가)×p.mm=총액 구조로 통일한다(이중계산 방지는 저장·로드 시점의 단가↔총액 변환 규율로 지킨다).
 function laborBuyTotal(p){
-  if(p.payType==='사업소득형') return p.buyAmount||0;
   if(p.payType!=='급여형') return Math.round(p.buy*p.mm);
   if(!p.start||!p.end) return Math.round(p.buy*p.mm);
   const months=ymList(p.start,p.end);
@@ -443,11 +441,10 @@ async function saveEstimate(){
   const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='저장 중…';
   const today=new Date().toISOString().slice(0,10);
   const prevItems=estimates.filter(e=>e.pipeline_id===cur.pipeline_id);
-  // v2.9.26: 인건비 매입은 지급형태에 따라 buy_price의 의미가 다르다(세금계산서형=단가→×mm 필요,
-  // 사업소득형/급여형=이미 확정된 총액→그대로 사용) — 여기서도 laborBuyTotal과 동일 원칙 적용해야
-  // 이중계산 없이 정확한 "변경 전" 금액을 비교할 수 있다.
-  const prevLaborBuy=e=>{ if((e.memo||'')==='사업소득형') return num(e.buy_price)||0;
-    if((e.memo||'').startsWith('급여형')) return num(e.buy_price)||0; // 저장 시 이미 월별 합계 총액
+  // v2.9.31: S12.buy_price는 급여형만 "월별 합계 총액"으로 저장되고, 세금계산서형·사업소득형은
+  // 항상 "단가"로 저장된다(위 저장부 수정과 동일 원칙) — 여기서도 그 규칙을 그대로 따라야 정확한
+  // "변경 전" 금액을 비교할 수 있다.
+  const prevLaborBuy=e=>{ if((e.memo||'').startsWith('급여형')) return num(e.buy_price)||0; // 저장 시 이미 월별 합계 총액
     return Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)); };
   const prevSell=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
   const prevBuy=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?prevLaborBuy(e):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
@@ -466,10 +463,17 @@ async function saveEstimate(){
     // v2.9.24: 사업소득형은 memo="사업소득형"으로 명시 태그(세금계산서형=memo 공백과 구분 필요 —
     // 이전에는 태그가 없어 "사업소득형"과 "v2.9.17 이전 기존 데이터(=세금계산서형)"를 구분할 수 없었음).
     const memo=p.payType==='급여형'?`급여형|${JSON.stringify(fullOverride)}`:(p.payType==='사업소득형'?'사업소득형':'');
-    const buyTotal=laborBuyTotal(p); // v2.9.26: 지급형태별 계산을 laborBuyTotal 한 곳으로 통일(SSOT)
+    // v2.9.31: 근본 결함 발견·수정 — S12.buy_price는 시스템 전체(project.html·cashflow.html·input.html의
+    // monthlyProfile)가 "단가"로 취급해 mm을 곱하는 필드인데, saveEstimate()만 laborBuyTotal(=이미
+    // 계산된 총액)을 그대로 넣고 있어 세금계산서형·사업소득형 매입이 어디서 읽든 항상 2중으로 곱해지고
+    // 있었다(v2.9.19 이후 계속 존재했을 근본 결함 — 이번에 사업소득형 UI를 단가 입력 방식으로 되돌리며
+    // 직접 재현·확인함). 급여형만 예외(월별 확정 총액을 memo의 JSON으로 별도 관리하며 mm×buy_price
+    // 공식 자체를 타지 않으므로 영향 없음) — 세금계산서형·사업소득형은 buy_price에 항상 "단가"(p.buy)를
+    // 저장해 소비처의 "buy_price=단가" 전제와 실제 저장 형식을 일치시킨다.
+    const buyToSave=p.payType==='급여형'?laborBuyTotal(p):p.buy;
     rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
     comp_type:'인건비',item_name:p.name||`${p.grade} 인력`,grade:p.grade,grade_set_id:p.setId,qty:1,
-    unit_price:p.sell,buy_price:buyTotal,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
+    unit_price:p.sell,buy_price:buyToSave,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
     memo,created_at:today});});
   [['infra','인프라'],['sol','솔루션'],['etc','기타']].forEach(([k,ct])=>{
     items[k].forEach(it=>{n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,

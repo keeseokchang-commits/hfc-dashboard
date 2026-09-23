@@ -109,10 +109,11 @@ async function run() {
       'v2.9.23: 저장된 JSON에 4개월 전부 명시(9월=오버라이드값, 나머지=단가)');
   }
 
-  // ── v2.9.26: 사업소득형 매입금액이 저장→재조회를 거쳐도 MM만큼 곱해지지 않아야 함(사용자 신고 버그) ──
-  // 원인: 저장 시 buy(단가)×mm으로 총액화한 값을 buy_price에 넣었는데, 재조회 시 이 총액을 다시 "단가"로
-  // 오인해 화면의 buy 필드에 복원 → 다음 저장 때 또 mm을 곱해 이중 반영됨. 해결: 단가(buy)와 금액(buyAmount)을
-  // 별도 필드로 분리해, 사업소득형은 항상 buyAmount만 사용(mm 곱셈 없음).
+  // ── v2.9.30: UI 표준(사용자 확립) — 매출·매입은 항상 [단가]×[MM]=[총액] 대칭 구조로 나열되어야 한다.
+  // v2.9.26의 사업소득형 전용 buyAmount(총액 직접입력) 필드는 이중계산은 막았지만 매출 칸과 비대칭인
+  // UI를 만든 설계 미스였음(사용자 지적) — 되돌려서 세금계산서형과 동일하게 단가 입력→MM 자동곱셈 구조로
+  // 통일하고, 저장 시 단가×mm=총액을 buy_price에 넣고 로드 시 총액÷mm으로 단가를 정확히 역산해
+  // 이중계산 없이 저장→재조회를 반복해도 값이 보존되는지 확인한다. ──
   {
     const sheetData = baseSheet([['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at']]);
     const wc = {};
@@ -122,29 +123,39 @@ async function run() {
     d.getElementById('oppSel').value = 'PL-999';
     w.eval('loadOpp()');
     await new Promise(r => setTimeout(r, 100));
-    w.eval(`labor=[{name:'김기황',grade:'고급',setId:'',sell:0,buy:0,buyAmount:9369234,start:'',end:'',mm:0,payType:'사업소득형'}]`);
+    w.eval(`labor=[{name:'김기황',grade:'고급',setId:'',sell:0,buy:0,start:'',end:'',mm:0,payType:'사업소득형'}]`);
     w.eval('renderLabor();');
     await new Promise(r => setTimeout(r, 50));
     const dateInputs = [...d.querySelectorAll('#laborList input[type=date]')];
-    dateInputs[0].value = '2026-08-03'; dateInputs[0].dispatchEvent(new w.Event('change', { bubbles: true }));
+    dateInputs[0].value = '2026-09-03'; dateInputs[0].dispatchEvent(new w.Event('change', { bubbles: true }));
     await new Promise(r => setTimeout(r, 50));
-    dateInputs[1].value = '2026-09-02'; dateInputs[1].dispatchEvent(new w.Event('change', { bubbles: true }));
+    dateInputs[1].value = '2026-11-02'; dateInputs[1].dispatchEvent(new w.Event('change', { bubbles: true }));
     await new Promise(r => setTimeout(r, 50));
-    s.check(w.eval('laborBuyTotal(labor[0])') === 9369234, 'v2.9.26: 사업소득형 매입금액은 MM(1)과 무관하게 그대로');
+    s.check(w.eval('labor[0].mm') === 2, 'v2.9.30: 사업소득형도 세금계산서형과 동일하게 기간에서 MM 자동계산(2.00)');
+    s.check(d.getElementById('mm_0').disabled === false, 'v2.9.30: 사업소득형 MM 입력칸은 활성 상태(UI 대칭 — 급여형만 예외)');
+    const allInputs = [...d.querySelectorAll('#laborList input')];
+    const buyInput = allInputs[2]; // [이름,매출단가,매입단가,...]
+    buyInput.value = '7917208'; buyInput.dispatchEvent(new w.Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    s.check(w.eval('laborBuyTotal(labor[0])') === 15834416, 'v2.9.30: 매입 단가(7,917,208)×MM(2)=총액(15,834,416) 정확 계산');
     await w.eval('saveEstimate()');
     await new Promise(r => setTimeout(r, 300));
     const row = (wc.S12 || []).slice(1).find(r => r[3] === '김기황');
-    s.check(row && row[8] === 9369234, 'v2.9.26: 저장된 buy_price가 이중계산 없이 9,369,234 그대로');
+    // v2.9.31: 근본 결함 발견으로 정정 — buy_price는 시스템 전체(project.html·cashflow.html·input.html)가
+    // "단가"로 취급해 mm을 곱하는 필드다. v2.9.30 시점엔 이걸 "총액"으로 저장하도록 잘못 고쳐서, 소비처에서
+    // mm이 다시 곱해져 이중계산되는 결함이 있었다(실제 재현·확인 후 즉시 수정) — 이제 단가 그대로 저장.
+    s.check(row && row[8] === 7917208, 'v2.9.31: 저장된 buy_price는 단가(7,917,208) 그대로 — 총액 아님');
 
-    // 재조회(새 세션) — 여기서 MM만큼 늘어나는 게 신고된 버그였음
+    // 재조회(새 세션) — buy_price가 이미 단가이므로 그대로 복원되고, 화면 표시 총액(단가×mm)도 정확해야 함
     const sheetData2 = baseSheet(wc.S12);
     const { dom: dom2 } = await openPage(ROOT, portFor('bizamount2'), 'estimate.html', sheetData2, { confirm: () => true });
     const w2 = dom2.window, d2 = w2.document;
     d2.getElementById('oppSel').value = 'PL-999';
     w2.eval('loadOpp()');
     await new Promise(r => setTimeout(r, 100));
-    s.check(w2.eval('laborBuyTotal(labor[0])') === 9369234,
-      'v2.9.26: 재조회해도 매입금액이 9,369,234 그대로(MM만큼 늘어나지 않음 — 신고된 버그 재현 방지)');
+    s.check(w2.eval('labor[0].buy') === 7917208, 'v2.9.31: 재조회 시 매입 단가가 그대로 복원(7,917,208, 역산 불필요)');
+    s.check(w2.eval('laborBuyTotal(labor[0])') === 15834416,
+      'v2.9.31: 재조회 후 화면 표시 총액(단가×mm)도 이중계산 없이 15,834,416 정확');
   }
 
   return s;
