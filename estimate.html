@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.28">
+<link rel="stylesheet" href="css/common.css?v=2.9.29">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.28"></script>
-<script src="js/common.js?v=2.9.28"></script>
-<script src="js/calc.js?v=2.9.28"></script>
-<script src="js/nav.js?v=2.9.28"></script>
+<script src="js/schema.js?v=2.9.29"></script>
+<script src="js/common.js?v=2.9.29"></script>
+<script src="js/calc.js?v=2.9.29"></script>
+<script src="js/nav.js?v=2.9.29"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -271,8 +271,12 @@ function renderLabor(){
             <option value="급여형" ${p.payType==='급여형'?'selected':''}>급여형 (4대보험, 계산서 없음)</option>
           </select></div>
         <div style="font-size:11px;color:var(--text3);align-self:flex-end;padding-bottom:8px">
-          ${p.payType==='급여형'?'매입 금액에 4대보험·소득세 포함 회사 실지급 총액을 직접 입력하세요(청구 스케줄 생성 시 매입 목록에 포함되지 않음)'
-            :p.payType==='사업소득형'?'매입 금액에 3.3% 원천징수 후 지급하는 사업소득 총액을 직접 입력하세요(청구 스케줄 생성 시 매입 목록에 포함되지 않음)'
+          <!-- v2.9.29: v2.9.27에서 "매입 스케줄=지급형태 무관 전원 포함"으로 설계를 뒤집으면서
+               이 안내 문구가 옛 설계(v2.9.24, 계산서 없는 매입은 스케줄에서 제외)를 그대로 남겨두고 있었음
+               (사용자 신고) — 실제로는 세금계산서 화면의 매입 스케줄에 포함되는데 "포함되지 않음"이라고
+               잘못 안내해 어디서 확인할 수 있는지 알 수 없게 만들었다. 정정. -->
+          ${p.payType==='급여형'?'매입 금액에 4대보험·소득세 포함 회사 실지급 총액을 직접 입력하세요(세금계산서 화면의 청구 스케줄에는 포함되나 부가세는 0원 처리)'
+            :p.payType==='사업소득형'?'매입 금액에 3.3% 원천징수 후 지급하는 사업소득 총액을 직접 입력하세요(세금계산서 화면의 청구 스케줄에는 포함되나 부가세는 0원 처리)'
             :'매입 단가에 세금계산서 공급가액(월/MM)을 입력하세요 — 청구 스케줄 생성 시 매입 목록(부가세 매입세액공제 대상)으로 자동 생성됩니다'}
         </div>
       </div>
