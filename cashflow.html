@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.43">
+<link rel="stylesheet" href="css/common.css?v=2.9.45">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -294,10 +294,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.43"></script>
-<script src="js/common.js?v=2.9.43"></script>
-<script src="js/calc.js?v=2.9.43"></script>
-<script src="js/nav.js?v=2.9.43"></script>
+<script src="js/schema.js?v=2.9.45"></script>
+<script src="js/common.js?v=2.9.45"></script>
+<script src="js/calc.js?v=2.9.45"></script>
+<script src="js/nav.js?v=2.9.45"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -497,21 +497,35 @@ function deriveActFromDetail(det){
     const inA=num(t.inflow_amt)||0, outA=num(t.outflow_amt)||0, bal=num(t.balance)||0;
     m.act_inflow+=inA; m.act_outflow+=outA;
     if(bal>0) m.act_balance=bal; // 정렬 확정 순서의 마지막 거래 잔액 = 월말 잔액
-    switch(t.category){
-      case '매출입금': m.inflow_revenue+=inA; break;
-      case '자본납입': m.inflow_capital+=inA; break;
-      case '기타입금': m.inflow_etc+=inA; break;
-      case '매입지급': m.outflow_cost+=outA; break;
-      case '고정비':   m.outflow_fixed+=outA; break;
-      case '급여':     m.outflow_fixed+=outA; break;
-      case '세금':     m.outflow_tax+=outA; break;
-      case '법인카드': m.outflow_card+=outA; break;
-      case 'AI사용료': m.outflow_ai+=outA; break;
-      default:         if(outA) m.outflow_etc+=outA; else if(inA) m.inflow_etc+=inA;
-    }
-    if((t.category==='기타비용'||t.category==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
+    // v2.9.45: 근본 재설계 — v2.9.44의 공백 제거는 "매출입금"류 우연한 불일치만 가리는 편법이었다
+    // (사용자 지적: "띄어쓰기가 문제인게 아니고, 등록된 유형을 기준으로 분류하도록 해야지"). 이제
+    // 하드코딩 문자열과 비교하지 않고, 코드 관리 화면에서 사용자가 각 유형에 명시적으로 지정한
+    // "집계 버킷"(bucketOf, S10의 description 컬럼)을 조회해 정확히 그 버킷에 집계한다 — 유형명이
+    // 무엇이든, 몇 개를 등록했든 항상 정확하다. 버킷을 지정하지 않은 유형(또는 미분류)은 기타로.
+    addToBucket(m, bucketOf(t.category), inA, outA);
+    if((bucketOf(t.category)==='기타비용'||bucketOf(t.category)==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
   });
   return Object.values(monthly).sort((a,b)=>a.year_month.localeCompare(b.year_month));
+}
+// v2.9.45: 유형명 → 집계 버킷 조회(코드 관리에서 사용자가 명시적으로 지정한 매핑, S10의 category=
+// 'txn_type' 행의 description 컬럼). 지정이 없으면(구버전 데이터·미분류) 기타로 폴백.
+function bucketOf(category){
+  const r=(s10All||[]).find(x=>x.category==='txn_type'&&x.setting_key===category);
+  return (r&&r.description)||'';
+}
+function addToBucket(m,bucket,inA,outA){
+  switch(bucket){
+    case '매출입금': m.inflow_revenue+=inA; break;
+    case '자본납입': m.inflow_capital+=inA; break;
+    case '기타입금': m.inflow_etc+=inA; break;
+    case '매입지급': m.outflow_cost+=outA; break;
+    case '고정비':   m.outflow_fixed+=outA; break;
+    case '세금':     m.outflow_tax+=outA; break;
+    case '법인카드': m.outflow_card+=outA; break;
+    case 'AI사용료': m.outflow_ai+=outA; break;
+    case '기타비용': m.outflow_etc+=outA; break;
+    default:         if(outA) m.outflow_etc+=outA; else if(inA) m.inflow_etc+=inA;
+  }
 }
 
 // v2.5.2: 시간 오름차순 재배열 + 동일 일시 그룹은 잔액 체이닝(직전잔액+입금−출금=잔액)으로 순서 확정
@@ -560,21 +574,12 @@ function aggregateMonthly(txns){
     m.act_outflow+=t.outAmt;
     monthTxns[t.ym].push(t);
 
-    switch(t.cat){
-      case '매출입금':  m.inflow_revenue+=t.inAmt; break;
-      case '자본납입':  m.inflow_capital+=t.inAmt; break;
-      case '기타입금':  m.inflow_etc+=t.inAmt; break;
-      case '매입지급':  m.outflow_cost+=t.outAmt; break;
-      case '고정비':    m.outflow_fixed+=t.outAmt; break;
-      case '세금':      m.outflow_tax+=t.outAmt; break;
-      case '법인카드':  m.outflow_card+=t.outAmt; break;
-      case 'AI사용료':  m.outflow_ai+=t.outAmt; break;
-      case '기타비용':  m.outflow_etc+=t.outAmt; break;
-    }
+    // v2.9.45: 위 aggregateMonthly(rows)와 동일한 근본 수정 — 코드 관리에서 지정한 집계 버킷으로 조회.
+    addToBucket(m, bucketOf(t.cat), t.inAmt, t.outAmt);
   });
 
   // 미분류 체크 (기타비용·기타입금 중 금액 큰 것)
-  unclassified=txns.filter(t=>t.cat==='기타비용'&&t.outAmt>=50000);
+  unclassified=txns.filter(t=>bucketOf(t.cat)==='기타비용'&&t.outAmt>=50000);
   parsedMonthly=monthly;
   // v2.4.3: 병합 원칙 — 기존 시트의 월 실적은 보존하고, 이번 CSV에 등장한 월만 갱신
   const _newAct=Object.entries(monthly).map(([ym,v])=>({year_month:ym,...v}));

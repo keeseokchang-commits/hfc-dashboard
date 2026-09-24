@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.43">
+<link rel="stylesheet" href="css/common.css?v=2.9.45">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -215,10 +215,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.43"></script>
-<script src="js/common.js?v=2.9.43"></script>
-<script src="js/calc.js?v=2.9.43"></script>
-<script src="js/nav.js?v=2.9.43"></script>
+<script src="js/schema.js?v=2.9.45"></script>
+<script src="js/common.js?v=2.9.45"></script>
+<script src="js/calc.js?v=2.9.45"></script>
+<script src="js/nav.js?v=2.9.45"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -471,7 +471,10 @@ async function loadCodes(){
  try{
   const rows=toObj(await fetchSheet(...R.S10));
   s10Other=rows.filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category));
-  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
+  // v2.9.45: txn_type만 description 컬럼에 저장된 "집계 버킷"을 세 번째 요소로 함께 복원.
+  // description은 그동안 이 카테고리들에서 항상 빈 문자열로만 저장되던 컬럼이라 스키마 변경 없이 재사용.
+  codeRows.txn_type=rows.filter(r=>r.category==='txn_type').map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.description||'']);
+  ['branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
   if(!codeRows.txn_type.length){
     // v2.9.42: 이 폴백도 옛 key/value 필드명이라 항상 빈 값만 반환하던 결함 — setting_key/setting_value로 정정.
     const kw=k=>(rows.find(r=>r.setting_key===k)||{}).setting_value||'';
@@ -480,6 +483,21 @@ async function loadCodes(){
   renderCodes();
  }catch(e){}
 }
+// v2.9.45: 근본 결함 수정 — 자금수지 집계(대시보드 배지·상세 모달)가 "매출입금"·"매입지급" 등
+// 정확히 9개의 하드코딩된 유형명 문자열에 의존해왔다. 사용자는 이 화면에서 원하는 이름으로 자유롭게
+// 유형을 등록할 수 있는데(예: "매출 입금", "보증보험", "수수료", "경조사비" 등 실제로 9개와 이름도
+// 개수도 다르게 등록되어 있었음), 그 이름이 하드코딩 문자열과 정확히 일치하지 않으면 집계에서
+// 조용히 누락됐다 — 공백 제거(v2.9.44)는 "매출입금"류의 우연한 불일치만 가리는 편법이었고, 근본
+// 원인(등록된 유형과 집계 로직이 별개로 하드코딩된 구조)을 고치지 못했다(사용자 지적).
+// 근본 해결: 각 유형에 "집계 버킷"(자금수지 배지·상세모달이 실제로 읽는 카테고리)을 명시적으로
+// 지정하는 드롭다운을 추가한다. classify()는 여전히 사용자가 등록한 유형명 그대로를 반환하고,
+// 집계 로직은 그 유형명으로 이 매핑을 조회해 버킷을 결정한다 — 문자열 일치가 아니라 사용자가
+// 명시한 매핑을 사용하므로 이름이 무엇이든, 몇 개를 등록하든 항상 정확하다.
+const TXN_BUCKETS=[
+  ['매출입금','매출입금(입금)'],['자본납입','자본납입(입금)'],['기타입금','기타입금(입금)'],
+  ['매입지급','매입지급(출금)'],['고정비','고정비(출금)'],['세금','세금(출금)'],
+  ['법인카드','법인카드(출금)'],['AI사용료','AI사용료(출금)'],['기타비용','기타비용(출금)'],
+];
 function renderCodes(){
   const mk=(c,ph1,ph2,useDL)=>codeRows[c].map((r,i)=>`<div class="code-row">
     <input value="${r[0]||''}" placeholder="${ph1}" data-c="${c}" data-i="${i}" data-f="0" oninput="codeRows['${c}'][${i}][0]=this.value${c==='txn_type'?';fillDL()':''}">
@@ -487,7 +505,16 @@ function renderCodes(){
     <button onclick="moveCode('${c}',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
     <button onclick="moveCode('${c}',${i},1)" title="우선순위 내리기" ${i===codeRows[c].length-1?'disabled style="opacity:.25"':''}>▼</button>
     <button onclick="codeRows['${c}'].splice(${i},1);renderCodes()">✕</button></div>`).join('');
-  document.getElementById('ctTxn').innerHTML=mk('txn_type','유형명 (예: 매입지급)','키워드 콤마구분 (예: 오벳소프트,외주비)');
+  document.getElementById('ctTxn').innerHTML=codeRows.txn_type.map((r,i)=>`<div class="code-row">
+    <input value="${r[0]||''}" placeholder="유형명 (예: 매출 입금)" data-c="txn_type" data-i="${i}" data-f="0" oninput="codeRows['txn_type'][${i}][0]=this.value;fillDL()">
+    <input value="${r[1]||''}" placeholder="키워드 콤마구분 (예: 오벳소프트,외주비)" oninput="codeRows['txn_type'][${i}][1]=this.value">
+    <select style="max-width:150px" onchange="codeRows['txn_type'][${i}][2]=this.value">
+      <option value="">집계 버킷 선택…</option>
+      ${TXN_BUCKETS.map(([v,l])=>`<option value="${v}" ${r[2]===v?'selected':''}>${l}</option>`).join('')}
+    </select>
+    <button onclick="moveCode('txn_type',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
+    <button onclick="moveCode('txn_type',${i},1)" title="우선순위 내리기" ${i===codeRows.txn_type.length-1?'disabled style="opacity:.25"':''}>▼</button>
+    <button onclick="codeRows['txn_type'].splice(${i},1);renderCodes()">✕</button></div>`).join('');
   document.getElementById('ctBranch').innerHTML=mk('branch_rule','거래점 패턴 (예: 하나은행0026)','적용 유형 (예: 법인카드)',true);
   document.getElementById('ctFixed').innerHTML=mk('fixed_item','항목명 (예: 임차료)','대사 키워드(선택)');
   document.getElementById('ctSkill').innerHTML=mk('skill_tag','태그명 (예: React)','동의어 콤마구분 (예: 리액트,react)');
@@ -516,7 +543,9 @@ async function saveCodes(){
     ? toObj(freshRows).filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category))
     : s10Other;
   const rows=[...freshOther.map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.category,r.description,r.updated_at])];
-  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'',c,'',today])));
+  // v2.9.45: txn_type은 description 컬럼에 사용자가 지정한 집계 버킷(r[2])을 저장 — 다른
+  // 카테고리(branch_rule 등)는 description을 쓰지 않으므로 그대로 빈 문자열 유지.
+  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'',c,c==='txn_type'?(r[2]||''):'',today])));
   const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
 }
