@@ -130,6 +130,36 @@ async function run() {
     s.check(!!kwRow && kwRow[1] === '비플레이스,신규키워드', 'v2.9.38: 키워드 자체도 정상적으로 갱신됨');
   }
 
+  // ── v2.9.39: CSV 자동분류 키워드·거래점 분류 규칙 입력 UI 복원 회귀 ──
+  // 전수조사(사용자 요청) 결과, cashflow.html의 통장 CSV 자동분류가 실제로 지금도 kw_* 설정값을
+  // 읽어 쓰는데(살아있는 기능), 그 값을 입력할 <input> UI 자체가 예전 리팩터링 중 삭제된 채
+  // 방치되어 있었다 — 기능은 있는데 조작할 창구가 없는 상태. UI를 복원하고 저장·로드·자금수지
+  // 반영까지 전 구간이 정확한지 확인한다.
+  {
+    const sheetData = {
+      S11_GRADE_RATE: [['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at']],
+      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at'],
+        ['매입지급','오벳소프트,외주비','txn_type','','2026-08-01'],
+        ['kw_revenue_inflow','기존저장값','keyword','매출 입금 키워드','2026-08-01']],
+    };
+    const wc = {};
+    const { dom } = await openPage(ROOT, portFor('kw-ui-restore'), 'settings.html', sheetData, { writeCapture: wc, confirm: () => true });
+    const w = dom.window, d = w.document;
+    w.eval('accessToken="t"');
+    await new Promise(r => setTimeout(r, 300));
+    s.check(!!d.getElementById('kw_revenue_inflow'), 'v2.9.39: CSV 자동분류 키워드 입력 UI가 화면에 존재(복원됨)');
+    s.check(!!d.getElementById('kw_card_branch'), 'v2.9.39: 거래점 분류 규칙 입력 UI가 화면에 존재(복원됨)');
+    s.check(d.getElementById('kw_revenue_inflow').value === '기존저장값', 'v2.9.39: 기존 저장값이 화면에 정확히 로드됨');
+    d.getElementById('kw_revenue_inflow').value = '신규거래처,이노라인';
+    await w.eval('saveKeywords()');
+    await new Promise(r => setTimeout(r, 300));
+    const saved = (wc.S10 || []).slice(1);
+    const kwRow = saved.find(r => r[0] === 'kw_revenue_inflow');
+    const txnPreserved = saved.some(r => r[0] === '매입지급' && r[2] === 'txn_type');
+    s.check(!!kwRow && kwRow[1] === '신규거래처,이노라인', 'v2.9.39: 저장 시 새 키워드 값이 정확히 반영');
+    s.check(txnPreserved, 'v2.9.39: 키워드 저장 시에도 기존 코드 관리 데이터(원칙28) 계속 보존');
+  }
+
   return s;
 }
 
