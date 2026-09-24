@@ -106,9 +106,50 @@ async function run() {
     s.check(html.includes('매입(계산서없음) PRJ-1'), 'v2.9.43: 계산서없음 매입은 "매입(계산서없음)"으로 구분 표시(고정비와 혼동 방지)');
   }
 
+  // ── v2.9.46: 지급일 규칙 확정(사용자 확정) — 계산서없음 매입(급여형·사업소득형)은 "전월 근무분을
+  // 당월 10일에 지급"(회사 급여일 규칙). v2.9.36~45의 "익월말" 가정을 폐기하고 정확한 날짜(월,
+  // 일자 둘 다)를 직접 검증 — 이전 테스트들은 필터링 월만 확인해 이 규칙 변경을 놓칠 뻔했다. ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
+        ['PL-1','x','고객','','80','30000000','2026-08-01','2026-08-31','기타','수주','','','인력공급']],
+      S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
+        ['PRJ-1','PL-1','테스트','고객','30000000','2026-08-01','2026-08-31','수주']],
+      S04_REVENUE: [['revenue_id']], S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
+      S08_DETAIL: [['txn_id']], S02_CASHFLOW_EST: [['year_month']], S09_DASHBOARD: [['year_month']],
+      S10_SETTINGS: [['setting_key']], S13_VAT: [['vat_id']],
+      S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
+        ['E1','PL-1','인건비','김기황(선지급)','고급','','','0','9369234','0','1','2026-08-01','2026-08-31','사업소득형','']],
+    };
+    const { dom } = await openPage(ROOT, portFor('cf-payday-1'), 'cashflow.html', sheetData, { Chart: true });
+    const w = dom.window;
+    const noinv = w.eval("planCost.find(c=>c.cost_id.startsWith('NOINV'))");
+    s.check(noinv.payment_date === '2026-09-10',
+      'v2.9.46: 8월 근무분 계산서없음 매입의 지급일이 정확히 익월 10일(2026-09-10)로 산정됨');
+  }
+
+  // ── 연도 경계(12월 근무분 → 다음해 1월 10일)도 정확히 처리되는지 확인 ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
+        ['PL-1','x','고객','','80','30000000','2026-12-01','2026-12-31','기타','수주','','','인력공급']],
+      S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
+        ['PRJ-1','PL-1','테스트','고객','30000000','2026-12-01','2026-12-31','수주']],
+      S04_REVENUE: [['revenue_id']], S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
+      S08_DETAIL: [['txn_id']], S02_CASHFLOW_EST: [['year_month']], S09_DASHBOARD: [['year_month']],
+      S10_SETTINGS: [['setting_key']], S13_VAT: [['vat_id']],
+      S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
+        ['E1','PL-1','인건비','연말근무자','고급','','','0','5000000','0','1','2026-12-01','2026-12-31','사업소득형','']],
+    };
+    const { dom } = await openPage(ROOT, portFor('cf-payday-2'), 'cashflow.html', sheetData, { Chart: true });
+    const w = dom.window;
+    const noinv = w.eval("planCost.find(c=>c.cost_id.startsWith('NOINV'))");
+    s.check(noinv.payment_date === '2027-01-10',
+      'v2.9.46: 12월 근무분(연도 경계)의 지급일도 정확히 다음해 1월 10일(2027-01-10)로 산정됨');
+  }
+
   return s;
 }
-
 
 if (require.main === module) {
   run().then(s => {
