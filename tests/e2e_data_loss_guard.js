@@ -180,6 +180,31 @@ async function run() {
       'v2.9.40: ③코드 관리에서 등록한 고정비 항목이 고정비 화면 자동완성에 정확히 반영됨');
   }
 
+  // ── v2.9.42: txnTypeNames()도 classify()·fixed.html과 동일한 필드명 불일치 결함(r.key/r.value)을
+  //           갖고 있어, 미분류 거래 재지정 드롭다운이 코드 관리에서 등록한 거래유형을 전혀 못
+  //           읽고 항상 하드코딩 기본값만 보여주던 결함(사용자가 자금수지 재작업 중 지적으로 발견 —
+  //           v2.9.40 수정 당시 이 함수를 놓쳤음). ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id']], S03_PROJECT: [['project_id']], S04_REVENUE: [['revenue_id']],
+      S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
+      S08_DETAIL: [['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'],
+        ['T1','2026-09-01','알수없는거래','0','30000','1000000','','','기타비용','2026-09']],
+      S02_CASHFLOW_EST: [['year_month']], S09_DASHBOARD: [['year_month']], S13_VAT: [['vat_id']],
+      S12_ESTIMATE: [['estimate_id']],
+      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at'],
+        ['세금납부','원천세,법인세','txn_type','','2026-09-15'],
+        ['통신비지출','KT,SKT','txn_type','','2026-09-15']],
+    };
+    const { dom } = await openPage(ROOT, portFor('txntype-names'), 'cashflow.html', sheetData, { Chart: true });
+    const w = dom.window;
+    await new Promise(r => setTimeout(r, 300));
+    w.eval('rebuildRecon()');
+    const names = w.eval('txnTypeNames()');
+    s.check(names.includes('세금납부') && names.includes('통신비지출'),
+      'v2.9.42: 미분류 거래 재지정 드롭다운이 코드 관리 등록 유형(세금납부·통신비지출)을 정확히 반영');
+  }
+
   return s;
 }
 

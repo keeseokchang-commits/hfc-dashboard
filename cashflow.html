@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.41">
+<link rel="stylesheet" href="css/common.css?v=2.9.42">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -294,10 +294,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.41"></script>
-<script src="js/common.js?v=2.9.41"></script>
-<script src="js/calc.js?v=2.9.41"></script>
-<script src="js/nav.js?v=2.9.41"></script>
+<script src="js/schema.js?v=2.9.42"></script>
+<script src="js/common.js?v=2.9.42"></script>
+<script src="js/calc.js?v=2.9.42"></script>
+<script src="js/nav.js?v=2.9.42"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -771,7 +771,10 @@ function openDetailModal(ym){
 function closeDetailModal(){ document.getElementById('detailModal').classList.remove('open'); }
 
 function txnTypeNames(){
-  const c=s10All.filter(r=>r.category==='txn_type'&&r.key).map(r=>r.key);
+  // v2.9.42: classify()·fixed.html의 항목 자동완성과 동일했던 필드명 불일치 결함(r.key/r.value →
+  // setting_key/setting_value) — 미분류 거래 재지정 드롭다운도 코드 관리에서 등록한 거래유형을
+  // 전혀 못 읽고 항상 하드코딩 기본값만 보여주고 있었다(사용자 지적으로 전수재확인 중 발견).
+  const c=s10All.filter(r=>r.category==='txn_type'&&r.setting_key).map(r=>r.setting_key);
   return c.length?c:['매출입금','매입지급','고정비','급여','세금','법인카드','AI사용료','기타비용','기타입금'];
 }
 function openUnclassModal(){

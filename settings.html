@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.41">
+<link rel="stylesheet" href="css/common.css?v=2.9.42">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -215,10 +215,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.41"></script>
-<script src="js/common.js?v=2.9.41"></script>
-<script src="js/calc.js?v=2.9.41"></script>
-<script src="js/nav.js?v=2.9.41"></script>
+<script src="js/schema.js?v=2.9.42"></script>
+<script src="js/common.js?v=2.9.42"></script>
+<script src="js/calc.js?v=2.9.42"></script>
+<script src="js/nav.js?v=2.9.42"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -473,7 +473,8 @@ async function loadCodes(){
   s10Other=rows.filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category));
   ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
   if(!codeRows.txn_type.length){
-    const kw=k=>(rows.find(r=>r.key===k)||{}).value||'';
+    // v2.9.42: 이 폴백도 옛 key/value 필드명이라 항상 빈 값만 반환하던 결함 — setting_key/setting_value로 정정.
+    const kw=k=>(rows.find(r=>r.setting_key===k)||{}).setting_value||'';
     codeRows.txn_type=DEF_TYPES.map(([n,_])=>[n,{'매출입금':kw('kw_revenue_inflow'),'매입지급':kw('kw_cost_outflow'),'고정비':kw('kw_fixed_outflow'),'세금':kw('kw_tax_outflow')}[n]||'']);
   }
   renderCodes();
