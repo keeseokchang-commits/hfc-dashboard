@@ -5,7 +5,7 @@ const R={ // 읽기 [시트명, 범위]
   S03:['S03_PROJECT','A1:K200'],
   S04:['S04_REVENUE','A1:M1000'],
   S05:['S05_COST','A1:O1000'],
-  S06:['S06_FIXED_COST','A1:H300'],
+  S06:['S06_FIXED_COST','A1:J300'],
   S07:['S07_PROFILE','A1:S500'],
   S16:['S16_PROFILE_ITEM','A1:M3000'],
   S08:['S08_CASHFLOW_ACT','A1:O24'],
@@ -24,7 +24,7 @@ const W={ // 쓰기 [시트명, 범위]
   S03:['S03_PROJECT','A:K'],
   S04:['S04_REVENUE','A:M'],
   S05:['S05_COST','A:O'],
-  S06:['S06_FIXED_COST','A:H'],
+  S06:['S06_FIXED_COST','A:J'],
   S07:['S07_PROFILE','A:S'],
   S16:['S16_PROFILE_ITEM','A:M'],
   S08:['S08_CASHFLOW_ACT','A:O'],
@@ -50,7 +50,9 @@ const HEADERS={
   S05:["cost_id", "project_id", "year_month", "cost_type", "person_name", "unit_price", "mm", "amount", "payment_date", "memo", "vat_amt", "invoice_plan_date", "invoice_date", "matched_txn_id", "pay_actual_date"],
   // v2.9.22: 기타경비(고정비)의 세금계산서 수취 여부·부가세 추가(사용자 확정) — 프로젝트 매입(S05)에 안 걸리는
   // 임대료·통신비 등 비정기 매입세액공제 대상을 부가세 계산에 반영하기 위함.
-  S06:["fixed_id", "year_month", "category", "amount", "payment_date", "memo", "has_tax_invoice", "vat_amt"],
+  // v2.9.41: 고정비도 매출(S04)·매입(S05)과 동일하게 통장 대사(계획↔실제 거래 매칭) 대상이 되어야 한다는
+  // 사용자 확정 — matched_txn_id(대사된 통장거래 ID)·pay_actual_date(실제 지급일) 추가.
+  S06:["fixed_id", "year_month", "category", "amount", "payment_date", "memo", "has_tax_invoice", "vat_amt", "matched_txn_id", "pay_actual_date"],
   S08:["year_month","act_balance","act_inflow","act_outflow","inflow_revenue","outflow_cost","outflow_fixed","outflow_tax","outflow_card","outflow_ai","outflow_etc","inflow_capital","inflow_etc","unclassified_cnt","csv_uploaded_at"],
   S08_DETAIL:["txn_id", "txn_date", "description", "inflow_amt", "outflow_amt", "balance", "recv", "branch", "category", "year_month"],
   S09:["year_month","est_balance","act_balance","diff_amount","accuracy_pct","diff_cause","alert_flag","updated_at"],

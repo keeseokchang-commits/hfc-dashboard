@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.39">
+<link rel="stylesheet" href="css/common.css?v=2.9.41">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -114,10 +114,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.39"></script>
-<script src="js/common.js?v=2.9.39"></script>
-<script src="js/calc.js?v=2.9.39"></script>
-<script src="js/nav.js?v=2.9.39"></script>
+<script src="js/schema.js?v=2.9.41"></script>
+<script src="js/common.js?v=2.9.41"></script>
+<script src="js/calc.js?v=2.9.41"></script>
+<script src="js/nav.js?v=2.9.41"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -127,7 +127,10 @@ async function loadAll(){
   const [fxR,stR]=await Promise.all([fetchSheet(...R.S06),fetchSheet(...R.S10).catch(()=>[])]);
   fixedAll=dedupe(toObj(fxR).filter(x=>x.fixed_id),'fixed_id');
   s10All=toObj(stR);
-  const items=s10All.filter(r=>r.category==='fixed_item').map(r=>r.key);
+  // v2.9.40: 필드명 불일치 결함 수정 — S10은 setting_key/setting_value 헤더인데 r.key를 참조해
+  // 코드 관리 화면(③고정비 항목)에서 등록한 항목이 이 자동완성 목록에 절대 반영되지 못하고
+  // 항상 하드코딩 기본값만 보이던 결함(전수조사로 발견).
+  const items=s10All.filter(r=>r.category==='fixed_item').map(r=>r.setting_key);
   document.getElementById('fxCatDL').innerHTML=(items.length?items:['임차료','급여','4대보험','통신비','세무기장료']).map(k=>`<option value="${k}">`).join('');
   const yrs=[...new Set(fixedAll.map(x=>(x.year_month||'').slice(0,4)).filter(Boolean))].sort();
   document.getElementById('fxYear').innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
@@ -138,15 +141,28 @@ function renderFx(){
   const y=document.getElementById('fxYear').value;
   const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
   document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(num(x.amount)),0))}원)`;
+  // v2.9.41: 통장 대사(자금수지 화면)로 확인된 실제 지급 여부를 여기서도 보여준다 — 매입 화면과
+  // 동일하게 "지급 완료" 배지 + 실지급일, 그리고 대사를 잘못 확인한 경우 여기서 직접 해제 가능.
   document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
-    <tr><td>${x.year_month}</td><td>${x.category}${x.has_tax_invoice==='Y'?` <span style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}</td><td style="text-align:right">${comma(x.amount)}원</td>
+    <tr><td>${x.year_month}</td><td>${x.category}${x.has_tax_invoice==='Y'?` <span style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}</td><td style="text-align:right">${comma(x.amount)}원</td>
     <td>${x.payment_date||'─'}</td><td style="color:var(--text3)">${x.memo||''}</td>
-    <td><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;margin-right:6px">수정</button><button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
+    <td><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;margin-right:6px">수정</button>${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;margin-right:6px">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
     :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
 }
 function openFxModal(){resetFxEdit();const t=new Date().toISOString().slice(0,7);document.getElementById('fx_sm').value=t;document.getElementById('fx_em').value=t;document.getElementById('fxModal').classList.add('open');}
+// v2.9.41: 통장 대사로 잘못 확인된 지급을 해제 — 매입 화면의 지급 해제와 동일 원칙(대사 정보만
+// 지우고 계획 자체는 보존).
+async function unmatchFxPay(id){
+  if(!confirm('이 고정비의 지급 확인을 해제할까요? (통장 대사 정보만 지워지고 계획은 유지됩니다)'))return;
+  const next=fixedAll.map(x=>x.fixed_id===id?{...x,pay_actual_date:'',matched_txn_id:''}:x);
+  const ok=await writeFx(next);
+  toast(ok?'지급 해제 완료':'저장 실패',!ok);
+}
 async function writeFx(next){
-  const H=['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt'];
+  // v2.9.41: 헤더에 matched_txn_id·pay_actual_date 추가(js/schema.js HEADERS.S06와 동일 순서 유지) —
+  // 이 화면이 계획(금액·항목)만 편집해도 자금수지의 통장 대사 결과(대사 상태)가 함께 보존되어야
+  // 한다. rowsFor가 next의 각 행에 이 필드가 있으면 그대로 쓰고 없으면 빈 값으로 채운다.
+  const H=HEADERS.S06;
   const ok=await clearAndWrite(...W.S06,[H,...rowsFor(H,dedupe(next,'fixed_id'))]);
   if(ok){fixedAll=dedupe(next,'fixed_id');renderFx();}
   return ok;

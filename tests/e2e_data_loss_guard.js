@@ -130,34 +130,54 @@ async function run() {
     s.check(!!kwRow && kwRow[1] === '비플레이스,신규키워드', 'v2.9.38: 키워드 자체도 정상적으로 갱신됨');
   }
 
-  // ── v2.9.39: CSV 자동분류 키워드·거래점 분류 규칙 입력 UI 복원 회귀 ──
-  // 전수조사(사용자 요청) 결과, cashflow.html의 통장 CSV 자동분류가 실제로 지금도 kw_* 설정값을
-  // 읽어 쓰는데(살아있는 기능), 그 값을 입력할 <input> UI 자체가 예전 리팩터링 중 삭제된 채
-  // 방치되어 있었다 — 기능은 있는데 조작할 창구가 없는 상태. UI를 복원하고 저장·로드·자금수지
-  // 반영까지 전 구간이 정확한지 확인한다.
+  // ── v2.9.40: v2.9.39에서 되살렸던 CSV 키워드·거래점분류 UI는 삭제가 의도적이었음이 확인되어
+  //           재제거. 대신 코드 관리(①②③)가 실제로 자금수지·고정비 화면에 반영되는지 전수검사한
+  //           결과 필드명 불일치(r.key/r.value vs r.setting_key/r.setting_value) 결함 2건 발견·수정. ──
   {
     const sheetData = {
       S11_GRADE_RATE: [['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at']],
-      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at'],
-        ['매입지급','오벳소프트,외주비','txn_type','','2026-08-01'],
-        ['kw_revenue_inflow','기존저장값','keyword','매출 입금 키워드','2026-08-01']],
+      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at']],
     };
-    const wc = {};
-    const { dom } = await openPage(ROOT, portFor('kw-ui-restore'), 'settings.html', sheetData, { writeCapture: wc, confirm: () => true });
-    const w = dom.window, d = w.document;
-    w.eval('accessToken="t"');
-    await new Promise(r => setTimeout(r, 300));
-    s.check(!!d.getElementById('kw_revenue_inflow'), 'v2.9.39: CSV 자동분류 키워드 입력 UI가 화면에 존재(복원됨)');
-    s.check(!!d.getElementById('kw_card_branch'), 'v2.9.39: 거래점 분류 규칙 입력 UI가 화면에 존재(복원됨)');
-    s.check(d.getElementById('kw_revenue_inflow').value === '기존저장값', 'v2.9.39: 기존 저장값이 화면에 정확히 로드됨');
-    d.getElementById('kw_revenue_inflow').value = '신규거래처,이노라인';
-    await w.eval('saveKeywords()');
-    await new Promise(r => setTimeout(r, 300));
-    const saved = (wc.S10 || []).slice(1);
-    const kwRow = saved.find(r => r[0] === 'kw_revenue_inflow');
-    const txnPreserved = saved.some(r => r[0] === '매입지급' && r[2] === 'txn_type');
-    s.check(!!kwRow && kwRow[1] === '신규거래처,이노라인', 'v2.9.39: 저장 시 새 키워드 값이 정확히 반영');
-    s.check(txnPreserved, 'v2.9.39: 키워드 저장 시에도 기존 코드 관리 데이터(원칙28) 계속 보존');
+    const { dom } = await openPage(ROOT, portFor('kw-ui-removed'), 'settings.html', sheetData, { confirm: () => true });
+    const d = dom.window.document;
+    s.check(!d.getElementById('kw_revenue_inflow'), 'v2.9.40: CSV 자동분류 키워드 UI가 다시 제거됨(사용자 확정: 의도적 삭제였음)');
+    s.check(!d.getElementById('kw_card_branch'), 'v2.9.40: 거래점 분류 규칙(구) UI가 다시 제거됨');
+    const fixedAddBtn = d.getElementById('ctFixed').nextElementSibling;
+    s.check(fixedAddBtn && fixedAddBtn.tagName === 'BUTTON' && fixedAddBtn.getAttribute('onclick') === "addCode('fixed_item')",
+      'v2.9.40: "+ 항목 추가"(고정비) 버튼이 기술태그 섹션이 아닌 ③고정비 섹션(ctFixed) 바로 뒤에 정확히 위치');
+  }
+
+  // ── v2.9.40: ①거래유형&키워드가 자금수지(classify)에서 필드명 불일치로 전혀 반영되지 않던 결함 ──
+  {
+    const sheetData = {
+      S01_PIPELINE: [['pipeline_id']], S03_PROJECT: [['project_id']], S04_REVENUE: [['revenue_id']],
+      S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']], S08_DETAIL: [['txn_id']],
+      S02_CASHFLOW_EST: [['year_month']], S09_DASHBOARD: [['year_month']], S13_VAT: [['vat_id']],
+      S12_ESTIMATE: [['estimate_id']],
+      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at'],
+        ['세금납부','원천세,법인세','txn_type','',''],
+        ['하나은행0026','법인카드','branch_rule','','']],
+    };
+    const { dom } = await openPage(ROOT, portFor('classify-fix'), 'cashflow.html', sheetData, { Chart: true });
+    const w = dom.window;
+    s.check(w.eval("classify('원천세 납부','','',0,500000)") === '세금납부',
+      'v2.9.40: ①코드 관리에서 등록한 거래유형(세금납부)이 자금수지 자동분류에 정확히 반영됨');
+    s.check(w.eval("classify('결제','','하나은행0026',0,50000)") === '법인카드',
+      'v2.9.40: ②거래점 분류규칙(하나은행0026→법인카드)도 자금수지에 정확히 반영됨');
+  }
+
+  // ── v2.9.40: ③고정비 항목이 fixed.html 자동완성에서 필드명 불일치로 전혀 반영되지 않던 결함 ──
+  {
+    const sheetData = {
+      S06_FIXED_COST: [['fixed_id']],
+      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at'],
+        ['소프트웨어구독료','마이크로소프트,어도비','fixed_item','','']],
+    };
+    const { dom } = await openPage(ROOT, portFor('fixed-item-fix'), 'fixed.html', sheetData, {});
+    const d = dom.window.document;
+    const opts = [...d.getElementById('fxCatDL').querySelectorAll('option')].map(o => o.value);
+    s.check(opts.includes('소프트웨어구독료'),
+      'v2.9.40: ③코드 관리에서 등록한 고정비 항목이 고정비 화면 자동완성에 정확히 반영됨');
   }
 
   return s;

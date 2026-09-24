@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.39">
+<link rel="stylesheet" href="css/common.css?v=2.9.41">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -294,10 +294,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.39"></script>
-<script src="js/common.js?v=2.9.39"></script>
-<script src="js/calc.js?v=2.9.39"></script>
-<script src="js/nav.js?v=2.9.39"></script>
+<script src="js/schema.js?v=2.9.41"></script>
+<script src="js/common.js?v=2.9.41"></script>
+<script src="js/calc.js?v=2.9.41"></script>
+<script src="js/nav.js?v=2.9.41"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -456,12 +456,16 @@ function processBankRows(rows,rawNum){
 // ── 분류 엔진 ─────────────────────────────────────────────────
 function kws(key,def){ return (settings[key]||def||'').split(',').map(k=>k.trim()).filter(Boolean); }
 function classify(desc,recv,branch,inAmt,outAmt){
-  // v1.2(#13,#15): 설정 코드 마스터 우선 적용
-  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.value)){
-    if((r.value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.key;
+  // v2.9.40: 필드명 불일치 결함 수정 — S10 시트는 setting_key/setting_value 헤더로 통일되어
+  // 있는데(v2.9.9), 이 함수는 옛 key/value 필드명을 참조해 코드 관리 화면(①거래유형&키워드,
+  // ②거래점 분류규칙)에서 등록한 데이터가 여기 전혀 반영되지 않고 있었다(전수조사로 발견 —
+  // 실제로 "세금납부"라는 사용자 정의 유형을 등록해도 분류 결과는 하드코딩된 기본 유형명
+  // "세금"으로만 나왔음). setting_key/setting_value로 정정.
+  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.setting_value)){
+    if((r.setting_value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.setting_key;
   }
-  for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.key)){
-    if((branch||'').includes(b.key)) return b.value||'기타비용';
+  for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.setting_key)){
+    if((branch||'').includes(b.setting_key)) return b.setting_value||'기타비용';
   }
   const d=desc, rv=recv, br=branch;
   // v2.2 §4: S10 설정만 참조 (하드코딩 없음)
@@ -848,7 +852,7 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],detailAll=[],s10All=[],estAll=[];
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],unmatchedFix=[],detailAll=[],s10All=[],estAll=[];
 async function loadSheets(){
   try{
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR,esR]=await Promise.all([
@@ -983,11 +987,17 @@ function renderVatBanner(){
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
+// v2.9.41: 고정비도 매출·매입과 동일하게 통장 대사 대상(사용자 확정) — S06 헤더에 matched_txn_id·
+// pay_actual_date 추가(js/schema.js와 동일 순서 유지).
+const H6C=['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt','matched_txn_id','pay_actual_date'];
 async function saveS05(next){
   return await clearAndWrite(...W.S05,[H5C,...rowsFor(H5C,dedupe(next,'cost_id'))]);
 }
 async function saveS04(next){
   return await clearAndWrite(...W.S04,[H4C,...rowsFor(H4C,dedupe(next,'revenue_id'))]);
+}
+async function saveS06(next){
+  return await clearAndWrite(...W.S06,[H6C,...rowsFor(H6C,dedupe(next,'fixed_id'))]);
 }
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
@@ -1032,16 +1042,42 @@ async function reconcile(){
     if(ok){s05All=dedupe(next,'cost_id');toast(`💸 지급 대사: ${cMatches.length}건 자동 확인`);}
     else toast('지급 대사 저장 실패',true);
   }
-  renderRecon(matches.length,cMatches.length);
+  // ── v2.9.41: 고정비 지급 대사(매입 지급 대사와 동일 원칙, 사용자 확정) — 세금계산서 수취 항목만
+  // amount+vat_amt(부가세 포함 실지급액), 미수취 항목은 amount 그대로가 실제 지급액. 매입처럼
+  // 발행/수취 개념이 없으므로 "이미 대사되지 않은 모든 고정비 계획"이 대상.
+  const foutS=parsedTxns.filter(t=>t.cat==='고정비'&&t.outAmt>0);
+  const fixedEligible=()=>planFix.filter(f=>!f.pay_actual_date);
+  unmatchedFix=[]; const fMatches=[];
+  const usedF=new Set();
+  const usedTxnF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean));
+  foutS.forEach(t=>{
+    if(t.txnId&&usedTxnF.has(t.txnId)){return;}
+    const cands=fixedEligible().filter(f=>!usedF.has(f.fixed_id)
+      &&Math.abs((f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0))-t.outAmt)<=1000
+      &&f.payment_date&&Math.abs(dDiff(f.payment_date,t.date))<=45);
+    if(cands.length===1){usedF.add(cands[0].fixed_id);fMatches.push([t,cands[0]]);}
+    else unmatchedFix.push(t);
+  });
+  if(fMatches.length){
+    const next=planFix.map(f=>{const m=fMatches.find(x=>x[1].fixed_id===f.fixed_id);
+      return m?{...f,pay_actual_date:m[0].date,matched_txn_id:m[0].txnId||''}:f;});
+    const ok=await saveS06(next);
+    if(ok){planFix=dedupe(next,'fixed_id');toast(`🏢 고정비 대사: ${fMatches.length}건 자동 확인`);}
+    else toast('고정비 대사 저장 실패',true);
+  }
+  renderRecon(matches.length,cMatches.length,fMatches.length);
   renderAging();
 }
 function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 화면 상시 재구성
   if(!detailAll.length) return;
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
+  const mF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean)); // v2.9.41
   unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:num(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
+  unmatchedFix=detailAll.filter(t=>t.category==='고정비'&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
@@ -1055,6 +1091,9 @@ function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.match
   return _cands(open,t.inAmt).map(c=>`<button onclick="quickPick('mr_${i}','${c.id}')" title="수금예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt);color:var(--blue);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
 function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&!c.matched_txn_id).map(c=>({id:c.cost_id,a:Math.round((num(c.amount)||0)*1.1),d:c.payment_date,ym:c.year_month}));
   return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mc_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber-lt);color:var(--amber);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
+// v2.9.41: 고정비 대사 후보(매입 대사와 동일 패턴) — 세금계산서 수취 항목은 amount+vat_amt, 미수취는 amount 그대로.
+function fixCands(t,i){const open=planFix.filter(f=>!f.pay_actual_date&&!f.matched_txn_id).map(f=>({id:f.fixed_id,a:f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0),d:f.payment_date,ym:f.year_month,cat:f.category}));
+  return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mf_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--text2);background:var(--bg2,#F3F4F6);color:var(--text2);cursor:pointer">👍 ${c.ym} ${c.cat||''} ${won(c.a)}</button>`).join(' ');}
 function quickPick(sel,val){const el=document.getElementById(sel);if(el)el.value=val;}
 async function saveReclass(){
   let n=0;
@@ -1116,6 +1155,16 @@ async function manualMatchCost(i){
   const next=s05All.map(c=>c.cost_id===cid?{...c,pay_actual_date:t.date,matched_txn_id:t.txnId||''}:c);
   const ok=await saveS05(next);
   if(ok){s05All=dedupe(next,'cost_id');unmatchedOut.splice(i,1);toast('지급 수동 매칭 ✓');renderRecon();renderAging();}
+  else toast('저장 실패',true);
+}
+// v2.9.41: 고정비 수동 매칭(매입 수동 매칭과 동일 패턴)
+async function manualMatchFix(i){
+  const t=unmatchedFix[i]; const fid=document.getElementById('mf_'+i).value;
+  if(!fid){toast('고정비 항목을 선택하세요',true);return;}
+  if(t.txnId&&planFix.some(f=>f.matched_txn_id===t.txnId)){toast('이 출금은 이미 다른 고정비 건에 매칭되어 있습니다. 먼저 [지급 해제]하세요.',true);return;}
+  const next=planFix.map(f=>f.fixed_id===fid?{...f,pay_actual_date:t.date,matched_txn_id:t.txnId||''}:f);
+  const ok=await saveS06(next);
+  if(ok){planFix=dedupe(next,'fixed_id');unmatchedFix.splice(i,1);toast('고정비 수동 매칭 ✓');renderRecon();renderAging();}
   else toast('저장 실패',true);
 }
 // v2.5.8: 매칭 불변식 감사 — 하나의 거래ID는 청구 1건에만. 중복(과거 오염) 검출·정리
@@ -1185,12 +1234,12 @@ async function fixDupMatches(){
     toast('중복 매칭 정리 완료 ✓'); renderDupAudit(); renderRecon(); renderAging(); }
   else toast('정리 저장 실패 — 데이터 변경 없음',true);
 }
-function renderRecon(autoCnt,costCnt){
+function renderRecon(autoCnt,costCnt,fixCnt){
   const card=document.getElementById('reconCard');
   const openRows=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id).sort((a,b)=>String(a.cash_recv_date||'9999').localeCompare(String(b.cash_recv_date||'9999')));
   card.style.display='block';
   renderDupAudit();
-  document.getElementById('reconSummary').textContent=`수금 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건 | 지급 매칭 ${costCnt||0}건 · 미매칭 출금 ${unmatchedOut.length}건`;
+  document.getElementById('reconSummary').textContent=`수금 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건 | 지급 매칭 ${costCnt||0}건 · 미매칭 출금 ${unmatchedOut.length}건 | 고정비 매칭 ${fixCnt||0}건 · 미매칭 ${unmatchedFix.length}건`;
   document.getElementById('reconUnmatched').innerHTML=unmatchedDep.length?unmatchedDep.map((t,i)=>`
     <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
       <span style="flex:1;min-width:150px">${t.date} <b>${(t.inAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
@@ -1209,6 +1258,17 @@ function renderRecon(autoCnt,costCnt){
         ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((num(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
       </select>
       ${costCands(t,i)} <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
+    </div>`).join('')):'';
+  // v2.9.41: 고정비 미매칭 출금(매입지급과 동일 UI 패턴, 사용자 확정 — 고정비도 통장 대사 대상)
+  const eligF=planFix.filter(f=>!f.pay_actual_date&&!f.matched_txn_id).sort((a,b)=>String(a.payment_date||'9999').localeCompare(String(b.payment_date||'9999')));
+  document.getElementById('reconUnmatched').innerHTML+=unmatchedFix.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미매칭 출금 (고정비 분류)</div>'+unmatchedFix.map((t,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
+      <span style="flex:1;min-width:150px">${t.date} <b>${(t.outAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
+      <select id="mf_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
+        <option value="">고정비 계획 선택…</option>
+        ${eligF.map(f=>`<option value="${f.fixed_id}">${f.year_month} ${f.category} ${(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0)).toLocaleString()}원</option>`).join('')}
+      </select>
+      ${fixCands(t,i)} <button onclick="manualMatchFix(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--text2);color:#fff;cursor:pointer">매칭</button>
     </div>`).join('')):'';
   // v1.2(#13): 미분류·기타 재지정 (상시)
   const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);

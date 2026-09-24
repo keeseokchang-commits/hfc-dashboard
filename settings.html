@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.39">
+<link rel="stylesheet" href="css/common.css?v=2.9.41">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -144,51 +144,25 @@
     </div>
   </div>
 
-  <!-- v2.9.39: 통장 CSV 자동분류(cashflow.html의 classify 로직)가 실제로 지금도 이 kw_* 값들을 읽어
-       쓰는데(카테고리 구분 없이 S10 전체를 읽어 settings 객체에 채움), 이 값을 입력할 UI 자체가
-       예전 리팩터링 중 삭제된 채 방치되어 있었다(전수조사로 발견) — 기능은 살아있는데 조작할 창구가
-       없는 상태. 값이 비어 있으면 cashflow.html의 기본값(placeholder에 표시한 것과 동일)으로 동작. -->
-  <div class="card">
-    <div class="card-title">🏷️ CSV 자동분류 키워드 <span style="font-size:11px;color:var(--text3);font-weight:400">(통장 거래 적요에 이 키워드가 있으면 해당 유형으로 자동 분류)</span></div>
-    <div class="param-row"><span class="param-label">매출 입금 키워드</span>
-      <input class="kw-input" id="kw_revenue_inflow" placeholder="예: 이노라인,비플레이스"></div>
-    <div class="param-row"><span class="param-label">매입 지급 키워드</span>
-      <input class="kw-input" id="kw_cost_outflow" placeholder="예: 오벳소프트,외주비,용역비"></div>
-    <div class="param-row"><span class="param-label">고정비 키워드</span>
-      <input class="kw-input" id="kw_fixed_outflow" placeholder="예: 급여,임차료,4대보험,세무"></div>
-    <div class="param-row"><span class="param-label">세금 키워드</span>
-      <input class="kw-input" id="kw_tax_outflow" placeholder="예: 부가세,법인세,원천세,소득세"></div>
-    <div class="param-row"><span class="param-label">자본 납입 키워드</span>
-      <input class="kw-input" id="kw_capital_inflow" placeholder="예: 장기석"></div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end">
-      <button class="btn btn-primary" onclick="saveKeywords()">키워드 저장</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">🏦 거래점 분류 규칙 <span style="font-size:11px;color:var(--text3);font-weight:400">(적요 키워드로 분류가 안 될 때, 거래점 패턴으로 대신 분류 — 키워드보다 후순위)</span></div>
-    <div class="param-row"><span class="param-label">법인카드 거래점</span>
-      <input class="kw-input" id="kw_card_branch" placeholder="예: 하나은행0026,하나은행0996"></div>
-    <div class="param-row"><span class="param-label">AI 사용료 거래점</span>
-      <input class="kw-input" id="kw_ai_branch" placeholder="예: 하나금융센터,하나증권금융센터"></div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end">
-      <button class="btn btn-primary" onclick="saveBranchRules()">분류 규칙 저장</button>
-    </div>
-  </div>
-  <style>.kw-input{flex:1;max-width:320px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none}
-  .kw-input:focus{border-color:var(--blue)}</style>
-
+  <!-- v2.9.40: v2.9.39에서 되살렸던 "CSV 자동분류 키워드"·"거래점 분류 규칙" 두 카드를 제거 —
+       사용자 확인 결과 이 UI는 삭제가 실수가 아니라 의도적인 결정이었음. 현재의 "코드 관리"(아래)
+       세 가지 입력 패턴(①거래유형&키워드 ②거래점 분류규칙 ③고정비 항목)만으로 충분하며, kw_* 값은
+       이 코드 관리 UI를 통해서만 관리한다(설계 확정). -->
   <div class="card">
     <div class="card-title">🗂 코드 관리 <a href="docs/코드관리_매뉴얼.pdf" target="_blank" style="font-size:11px;font-weight:600;color:var(--blue);text-decoration:none;border:1px solid var(--blue);border-radius:6px;padding:3px 9px;margin-left:8px">📖 매뉴얼(PDF)</a> <span style="font-size:11px;color:var(--text3);font-weight:400">v1.2 — 유형·규칙·항목 추가/삭제 가능 (아래가 우선 적용, 상단 키워드는 폴백)</span></div>
     <div style="font-size:12px;font-weight:700;margin:4px 0 6px">① 거래 유형 & 키워드 <small style="color:var(--text3)">(CSV 자동분류·대사·집계의 기준)</small></div>
     <div id="ctTxn"></div><button class="btn-mini" onclick="addCode('txn_type')">+ 유형 추가</button>
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">② 거래점 분류 규칙 <small style="color:var(--text3)">(거래점 패턴 → 유형, 키워드보다 후순위)</small></div>
     <div id="ctBranch"></div><button class="btn-mini" onclick="addCode('branch_rule')">+ 규칙 추가</button>
+    <!-- v2.9.40: UI 버그 수정 — "+ 항목 추가"(addCode('fixed_item')) 버튼이 ③고정비 항목이 아니라
+         ④기술 태그 섹션(ctSkill) 아래에 위치해, 기술태그 추가 버튼인 것처럼 보이던 결함(사용자
+         지적: 4번 기술태그의 갑작스런 추가 때문에 발생한 것으로 추정). 다른 섹션(②거래점 분류
+         규칙처럼 "그 섹션의 목록 div 바로 뒤에 그 섹션의 추가 버튼")과 동일한 패턴으로 정정. -->
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">③ 고정비 항목 <small style="color:var(--text3)">(고정비 계획 화면의 항목 드롭다운)</small></div>
-    <div id="ctFixed"></div>
+    <div id="ctFixed"></div><button class="btn-mini" onclick="addCode('fixed_item')">+ 항목 추가</button>
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">④ 기술 태그 <small style="color:var(--text3)">(인력 프로필 검색용 — 동의어는 콤마: React / 리액트,react)</small>
       <button onclick="addCode('skill_tag')" style="font-size:11px;margin-left:8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:3px 9px;cursor:pointer">+ 추가</button></div>
-    <div id="ctSkill"></div><button class="btn-mini" onclick="addCode('fixed_item')">+ 항목 추가</button>
+    <div id="ctSkill"></div>
     <datalist id="typeDL"></datalist>
     <button onclick="saveCodes()" style="width:100%;margin-top:14px;padding:11px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer">🗂 코드 전체 저장</button>
   </div>
@@ -241,10 +215,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.39"></script>
-<script src="js/common.js?v=2.9.39"></script>
-<script src="js/calc.js?v=2.9.39"></script>
-<script src="js/nav.js?v=2.9.39"></script>
+<script src="js/schema.js?v=2.9.41"></script>
+<script src="js/common.js?v=2.9.41"></script>
+<script src="js/calc.js?v=2.9.41"></script>
+<script src="js/nav.js?v=2.9.41"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
