@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.50">
+<link rel="stylesheet" href="css/common.css?v=2.9.51">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -118,7 +118,7 @@
        모드에서는 TO 필드 자체를 숨기고 라벨을 "해당 월"로 바꿔 단건 수정임을 명확히 한다
        (신규 추가 모드에서는 그대로 시작월~종료월 반복 생성 UI 유지). -->
   <div class="form-row"><label class="form-label" id="fx_period_label">적용 기간 <small style="color:var(--text3)">(반복: 시작월~종료월, 단건은 동일 월)</small></label>
-    <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm" style="flex:1"><input class="form-input" type="month" id="fx_em" style="flex:1"></div></div>
+    <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm" style="flex:1" oninput="syncFxEm()"><input class="form-input" type="month" id="fx_em" style="flex:1"></div></div>
   <!-- v2.9.22: 기타경비(고정비) 세금계산서 수취 여부·부가세 — 프로젝트 매입에 안 걸리는 임대료·통신비 등의
        매입세액공제를 부가세 계산에 반영하기 위함(비정기 발생이라 등록 시 기본은 미수취, 실제 계산서를 받으면 단건 수정으로 체크). -->
   <div class="form-row"><label class="form-label">세금계산서 수취</label>
@@ -129,10 +129,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.50"></script>
-<script src="js/common.js?v=2.9.50"></script>
-<script src="js/calc.js?v=2.9.50"></script>
-<script src="js/nav.js?v=2.9.50"></script>
+<script src="js/schema.js?v=2.9.51"></script>
+<script src="js/common.js?v=2.9.51"></script>
+<script src="js/calc.js?v=2.9.51"></script>
+<script src="js/nav.js?v=2.9.51"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -230,6 +230,15 @@ async function writeFx(next){
   return ok;
 }
 let editingFxId=null;
+// v2.9.51: 근본 결함 보완(사용자 확정) — 단건 수정에서 TO는 저장 시 쓰이지 않으므로(그 달
+// 하나의 year_month만 FROM으로 갱신), 화면에 FROM과 다른 TO 값이 남아있으면 "TO를 바꿔도
+// 반영 안 됨"이라는 혼란을 준다. 편집 모드에서는 FROM을 바꿀 때마다 TO를 자동으로 같은 값으로
+// 맞춰, 두 필드가 항상 같은 하나의 달을 가리키게 한다(신규 추가 모드에서는 FROM~TO로 여러 달을
+// 반복 생성하는 것이 정상 동작이므로 이 자동 동기화를 적용하지 않는다).
+function syncFxEm(){
+  if(!editingFxId) return;
+  document.getElementById('fx_em').value=document.getElementById('fx_sm').value;
+}
 // v2.5.1: 고정비 단건 수정 — 삭제·재등록 프로세스 대체
 function editFx(id){
   const x=fixedAll.find(f=>f.fixed_id===id); if(!x) return;

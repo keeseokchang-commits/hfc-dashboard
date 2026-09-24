@@ -50,6 +50,32 @@ async function run() {
     s.check(em.value === '2026-06', 'v2.9.50: TO 필드에 값을 정상적으로 입력할 수 있음');
   }
 
+  // ── v2.9.51: 단건 수정에서 TO는 저장 시 쓰이지 않으므로(사용자 확정: "From을 수정하면 To도
+  // 같은 값으로 대체해주면 되잖아"), FROM을 바꾸면 TO가 자동으로 같은 값을 따라감. 신규 추가
+  // 모드에서는 FROM~TO로 여러 달을 반복 생성하는 것이 정상 동작이므로 동기화하지 않음. ──
+  {
+    const sheetData = {
+      S06: [['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt','matched_txn_id','pay_actual_date'],
+        ['FIX-1','2026-04','법인카드','2500000','2026-04-30','','N','0','','']],
+      S10: [['setting_key','setting_value','category','description','updated_at']],
+    };
+    const { dom } = await openPage(ROOT, portFor('fx-to-sync-1'), 'fixed.html', sheetData, {});
+    const w = dom.window, d = w.document;
+    await new Promise(r => setTimeout(r, 300));
+    w.eval("editFx('FIX-1')");
+    d.getElementById('fx_sm').value = '2026-07';
+    w.eval('syncFxEm()');
+    s.check(d.getElementById('fx_em').value === '2026-07',
+      'v2.9.51: 편집 모드에서 FROM을 바꾸면 TO가 자동으로 같은 값으로 동기화됨');
+    w.eval("document.getElementById('fxModal').classList.remove('open')");
+    w.eval('openFxModal()');
+    d.getElementById('fx_em').value = '2026-12';
+    d.getElementById('fx_sm').value = '2026-09';
+    w.eval('syncFxEm()');
+    s.check(d.getElementById('fx_em').value === '2026-12',
+      'v2.9.51: 신규 추가 모드에서는 FROM을 바꿔도 TO가 자동 동기화되지 않음(반복 생성 정상 동작 유지)');
+  }
+
   // ── ③-1 여러 건 선택 후 "선택 수정" → 첫 번째로 선택된 건(화면 정렬 기준)만 수정 팝업 대상 ──
   {
     const sheetData = {
