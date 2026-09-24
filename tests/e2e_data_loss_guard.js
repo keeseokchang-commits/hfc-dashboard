@@ -99,6 +99,37 @@ async function run() {
       'v2.9.37: S17 로드 실패 상태에서는 마일스톤 저장을 건너뜀(다른 프로젝트 설정 유실 방지)');
   }
 
+  // ── settings.html: 세 가지 결함(전수조사로 발견, v2.9.38) ──
+  // ①saveSettingsToSheet()가 settingsMap(키워드·파라미터)만 갖고 S10 전체를 덮어써 코드 관리
+  //   데이터(거래유형 등)를 통째로 삭제하던 것 ②반대로 saveCodes()도 같은 방식으로 저장 시점에
+  //   최신 상태를 다시 확인하지 않던 것 ③loadSettings()가 코드 관리 카테고리 행까지 구분 없이
+  //   settingsMap에 담아, 저장 시 그 행들의 category가 keyword/parameter로 오염되던 것.
+  {
+    const sheetData = {
+      S11_GRADE_RATE: [['set_id','set_name','grade','sell_price','buy_price','description','is_default','updated_at']],
+      S10_SETTINGS: [['setting_key','setting_value','category','description','updated_at'],
+        ['매입지급','오벳소프트,외주비','txn_type','','2026-08-01'],
+        ['매출입금','이노라인,비플레이스','txn_type','','2026-08-01'],
+        ['kw_revenue_inflow','비플레이스','keyword','매출 입금 키워드','2026-08-01']],
+    };
+    const wc = {};
+    const { dom } = await openPage(ROOT, portFor('settings-preserve'), 'settings.html', sheetData, { writeCapture: wc, confirm: () => true });
+    const w = dom.window;
+    w.eval('accessToken="t"');
+    await new Promise(r => setTimeout(r, 300));
+    s.check(!Object.keys(w.eval('settingsMap')).some(k => ['매입지급', '매출입금'].includes(k)),
+      'v2.9.38: loadSettings()가 코드 관리 카테고리(txn_type) 행을 settingsMap에 담지 않음');
+    w.eval("settingsMap['kw_revenue_inflow']='비플레이스,신규키워드'");
+    await w.eval('saveSettingsToSheet()');
+    await new Promise(r => setTimeout(r, 300));
+    const saved = (wc.S10 || []).slice(1);
+    const txnRows = saved.filter(r => r[2] === 'txn_type');
+    const kwRow = saved.find(r => r[0] === 'kw_revenue_inflow');
+    s.check(txnRows.length === 2, 'v2.9.38: 키워드 저장 시 거래유형 코드 2건이 그대로 보존됨(개수)');
+    s.check(txnRows.every(r => r[2] === 'txn_type'), 'v2.9.38: 보존된 거래유형 코드의 category가 오염 없이 정확히 txn_type 유지');
+    s.check(!!kwRow && kwRow[1] === '비플레이스,신규키워드', 'v2.9.38: 키워드 자체도 정상적으로 갱신됨');
+  }
+
   return s;
 }
 

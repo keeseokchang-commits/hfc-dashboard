@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.37">
+<link rel="stylesheet" href="css/common.css?v=2.9.38">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -214,10 +214,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.37"></script>
-<script src="js/common.js?v=2.9.37"></script>
-<script src="js/calc.js?v=2.9.37"></script>
-<script src="js/nav.js?v=2.9.37"></script>
+<script src="js/schema.js?v=2.9.38"></script>
+<script src="js/common.js?v=2.9.38"></script>
+<script src="js/calc.js?v=2.9.38"></script>
+<script src="js/nav.js?v=2.9.38"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -375,7 +375,13 @@ async function deleteSet(){
 async function loadSettings(){
   try{
     const rows=await fetchSheet(...R.S10);
-    toObj(rows).forEach(r=>{ if(r.setting_key) settingsMap[r.setting_key]=r.setting_value; });
+    // v2.9.38: 치명적 결함 수정 — 코드 관리 카테고리(txn_type/branch_rule/fixed_item/skill_tag) 행까지
+    // 구분 없이 settingsMap에 담아왔다. saveSettingsToSheet()가 이 settingsMap을 그대로 저장하면서
+    // 그 행들의 category를 keyword/parameter로 잘못 재분류해버려(k.startsWith('kw_')가 아니므로
+    // 전부 'parameter'가 됨), 코드 관리 화면에서 저장한 거래유형 데이터가 정체불명의 category로
+    // 오염되는 사고로 이어졌다(전수조사로 발견). settingsMap은 키워드·파라미터 카테고리만 담는다.
+    const CODE_CATS=new Set(['txn_type','branch_rule','fixed_item','skill_tag']);
+    toObj(rows).forEach(r=>{ if(r.setting_key&&!CODE_CATS.has(r.category)) settingsMap[r.setting_key]=r.setting_value; });
     // 키워드 채우기
     ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow','kw_card_branch','kw_ai_branch'].forEach(k=>{ const _e=document.getElementById(k); if(!_e) return;
       const el=document.getElementById(k);
@@ -394,7 +400,15 @@ async function loadSettings(){
 }
 
 async function saveSettingsToSheet(){
-  // settingsMap 전체를 S10에 재작성
+  // v2.9.38: 치명적 결함 수정 — 이 함수는 settingsMap(키워드·파라미터 7~12개 항목)만 갖고 S10 시트
+  // 전체를 clearAndWrite했다. 그런데 S10에는 코드 관리 화면(saveCodes)이 저장한 거래유형·거래점
+  // 규칙·고정비 항목·스킬태그(txn_type/branch_rule/fixed_item/skill_tag) 데이터도 함께 들어있는데,
+  // settingsMap은 이 데이터를 전혀 모르므로 "키워드 저장"·"분류 규칙 저장"·"파라미터 저장" 중 아무
+  // 버튼이나 누르면 그 순간 거래유형 코드 전체가 흔적도 없이 사라졌다(사용자 신고로 발견 — v2.9.37의
+  // "읽기 실패 시 덮어쓰기"와는 별개의, 훨씬 직접적인 원인). 수정: 저장 직전 시트를 읽어와 코드 관리
+  // 카테고리 행은 그대로 보존하고, settingsMap 부분만 교체해 병합한다. 읽기가 실패하면(원칙 27,
+  // 최우선 데이터 보호 원칙) 쓰기 자체를 포기한다.
+  const CODE_CATS=new Set(['txn_type','branch_rule','fixed_item','skill_tag']);
   const header=['setting_key','setting_value','category','description','updated_at'];
   const today=new Date().toISOString().slice(0,10);
   const descMap={
@@ -409,10 +423,15 @@ async function saveSettingsToSheet(){
   // v2.9.9: setting_value는 키워드(텍스트)와 파라미터(숫자)가 같은 컬럼에 혼재 — 컬럼 단위 일괄 정규화(rowsFor) 대신
   // 숫자 파라미터(param_base_balance 등 금액·개월수)만 개별적으로 num()으로 순수 숫자화, 키워드는 원본 텍스트 유지.
   const NUMERIC_PARAMS=new Set(['param_alert_threshold','param_alert_days','param_base_balance','param_cash_warn_months']);
-  const rows=Object.entries(settingsMap).map(([k,v])=>[
+  const existingRows=await fetchSheetSafe(...R.S10);
+  if(existingRows===null) return false; // 읽기 실패 — 무엇을 보존해야 할지 알 수 없으므로 쓰기 포기
+  const existing=toObj(existingRows);
+  const preserved=existing.filter(r=>CODE_CATS.has(r.category)&&!Object.prototype.hasOwnProperty.call(settingsMap,r.setting_key))
+    .map(r=>[r.setting_key,r.setting_value,r.category,r.description||'',r.updated_at||today]);
+  const settingRows=Object.entries(settingsMap).map(([k,v])=>[
     k,NUMERIC_PARAMS.has(k)?num(v):v,k.startsWith('kw_')?'keyword':'parameter',descMap[k]||'',today
   ]);
-  return await clearAndWrite(...W.S10,[header,...rows]);
+  return await clearAndWrite(...W.S10,[header,...preserved,...settingRows]);
 }
 
 async function saveKeywords(){
@@ -481,11 +500,21 @@ function moveCode(c,i,d){
 function addCode(c){codeRows[c].push(['','']);renderCodes();}
 async function saveCodes(){
   const today=new Date().toISOString().slice(0,10);
-  // v2.9.9: 저장 헤더를 setting_key/setting_value로 통일(saveSettingsToSheet와 동일 헤더) —
-  // 기존 key/value 헤더는 같은 S10 시트에 함수마다 다른 헤더로 쓰던 정합성 결함이었음.
-  const H=['setting_key','setting_value','description','category','updated_at'];
-  const rows=[...s10Other.map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.description,r.category,r.updated_at])];
-  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'','',c,today])));
+  // v2.9.38: 헤더 컬럼 순서를 saveSettingsToSheet()와 완전히 통일 — 두 함수가 같은 S10 시트를
+  // ['setting_key','setting_value','description','category',...]와
+  // ['setting_key','setting_value','category','description',...]로 서로 다르게 써왔던 것이
+  // 전수조사(사용자 요청)로 드러남. toObj()는 시트에 실제로 저장된 헤더 행을 그대로 따라가므로
+  // 컬럼이 뒤바뀌어도 즉시 깨지지는 않지만, 두 함수가 번갈아 저장할 때마다 헤더 자체가 계속
+  // 바뀌는 것 자체가 데이터 정합성 위험이었다 — 이제 항상 category가 C열, description이 D열.
+  const H=['setting_key','setting_value','category','description','updated_at'];
+  // 저장 직전 시트를 다시 읽어 s10Other(로드 시점 캡처값)가 그 사이 최신 상태와 어긋나지 않는지
+  // 확인 — 읽기가 실패하면(원칙 27) 메모리의 s10Other로 계속 진행하되, 성공하면 최신 값으로 교체.
+  const freshRows=await fetchSheetSafe(...R.S10);
+  const freshOther=freshRows!==null
+    ? toObj(freshRows).filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category))
+    : s10Other;
+  const rows=[...freshOther.map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.category,r.description,r.updated_at])];
+  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'',c,'',today])));
   const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
 }
