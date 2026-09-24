@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.35">
+<link rel="stylesheet" href="css/common.css?v=2.9.36">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -294,10 +294,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.35"></script>
-<script src="js/common.js?v=2.9.35"></script>
-<script src="js/calc.js?v=2.9.35"></script>
-<script src="js/nav.js?v=2.9.35"></script>
+<script src="js/schema.js?v=2.9.36"></script>
+<script src="js/common.js?v=2.9.36"></script>
+<script src="js/calc.js?v=2.9.36"></script>
+<script src="js/nav.js?v=2.9.36"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -876,12 +876,36 @@ async function loadSheets(){
     s04All=dedupe(toObj(rvRows).filter(r=>r.revenue_id),'revenue_id');
     planRev=s04All.filter(r=>okPrj.has(r.project_id));
     s05All=dedupe(toObj(csRows).filter(c=>c.cost_id),'cost_id');
-    planCost=s05All.filter(c=>okPrj.has(c.project_id));
+    estAll=toObj(esR).filter(e=>e.estimate_id);
+    // v2.9.36: 계산서없음 매입(사업소득형·급여형·미수취 기타경비)은 "세금계산서" 화면(input.html)의
+    // 청구 스케줄에 더 이상 만들어지지 않는다(사용자 확정 — 그 화면은 세금계산서 관리에만 집중해야
+    // 함). 대신 자금수지가 견적(S12)에서 직접 월별로 계산해 지출 계획에 반영한다 — 견적을 저장하는
+    // 즉시(청구 스케줄 재생성 없이도) 자금수지에 정확히 나타나는 장점도 있다.
+    const isInvoiceType=e=>{
+      if(e.comp_type==='인건비') return !e.memo||e.memo==='';
+      return !(e.memo||'').startsWith('_NOINVOICE_');
+    };
+    const noInvoiceCosts=[];
+    prjAll.filter(p=>okPrj.has(p.project_id)).forEach(prj=>{
+      const items=estAll.filter(e=>e.pipeline_id===prj.pipeline_id&&e.comp_type!=='_EMPTY'&&!isInvoiceType(e));
+      if(!items.length) return;
+      const byM=monthlyProfile(items,'buy_price',prj.start_date,prj.end_date);
+      Object.keys(byM).forEach(ym=>{
+        if(!byM[ym]) return;
+        const [yy,mm]=ym.split('-').map(Number);
+        const nextEnd=new Date(yy,mm+1,0); // Date의 month는 0-based라 mm(1-based)+1=다음다음달, day 0=그 전달 말일=결과적으로 익월 말일
+        const payDate=`${nextEnd.getFullYear()}-${String(nextEnd.getMonth()+1).padStart(2,'0')}-${String(nextEnd.getDate()).padStart(2,'0')}`;
+        noInvoiceCosts.push({cost_id:`NOINV-${prj.project_id}-${ym}`,project_id:prj.project_id,year_month:ym,
+          cost_type:'인건비(계산서없음)',person_name:'',unit_price:'',mm:'',amount:Math.round(byM[ym]),
+          payment_date:payDate,memo:'견적 기준 자동계산(계산서없음, 청구스케줄 생성 대상 아님)',
+          vat_amt:0,invoice_plan_date:'',invoice_date:'',matched_txn_id:'',pay_actual_date:''});
+      });
+    });
+    planCost=[...s05All.filter(c=>okPrj.has(c.project_id)),...noInvoiceCosts];
     detailAll=toObj(dtR).filter(t=>t.txn_id);
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
-    estAll=toObj(esR).filter(e=>e.estimate_id);
     // v2.5.4 SSOT: 실적 표시는 항상 원천(S08_DETAIL)에서 재파생 — 원천 삭제·수정이 즉시 반영. S08_ACT는 기록용.
     actData=deriveActFromDetail(detailAll);
     renderAll();

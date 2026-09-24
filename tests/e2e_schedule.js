@@ -94,10 +94,11 @@ async function run() {
       'v2.9.15/16: 견적 없이 직접입력(70,000,000)으로 매입 3건 정상 저장');
   }
 
-  // ── v2.9.27: 매입 청구 스케줄은 지급형태와 무관하게 전 인력을 포함(자금유출은 계산서 유무와 무관하게
-  //           실재하므로). 세금계산서형만 vat_amt·invoice_plan_date가 채워지고, 사업소득형·급여형은
-  //           vat_amt=0으로 자금수지엔 반영되되 부가세 매입세액공제 대상에서는 제외된다.
-  //           (v2.9.24는 "매입 스케줄=부가세 대상"으로 잘못 단정해 급여형·사업소득형을 통째로 제외했었음 — 정정) ──
+  // ── v2.9.36: "청구 스케줄 생성"(세금계산서 화면)은 세금계산서형 매입만 다룬다(사용자 확정,
+  //           2026-09-15). 계산서없음(사업소득형·급여형·미수취 기타경비)의 지급 예정은 이 버튼과
+  //           무관하게 자금수지(cashflow.html)가 견적에서 직접 계산해 반영한다 — "세금계산서" 메뉴에
+  //           계산서 없는 거래의 "공급가액"·"수취예정" 같은 세금계산서 용어를 붙이는 것 자체가
+  //           전제부터 틀렸다는 지적에 따른 재정정(v2.9.27~35의 "매입 스케줄=전 지급형태 포함" 설계 폐기). ──
   {
     const sheetData = {
       S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
@@ -105,9 +106,7 @@ async function run() {
       S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
         ['PRJ-999','PL-999','테스트PJ','고객','30000000','2026-09-01','2027-03-31','수주']],
       S04_REVENUE: [['revenue_id']], S05_COST: [['cost_id']], S06_FIXED_COST: [['fixed_id']],
-      // v2.9.31: 근본 결함 수정 후 — 세금계산서형·사업소득형 모두 buy_price는 "단가"(mm과 곱해질 값).
-      // 외주업체(세금계산서형, 단가7,000,000×7=49,000,000)+프리랜서(사업소득형, 단가8,000,000×7=56,000,000)
-      // +정직원(급여형, 월별 확정 총액 합계 16,800,000) 3인 혼합
+      // 외주업체(세금계산서형, 단가7,000,000×7=49,000,000)+프리랜서(사업소득형, 계산서없음)+정직원(급여형, 계산서없음) 3인 혼합
       S12_ESTIMATE: [['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'],
         ['E1','PL-999','인건비','외주업체','특급','','','13000000','7000000','','7','2026-09-01','2027-03-31','',''],
         ['E2','PL-999','인건비','프리랜서','고급','','','10000000','8000000','','7','2026-09-01','2027-03-31','사업소득형',''],
@@ -124,20 +123,17 @@ async function run() {
     await new Promise(r => setTimeout(r, 100));
     const c = w.eval('genCtx()');
     s.check(c.eSell === 161000000, 'v2.9.27: 매출은 지급형태 무관하게 3인 전원 포함(161,000,000)');
-    s.check(c.eBuy === 121800000, 'v2.9.31: 매입(자금유출)도 3인 전원 포함(49,000,000+56,000,000+16,800,000) — 단가 저장 방식 수정 후에도 정확');
-    s.check(c.eBuyInvoice === 49000000, 'v2.9.27: 세금계산서형 매입만 별도 집계(49,000,000)');
-    s.check(c.eBuyNonInvoice === 72800000, 'v2.9.31: 사업소득형+급여형(계산서없음) 매입 별도 집계(72,800,000)');
+    s.check(c.eBuy === 49000000, 'v2.9.36: 청구 스케줄 매입기준(eBuy)은 세금계산서형(외주업체)만(49,000,000), 계산서없음 2인 제외');
 
     await w.eval('saveGen()');
     await new Promise(r => setTimeout(r, 400));
     const saved = (wc.S05 || []).slice(1);
     const totalAmount = saved.reduce((sum, r) => sum + r[7], 0);
     const totalVat = saved.reduce((sum, r) => sum + r[10], 0);
-    s.check(totalAmount === 121800000, 'v2.9.31: 저장된 매입 총액이 3인 전원 반영(121,800,000)');
-    s.check(totalVat === 4900000, 'v2.9.27: 저장된 부가세는 세금계산서형만 반영(4,900,000, 나머지는 0)');
-    const nonInvoiceRows = saved.filter(r => r[10] === 0);
-    s.check(nonInvoiceRows.reduce((sum, r) => sum + r[7], 0) === 72800000,
-      'v2.9.27: 부가세 0원인 행(계산서없음)의 금액 합계가 정확히 72,800,000');
+    s.check(totalAmount === 49000000, 'v2.9.36: 저장된 매입은 세금계산서형(외주업체)만(49,000,000) — 계산서없음은 S05에 생성되지 않음');
+    s.check(totalVat === 4900000, 'v2.9.36: 저장된 부가세는 세금계산서형 전액 기준(4,900,000)');
+    s.check(saved.every(r => (parseInt(String(r[10]).replace(/,/g,''))||0) > 0 || r[7] === 0),
+      'v2.9.36: S05에 저장된 모든 매입 건이 부가세를 가짐(계산서없음 행이 섞이지 않음)');
   }
 
   // ── v2.9.31: 근본 결함 회귀 방지 — S12.buy_price는 시스템 전체(project.html·cashflow.html·input.html의

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.35">
+<link rel="stylesheet" href="css/common.css?v=2.9.36">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -215,10 +215,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.35"></script>
-<script src="js/common.js?v=2.9.35"></script>
-<script src="js/calc.js?v=2.9.35"></script>
-<script src="js/nav.js?v=2.9.35"></script>
+<script src="js/schema.js?v=2.9.36"></script>
+<script src="js/common.js?v=2.9.36"></script>
+<script src="js/calc.js?v=2.9.36"></script>
+<script src="js/nav.js?v=2.9.36"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 
@@ -300,7 +300,15 @@ function renderLists(){
         ${r.is_received==='Y'?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkRecv('${r.revenue_id}')">입금 해제</button>`:''}
         ${r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelInvoice('${r.revenue_id}')">발행 취소</button>`:''}</span></div></div>`;}).join('')
     :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">내역 없음</div>';
-  const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  // v2.9.36: "세금계산서" 메뉴는 세금계산서 관리 화면이므로, 계산서를 아예 받지 않는 매입
+  // (vat_amt=0으로 저장된 계산서없음 건 — 사업소득형·급여형·계산서없는 기타경비)은 이 목록에서
+  // 제외한다(사용자 지적: "공급가액"·"수취예정"·"VAT" 같은 세금계산서 체계 용어를 계산서가
+  // 없는 거래에 붙이는 것 자체가 전제가 틀렸음). 그 데이터는 여전히 S05에 저장되어 자금수지
+  // (cashflow.html)에는 정확히 반영되지만, 세금계산서 관리 목적의 이 화면에는 나타나지 않는다.
+  // invoice_plan_date(발행/수취 예정일)는 세금계산서형 매입에서만 채워진다(계산서없음은 공란) —
+  // vat_amt로 판별하면 면세 등 실제로 0원인 세금계산서형 케이스를 오판할 위험이 있어 이 필드를 쓴다.
+  const isInvoiceCost=c=>!!c.invoice_plan_date||!!c.invoice_date;
+  const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&isInvoiceCost(c)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
   document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
     const st=c.pay_actual_date?['badge-on','지급완료']:(c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정']);
@@ -397,22 +405,20 @@ function genCtx(){
   // 예정)에는 반드시 반영되어야 한다. v2.9.24에서 "매입 스케줄=부가세 매입세액공제 대상"으로 잘못
   // 단정해 급여형·사업소득형을 통째로 제외했던 것은 절반만 맞는 설계였다 — 부가세 계산(vat.html)에서만
   // 빠지면 되는데, 자금 유출 추적 자체에서도 빠져버려 월 추정 자금수지가 부정확해지는 결함이었다.
-  // 세금계산서 발행 여부(부가세 매입세액공제 대상 여부)의 구분은 각 매입 건의 vat_amt·invoice_plan_date로
-  // 처리한다(세금계산서형만 채움, 나머지는 0/공란) — saveGen()의 매입 레코드 생성부에서 적용.
   const eSell=hasEst?profileTotal(items,'unit_price',st0,en0):0; // 매출은 지급형태 무관하게 전 인력 포함
-  const eBuy=hasEst?profileTotal(items,'buy_price',st0,en0):0; // 매입도 지급형태 무관하게 전 인력 포함(자금유출 추적)
-  // v2.9.27: 부가세 매입세액공제 대상(세금계산서형)과 대상이 아닌 것(사업소득형·급여형)을 분리 계산 —
-  // 매입 스케줄 생성 시 두 갈래로 나눠 각각 정확한 vat_amt·invoice_plan_date를 부여하기 위함.
-  // v2.9.35: 인프라·솔루션·기타(기타원가)도 매입 지급형태 구분 대상 — memo가 "_NOINVOICE_"로 시작하면
-  // 세금계산서 미수취(계산서 없이 나가는 매입, 예: 원격지 근무 기타경비)로 취급해 인건비와 동일 원칙 적용.
+  // v2.9.36: "청구 스케줄 생성"은 세금계산서(발행·수취) 계획을 만드는 기능이므로 세금계산서형 매입만
+  // 대상으로 한다(사용자 확정, 2026-09-15) — 계산서없음 매입(사업소득형·급여형·미수취 기타경비)의
+  // 지급 예정은 이 버튼과 무관하게 자금수지(cashflow.html)가 견적(S12)에서 직접 계산해 반영한다.
+  // v2.9.27~35에서 "매입 스케줄=전 지급형태 포함, vat_amt로만 구분"으로 설계했던 것을 재정정 —
+  // "세금계산서" 화면에 계산서 없는 항목의 "공급가액"·"수취예정" 같은 세금계산서 용어를 붙이는 것
+  // 자체가 전제부터 틀렸다는 지적(사용자)에 따른 것. 인건비는 memo 공백, 기타원가는 "_NOINVOICE_"
+  // 접두사가 없는 것만 세금계산서형으로 판별.
   const isInvoiceType=e=>{
     if(e.comp_type==='인건비') return !e.memo||e.memo==='';
     return !(e.memo||'').startsWith('_NOINVOICE_');
   };
   const itemsInvoice=items.filter(isInvoiceType);
-  const itemsNonInvoice=items.filter(e=>!isInvoiceType(e));
-  const eBuyInvoice=hasEst?profileTotal(itemsInvoice,'buy_price',st0,en0):0;
-  const eBuyNonInvoice=hasEst?profileTotal(itemsNonInvoice,'buy_price',st0,en0):0;
+  const eBuy=hasEst?profileTotal(itemsInvoice,'buy_price',st0,en0):0; // 세금계산서형 매입만
   const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
   const amt=un(genPl.contract_amount||prj.contract_amount);
   // v2.9.15: 매입 기준 — 견적 매입 합계 또는 직접 입력 총액. 견적이 없어도(hasEst=false) 직접 입력을 선택하면
@@ -423,7 +429,7 @@ function genCtx(){
   const applyBuy=(costBase==='est')?eBuy:manualBuy;
   return {pid,prj,biz:genPl.biz_type||'인력공급',pay:genPl.payment_cycle||'익월말',
     start:genPl.expected_start||prj.start_date,end:genPl.expected_end||prj.end_date,
-    amt,items,itemsInvoice,itemsNonInvoice,hasEst,eSell,eBuy,eBuyInvoice,eBuyNonInvoice,
+    amt,items,itemsInvoice,hasEst,eSell,eBuy,
     revAmt:(revBase==='est'&&hasEst)?eSell:amt,costBase,canCost,applyBuy};
 }
 function onGenPrjChange(){
@@ -455,10 +461,12 @@ function buildGen(){
   document.getElementById('revBaseEst').disabled=!c.hasEst;
   const info=document.getElementById('genInfo');
   info.style.display='block';
-  // v2.9.27: 매입 구성(세금계산서형/계산서없음)을 안내에 명시 — 부가세 예상액이 매입 총액과 다를 수 있음을 미리 인지시킴
-  const buyBreakdown=(c.hasEst&&c.costBase==='est'&&(c.eBuyInvoice||c.eBuyNonInvoice))
-    ?` (세금계산서 ${comma(c.eBuyInvoice)}원 + 계산서없음 ${comma(c.eBuyNonInvoice)}원)`:'';
-  info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입 <b>${comma(c.eBuy)}원</b>${buyBreakdown}`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>${c.canCost?` · 적용 매입기준 <b>${comma(c.applyBuy)}원</b>`:''}`;
+  // v2.9.36: "청구 스케줄 생성"은 세금계산서형 매입만 다루므로(사용자 확정), 견적에 계산서없음
+  // 매입이 함께 있으면 "왜 매입 총액이 견적서 매입 합계보다 적지?"라는 혼란이 생길 수 있어
+  // 계산서없음 매입은 자금수지에서 별도 반영됨을 안내한다.
+  const nonInvoiceHint=(c.hasEst&&c.items.length>c.itemsInvoice.length)
+    ?' <span style="color:var(--text3)">(계산서없음 매입은 자금수지에서 별도 반영됩니다)</span>':'';
+  info.innerHTML=`📌 <b>${genPl.opportunity||''}</b> <span style="color:var(--text3)">(${genPl.pipeline_id} → ${c.pid})</span><br><b>${c.biz}</b> · 지급조건 <b>${c.pay}</b> · 기간 ${c.start||'─'}~${c.end||'─'}<br>계약금액 <b>${comma(c.amt)}원</b>${c.hasEst?` · 견적 매출 <b>${comma(c.eSell)}원</b> · 견적 매입(세금계산서) <b>${comma(c.eBuy)}원</b>${nonInvoiceHint}`:' · 견적 없음'} · 적용 매출기준 <b>${comma(c.revAmt)}원</b>${c.canCost?` · 적용 매입기준 <b>${comma(c.applyBuy)}원</b>`:''}`;
   if(!c.start||!c.end||(!c.revAmt&&!c.canCost)){info.innerHTML+='<br>⚠️ 기간·금액이 없어 생성할 수 없습니다.';
     genRows=[];genCostRows=[];renderGenPreview();renderGenCostPreview();return;}
   const rb=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
@@ -486,19 +494,14 @@ function buildGen(){
       }
     }
     // ── 매입: 견적 있으면 항목 기간 기반 정밀 분배, 직접입력이면 기간 균등 분배(매출의 견적없음 경로와 동일 방식) ──
-    // v2.9.27: 세금계산서형(부가세 매입세액공제 대상)과 사업소득형·급여형(계산서 없음, 자금유출만 추적)을
-    // 분리해 각각 별도 월별 스케줄을 만들고 isInvoice 플래그를 부여 — saveGen()이 이 플래그로 vat_amt·
-    // invoice_plan_date·cost_type을 다르게 채운다. "직접 입력" 기준은 이 구분이 불가능하므로 전액 세금계산서형으로 취급.
+    // v2.9.36: "청구 스케줄 생성"은 세금계산서형 매입만 만든다(사용자 확정) — 계산서없음(사업소득형·
+    // 급여형·미수취 기타경비)은 여기서 스케줄을 만들지 않고 자금수지가 견적에서 직접 계산해 반영한다.
     genCostRows=[];
     if(document.getElementById('genDoCost').checked&&c.canCost){
       if(c.costBase==='est'&&c.hasEst){
         const buyByMInv=monthlyProfile(c.itemsInvoice,'buy_price',c.start,c.end);
-        const buyByMNon=monthlyProfile(c.itemsNonInvoice,'buy_price',c.start,c.end);
-        const rowsInv=c.eBuyInvoice?profileToRows(buyByMInv,c.eBuyInvoice)
+        genCostRows=c.eBuy?profileToRows(buyByMInv,c.eBuy)
           .map(r=>({plan:r.plan,name:r.name.replace('합산','매입 합산'),supply:r.supply,pay:r.pay,isInvoice:true})):[];
-        const rowsNon=c.eBuyNonInvoice?profileToRows(buyByMNon,c.eBuyNonInvoice)
-          .map(r=>({plan:r.plan,name:r.name.replace('합산','매입(계산서없음) 합산'),supply:r.supply,pay:r.pay,isInvoice:false})):[];
-        genCostRows=[...rowsInv,...rowsNon];
       } else {
         const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
         genCostRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.applyBuy-acc:cut100(c.applyBuy*x.w/totW);acc+=sup;
@@ -536,26 +539,18 @@ function msCalc(){
   for(let i=0;i<n;i++){const r=parseFloat((document.getElementById('msR_'+i)||{}).value)||0;sum+=r;rs.push(r);}
   document.getElementById('msSum').textContent=sum;
   document.getElementById('msSum').style.color=sum===100?'var(--green)':'var(--red)';
-  let acc=0, accC=0, accCInv=0, accCNon=0;
+  let acc=0, accC=0;
   genRows=[]; genCostRows=[];
-  // v2.9.27: 마일스톤(회차) 방식도 세금계산서형/비세금계산서형 비율대로 각 회차 안에서 나눠 isInvoice 플래그 부여.
-  // "직접 입력" 기준(costBase!=='est')은 이 구분이 불가능하므로 전액 세금계산서형으로 취급.
-  const useSplit=c.costBase==='est'&&c.hasEst&&(c.eBuyInvoice>0||c.eBuyNonInvoice>0);
+  // v2.9.36: 마일스톤(회차) 방식도 세금계산서형 매입만 회차 비율로 나눈다(c.applyBuy가 이미
+  // 세금계산서형 기준으로 계산됨 — genCtx 참조). 계산서없음은 이 화면에서 스케줄을 만들지 않는다.
   rs.forEach((r,i)=>{
     const plan=(document.getElementById('msD_'+i)||{}).value||'';
     if(document.getElementById('genDoRev').checked&&c.revAmt){
       let sup=(i===n-1)?c.revAmt-acc:cut100(c.revAmt*r/100); acc+=sup;
       genRows.push({plan,name:labels[i],supply:sup,recv:plan?recvDue(plan):''});}
     if(document.getElementById('genDoCost').checked&&c.canCost){
-      if(useSplit){
-        let supInv=(i===n-1)?c.eBuyInvoice-accCInv:cut100(c.eBuyInvoice*r/100); accCInv+=supInv;
-        let supNon=(i===n-1)?c.eBuyNonInvoice-accCNon:cut100(c.eBuyNonInvoice*r/100); accCNon+=supNon;
-        if(supInv) genCostRows.push({plan,name:labels[i],supply:supInv,pay:plan?nextMonthEnd(plan):'',isInvoice:true});
-        if(supNon) genCostRows.push({plan,name:labels[i]+'(계산서없음)',supply:supNon,pay:plan?nextMonthEnd(plan):'',isInvoice:false});
-      } else {
-        let supC=(i===n-1)?c.applyBuy-accC:cut100(c.applyBuy*r/100); accC+=supC;
-        genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):'',isInvoice:true});
-      }
+      let supC=(i===n-1)?c.applyBuy-accC:cut100(c.applyBuy*r/100); accC+=supC;
+      genCostRows.push({plan,name:labels[i],supply:supC,pay:plan?nextMonthEnd(plan):'',isInvoice:true});
     }
   });
   renderGenPreview(); renderGenCostPreview();
@@ -681,10 +676,9 @@ async function saveGen(){
     if(existOpen.length&&confirm(`이 프로젝트의 기존 미수취 매입 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
       base=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
     let seq=costs.reduce((m,x)=>{const n=parseInt((x.cost_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
-    // v2.9.27: isInvoice=true(세금계산서형)만 vat_amt·invoice_plan_date를 채운다 — 세금계산서 발행/수취
-    // 관리 및 부가세 매입세액공제 대상이라는 뜻. isInvoice=false(사업소득형·급여형)는 계산서가 없으므로
-    // vat_amt=0·invoice_plan_date 공란으로 남기되, 자금수지 반영을 위해 지급 예정일(payment_date)은 동일하게
-    // 채운다 — 자금 유출은 형태와 무관하게 실재하기 때문이다(부가세만 형태별로 갈리고, 지출 예정 추적은 공통).
+    // v2.9.36: genCostRows는 이제 세금계산서형만 생성되므로(genCtx·buildGen·msCalc에서 계산서없음
+    // 제외) isInvoice는 사실상 항상 true다. 구조는 유지하되 실질적으로 이 분기에서 만들어지는 매입은
+    // 전부 세금계산서형 — 발행/수취 관리 및 부가세 매입세액공제 대상.
     const recs=genCostRows.map(g=>{seq++;const isInv=g.isInvoice!==false;return {cost_id:`COST-2026-${String(seq).padStart(3,'0')}`,project_id:c.pid,
       year_month:g.plan.slice(0,7),cost_type:isInv?'외주비':'인건비(계산서없음)',person_name:'',unit_price:'',mm:'',
       amount:g.supply,payment_date:g.pay,memo:isInv?'매입 스케줄 자동생성(월합산)':'매입 스케줄 자동생성(계산서없음, 월합산)',

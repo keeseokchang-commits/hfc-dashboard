@@ -102,8 +102,10 @@ async function run() {
     w3.eval('onGenPrjChange()');
     await new Promise(r => setTimeout(r, 100));
     const c = w3.eval('genCtx()');
-    s.check(c.eBuyInvoice === 0 && c.eBuyNonInvoice === 728000,
-      'v2.9.35: 청구 스케줄 생성 시 세금계산서 미수취 기타원가(728,000원)가 "계산서없음"으로 정확히 분류(세금계산서형 아님)');
+    // v2.9.36: 청구 스케줄 생성은 세금계산서형만 다룬다(사용자 확정) — 계산서없음 기타원가(728,000원)는
+    // 이 화면의 매입 기준(eBuy)에서 완전히 제외되어야 하고(자금수지에서 별도 계산), canCost도 false여야 함.
+    s.check(c.eBuy === 0, 'v2.9.36: 청구 스케줄 생성 매입기준(eBuy)에 계산서없음 기타원가(728,000원)가 포함되지 않음');
+    s.check(c.canCost === false, 'v2.9.36: 계산서없음 항목만 있으면 매입 스케줄 생성 자체가 불가능(canCost=false)');
   }
 
   return s;
