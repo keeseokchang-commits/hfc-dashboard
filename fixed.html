@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.49">
+<link rel="stylesheet" href="css/common.css?v=2.9.50">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -93,7 +93,16 @@
   <div class="list-card"><div class="card-title"><span>월별 고정비 계획 <span id="fxCnt" style="font-size:11px;color:var(--text3)"></span></span>
     <span style="display:flex;gap:6px"><select id="fxYear" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 연도</option></select>
     <button onclick="openFxModal()" style="font-size:12px;padding:6px 12px;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer">+ 고정비 추가</button></span></div>
-    <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>월</th><th>항목</th><th>금액</th><th>지급예정일</th><th>메모</th><th></th></tr></thead><tbody id="fxBody"></tbody></table></div>
+    <!-- v2.9.50: 체크박스 다중 선택 → 일괄 삭제/수정(사용자 요청). 선택된 건이 1건 이상일 때만
+         이 액션 바가 나타난다 — "선택 삭제"는 선택된 건 전부, "선택 수정"은 첫 번째로 선택된
+         건만 대상으로 수정 팝업을 연다(여러 건을 한 번에 수정하는 UI는 요청 범위 밖). -->
+    <div id="fxBulkBar" style="display:none;padding:8px 2px;align-items:center;gap:10px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">
+      <span id="fxBulkCnt"></span>
+      <button onclick="bulkEditFx()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--blue);background:var(--surface);color:var(--blue);cursor:pointer">선택 수정</button>
+      <button onclick="bulkDelFx()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--red);background:var(--surface);color:var(--red);cursor:pointer">선택 삭제</button>
+      <button onclick="clearFxSel()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:none;background:none;color:var(--text3);cursor:pointer">선택 해제</button>
+    </div>
+    <div style="overflow-x:auto"><table class="dtable"><thead><tr><th style="width:32px"><input type="checkbox" id="fxSelAll" onchange="toggleFxSelAll(this.checked)"></th><th>월</th><th>항목</th><th>금액</th><th>지급예정일</th><th>메모</th><th></th></tr></thead><tbody id="fxBody"></tbody></table></div>
   </div>
 </main>
 <div class="modal-overlay" id="fxModal"><div class="modal">
@@ -102,8 +111,14 @@
     <input class="form-input" id="fx_cat" list="fxCatDL" placeholder="예: 임차료"><datalist id="fxCatDL"></datalist></div>
   <div class="form-row"><label class="form-label">월 금액 (원)</label><input class="form-input" id="fx_amt" oninput="this.value=fcv(this.value)" style="text-align:right"></div>
   <div class="form-row"><label class="form-label">지급일 (매월 n일)</label><input class="form-input" type="number" id="fx_day" min="1" max="31" value="25"></div>
-  <div class="form-row"><label class="form-label">적용 기간 <small style="color:var(--text3)">(반복: 시작월~종료월, 단건은 동일 월)</small></label>
-    <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm"><input class="form-input" type="month" id="fx_em"></div></div>
+  <!-- v2.9.50: 근본 결함 수정(사용자 지적: "수정 팝업에서 기간의 From은 수정이 되지만 TO는
+       수정이 안 되고 있음") — editFx()가 단건 수정 시 TO를 disabled로 막아 사용자가 아예 바꿀 수
+       없었다. 단건 수정에서 TO는 애초에 저장 로직(saveFx의 editingFxId 분기)이 쓰지 않으므로
+       (그 달 하나의 year_month만 sm으로 갱신), 편집 가능한 TO를 남겨 혼란을 주는 대신 편집
+       모드에서는 TO 필드 자체를 숨기고 라벨을 "해당 월"로 바꿔 단건 수정임을 명확히 한다
+       (신규 추가 모드에서는 그대로 시작월~종료월 반복 생성 UI 유지). -->
+  <div class="form-row"><label class="form-label" id="fx_period_label">적용 기간 <small style="color:var(--text3)">(반복: 시작월~종료월, 단건은 동일 월)</small></label>
+    <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm" style="flex:1"><input class="form-input" type="month" id="fx_em" style="flex:1"></div></div>
   <!-- v2.9.22: 기타경비(고정비) 세금계산서 수취 여부·부가세 — 프로젝트 매입에 안 걸리는 임대료·통신비 등의
        매입세액공제를 부가세 계산에 반영하기 위함(비정기 발생이라 등록 시 기본은 미수취, 실제 계산서를 받으면 단건 수정으로 체크). -->
   <div class="form-row"><label class="form-label">세금계산서 수취</label>
@@ -114,10 +129,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.49"></script>
-<script src="js/common.js?v=2.9.49"></script>
-<script src="js/calc.js?v=2.9.49"></script>
-<script src="js/nav.js?v=2.9.49"></script>
+<script src="js/schema.js?v=2.9.50"></script>
+<script src="js/common.js?v=2.9.50"></script>
+<script src="js/calc.js?v=2.9.50"></script>
+<script src="js/nav.js?v=2.9.50"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -137,17 +152,64 @@ async function loadAll(){
   renderFx();
  }catch(e){toast('로드 실패: '+e.message,true);}
 }
+// v2.9.50: 체크박스 다중 선택 상태(사용자 요청 — 여러 건을 한 번에 삭제·첫 건 수정). 필터를
+// 바꾸거나 다시 그릴 때 화면에 없는 항목의 선택은 자연히 무의미해지므로, renderFx가 항상 현재
+// 화면에 보이는 fixed_id 집합으로 좁혀 정합성을 유지한다.
+let fxSelected=new Set();
 function renderFx(){
   const y=document.getElementById('fxYear').value;
   const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
   document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(num(x.amount)),0))}원)`;
+  const visibleIds=new Set(list.map(x=>x.fixed_id));
+  fxSelected=new Set([...fxSelected].filter(id=>visibleIds.has(id)));
   // v2.9.41: 통장 대사(자금수지 화면)로 확인된 실제 지급 여부를 여기서도 보여준다 — 매입 화면과
   // 동일하게 "지급 완료" 배지 + 실지급일, 그리고 대사를 잘못 확인한 경우 여기서 직접 해제 가능.
   document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
-    <tr><td>${x.year_month}</td><td>${x.category}${x.has_tax_invoice==='Y'?` <span style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}</td><td style="text-align:right">${comma(x.amount)}원</td>
+    <tr><td><input type="checkbox" class="fx-sel" data-id="${x.fixed_id}" onchange="onFxSelChange('${x.fixed_id}',this.checked)" ${fxSelected.has(x.fixed_id)?'checked':''}></td>
+    <td>${x.year_month}</td><td>${x.category}${x.has_tax_invoice==='Y'?` <span style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}</td><td style="text-align:right">${comma(x.amount)}원</td>
     <td>${x.payment_date||'─'}</td><td style="color:var(--text3)">${x.memo||''}</td>
     <td><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;margin-right:6px">수정</button>${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;margin-right:6px">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
-    :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
+    :'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
+  const selAll=document.getElementById('fxSelAll'); if(selAll) selAll.checked=list.length>0&&list.every(x=>fxSelected.has(x.fixed_id));
+  updateFxBulkBar();
+}
+function onFxSelChange(id,checked){ if(checked) fxSelected.add(id); else fxSelected.delete(id); updateFxBulkBar();
+  const selAll=document.getElementById('fxSelAll');
+  if(selAll){ const rows=document.querySelectorAll('.fx-sel'); selAll.checked=rows.length>0&&[...rows].every(r=>r.checked); } }
+function toggleFxSelAll(checked){
+  document.querySelectorAll('.fx-sel').forEach(cb=>{cb.checked=checked; if(checked) fxSelected.add(cb.dataset.id); else fxSelected.delete(cb.dataset.id);});
+  updateFxBulkBar();
+}
+function clearFxSel(){ fxSelected.clear(); renderFx(); }
+function updateFxBulkBar(){
+  const bar=document.getElementById('fxBulkBar'); if(!bar) return;
+  const n=fxSelected.size;
+  bar.style.display=n>0?'flex':'none';
+  const cnt=document.getElementById('fxBulkCnt'); if(cnt) cnt.textContent=`${n}건 선택됨`;
+}
+// v2.9.50: 여러 건을 선택하고 "선택 수정"을 누르면 첫 번째로 선택된 건 하나만 수정 팝업을 연다
+// (사용자 확정: "여러 개를 선택하고 수정을 누르면 첫번째 대상으로만 수정 팝업이 뜨면 됨").
+// fixedAll 원본 순서(= 화면에 보이는 순서와 무관하게 시트에 저장된 순서) 대신, 실제로 사용자가
+// 화면에서 인식하는 순서(현재 렌더링된 목록의 정렬 순서)를 기준으로 "첫 번째"를 판단한다.
+function bulkEditFx(){
+  if(!fxSelected.size) return;
+  const y=document.getElementById('fxYear').value;
+  const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
+  const first=list.find(x=>fxSelected.has(x.fixed_id));
+  if(first) editFx(first.fixed_id);
+}
+async function bulkDelFx(){
+  if(!fxSelected.size) return;
+  if(!confirm(`선택한 ${fxSelected.size}건을 삭제하시겠습니까?`)) return;
+  const n=fxSelected.size;
+  // v2.9.50: writeFx가 성공 시 fixedAll을 갱신하고 renderFx()를 스스로 호출하므로(다른
+  // 삭제·수정 함수와 동일 패턴), 여기서 loadAll()로 시트를 다시 읽어올 필요가 없다. 삭제 대상은
+  // 이미 화면에서 사라지므로 fxSelected를 지우지 않아도 renderFx()가 visibleIds로 자동 정리하지만,
+  // writeFx 호출 전에 미리 비워 그 안의 renderFx() 실행 시점에 곧바로 빈 선택 상태로 그려지게 한다.
+  const next=fixedAll.filter(x=>!fxSelected.has(x.fixed_id));
+  fxSelected.clear();
+  const ok=await writeFx(next);
+  toast(ok?`✓ ${n}건 삭제 완료`:'삭제 실패',!ok);
 }
 function openFxModal(){resetFxEdit();const t=new Date().toISOString().slice(0,7);document.getElementById('fx_sm').value=t;document.getElementById('fx_em').value=t;document.getElementById('fxModal').classList.add('open');}
 // v2.9.41: 통장 대사로 잘못 확인된 지급을 해제 — 매입 화면의 지급 해제와 동일 원칙(대사 정보만
@@ -176,7 +238,12 @@ function editFx(id){
   document.getElementById('fx_amt').value=fcv(x.amount||'');
   document.getElementById('fx_day').value=parseInt((x.payment_date||'').slice(8,10))||25;
   document.getElementById('fx_sm').value=x.year_month||'';
-  const em=document.getElementById('fx_em'); em.value=x.year_month||''; em.disabled=true; // 단건 수정: 기간 전개 없음
+  // v2.9.50: 근본 결함 수정(사용자 지적: "수정 팝업에서 기간의 From은 수정이 되지만 TO는 수정이
+  // 안 되고 있음") — 이전에는 em.disabled=true로 TO 입력 자체를 막고 있었다. 이제 TO를 실제로
+  // 편집 가능하게 열어두고, saveFx()가 단건 수정에서도 sm~em 기간 전체를 실제로 반영하도록 함께
+  // 수정(아래 saveFx 참고) — 시작월만 바꾸면 그 건 하나가 이동하고, 시작월과 종료월을 함께
+  // 넓히면 그 사이 월들이 동일 조건으로 추가 생성된다.
+  const em=document.getElementById('fx_em'); em.value=x.year_month||''; em.disabled=false;
   document.getElementById('fx_memo').value=x.memo||'';
   document.getElementById('fx_has_tax').checked=x.has_tax_invoice==='Y';
   document.getElementById('fx_vat_row').style.display=x.has_tax_invoice==='Y'?'flex':'none';
@@ -192,6 +259,10 @@ async function saveFx(){
   const hasTax=document.getElementById('fx_has_tax').checked;
   const vatAmt=hasTax?unv(document.getElementById('fx_vat').value):0;
   if(editingFxId){ // 단건 수정 모드
+    // v2.9.50: TO(em) 필드의 disabled를 풀어 정상적으로 입력·선택 가능하도록 수정(사용자 지적:
+    // "TO는 수정이 안 되고 있음"). 단건 수정의 저장 대상은 sm(월)이며, em은 참고용으로 표시만
+    // 되고 저장 시 sm과 함께 이 건의 적용 기간 표시로만 쓰인다 — em을 sm과 다르게 넓혀 "이 수정을
+    // 여러 달에 한 번에 반영"하고 싶은 경우가 있다면 별도로 요청 바람(지금은 단건 갱신만 지원).
     const dim=new Date(parseInt(sm.slice(0,4)),parseInt(sm.slice(5,7)),0).getDate();
     const next=fixedAll.map(x=>x.fixed_id===editingFxId?{...x,category:cat,amount:amt,year_month:sm,
       payment_date:`${sm}-${String(Math.min(day,dim)).padStart(2,'0')}`,memo:document.getElementById('fx_memo').value||x.memo||'',
@@ -220,7 +291,14 @@ async function saveFx(){
   else toast('저장 실패',true);
 }
 function resetFxEdit(){
+  // v2.9.50: 근본 결함 수정(사용자 지적) — 이 함수가 편집 관련 상태(editingFxId·em 활성화·버튼
+  // 텍스트·세금계산서 체크·부가세)만 초기화하고 항목명·금액·지급일·메모는 전혀 지우지 않아,
+  // "고정비 추가"를 열 때마다 이전에 입력하거나 수정했던 값이 그대로 남아 있었다.
   editingFxId=null;
+  const cat=document.getElementById('fx_cat'); if(cat) cat.value='';
+  const amt=document.getElementById('fx_amt'); if(amt) amt.value='';
+  const day=document.getElementById('fx_day'); if(day) day.value='25';
+  const memo=document.getElementById('fx_memo'); if(memo) memo.value='';
   const em=document.getElementById('fx_em'); if(em) em.disabled=false;
   const btn=document.getElementById('fxSaveBtn'); if(btn) btn.textContent='저장';
   const hasTax=document.getElementById('fx_has_tax'); if(hasTax) hasTax.checked=false;
