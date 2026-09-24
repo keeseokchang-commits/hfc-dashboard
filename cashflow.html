@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.51">
+<link rel="stylesheet" href="css/common.css?v=2.9.53">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -150,6 +150,25 @@
       <table class="cf-table">
         <thead><tr><th>월</th><th>계획입금</th><th>실입금</th><th>계획출금</th><th>실출금</th></tr></thead>
         <tbody id="planActBody"><tr><td colspan="5"><div class="empty-state">CSV 업로드 후 표시됩니다</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- v2.9.53: 고정비 항목별 계획 대비 실적(사용자 확정) — "월별 계획 vs 실적"이 전체 입출금
+       총액만 비교하는 것과 달리, 이 카드는 fixed.html에서 등록한 세부 항목명(급여·세금·법인카드
+       등)을 그대로 기준으로 그 달의 계획 합계와 실제 통장 지출 합계를 항목별로 나란히 보여준다.
+       "세금은 예산보다 많이 냈다", "법인카드는 덜 썼다" 같은 경영 인사이트를 위한 화면 — 대사
+       (건별 매칭) 여부와 무관하게, 그 달 발생한 통장 거래를 계획과 같은 이름 기준으로 그대로
+       재집계한다(계획과 실적이 같은 이름 체계를 공유한다는 원칙, 원칙40 참고). -->
+  <div class="card">
+    <div class="card-title">고정비 항목별 계획 대비 실적 <span style="font-size:11px;color:var(--text3)">※ 항목명이 코드 관리에서 등록한 유형명과 일치해야 정확히 비교됨</span>
+      <select id="fciYear" onchange="renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select>
+      <select id="fciMonth" onchange="renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></select>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="cf-table">
+        <thead><tr><th>항목</th><th>계획</th><th>실적</th><th>차이</th></tr></thead>
+        <tbody id="fixCompareBody"><tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -310,10 +329,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.51"></script>
-<script src="js/common.js?v=2.9.51"></script>
-<script src="js/calc.js?v=2.9.51"></script>
-<script src="js/nav.js?v=2.9.51"></script>
+<script src="js/schema.js?v=2.9.53"></script>
+<script src="js/common.js?v=2.9.53"></script>
+<script src="js/calc.js?v=2.9.53"></script>
+<script src="js/nav.js?v=2.9.53"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -945,7 +964,13 @@ async function loadSheets(){
       });
     });
     planCost=[...s05All.filter(c=>okPrj.has(c.project_id)),...noInvoiceCosts];
-    detailAll=toObj(dtR).filter(t=>t.txn_id);
+    // v2.9.52: 근본 결함 수정(사용자 지적 — 실제 시트에는 "자본 납입"이 1건뿐인데 화면에는 7건,
+    // 22,963,120원으로 부풀려져 보임) — s04All·s05All은 dedupe(...,'revenue_id'/'cost_id')로
+    // 중복 제거를 하는데 detailAll만 이 처리가 빠져 있었다. 시트에 같은 txn_id가 중복 저장되는
+    // 경로가 한 번이라도 생기면(예: CSV 재업로드 시 지문 매칭 실패, 수동 편집 등) 화면의 모든
+    // 집계(유형별 집계·건별 내역·실적 파생)가 그 중복을 그대로 다 세어 실제보다 부풀려지고,
+    // saveReclass()가 이 부풀려진 배열을 그대로 다시 저장하면 중복이 시트에 영구히 남는다.
+    detailAll=dedupe(toObj(dtR).filter(t=>t.txn_id),'txn_id');
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
@@ -953,6 +978,8 @@ async function loadSheets(){
     actData=deriveActFromDetail(detailAll);
     renderAll();
     renderPlanAct();
+    initFixCompareSelectors();
+    renderFixCompareItems();
     renderStaleEstBanner();
     renderVatBanner();
     renderAging();
@@ -1012,6 +1039,55 @@ function renderPlanAct(){
       <td>${pOut?`<span style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" onclick="openPlanDetail('${ym}','out')">${won(pOut,false)}</span>`:'─'}</td>
       <td>${aOut!==null?`${won(aOut,false)}<br><span style="font-size:10px" class="${dOut<=0?'pos':'neg'}">${dOut>=0?'+':''}${won(dOut,false)}</span>`:'─'}</td></tr>`;
   }).join('')||'<tr><td colspan="5"><div class="empty-state">데이터 없음</div></td></tr>';
+}
+// v2.9.53: 고정비 항목별 계획 대비 실적(사용자 확정) — 계획(fixed.html의 category)과 실적
+// (통장 거래의 category)이 같은 이름 체계를 공유한다는 원칙에 따라, 이름을 그대로 조인 키로
+// 사용해 매칭 없이 그 달의 계획 합계와 실적 합계를 항목별로 비교한다. 계획에 없던 항목이 실제로
+// 나가면 "예산 외 지출"로, 계획은 있는데 실적이 0이면 "미집행"으로 표시.
+function initFixCompareSelectors(){
+  const ys=document.getElementById('fciYear'), ms=document.getElementById('fciMonth');
+  const yrs=[...new Set(planFix.map(f=>(f.year_month||'').slice(0,4)).filter(Boolean))].sort();
+  const now=new Date(); const curY=String(now.getFullYear()), curM=String(now.getMonth()+1).padStart(2,'0');
+  ys.innerHTML=(yrs.length?yrs:[curY]).map(y=>`<option ${y===curY?'selected':''}>${y}</option>`).join('');
+  ms.innerHTML=['01','02','03','04','05','06','07','08','09','10','11','12']
+    .map(m=>`<option value="${m}" ${m===curM?'selected':''}>${parseInt(m)}월</option>`).join('');
+}
+function renderFixCompareItems(){
+  const y=document.getElementById('fciYear').value, m=document.getElementById('fciMonth').value;
+  if(!y||!m){ document.getElementById('fixCompareBody').innerHTML='<tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr>'; return; }
+  const ym=`${y}-${m}`;
+  // 계획: 그 달 고정비 계획을 항목명(category)별로 합산
+  const plan={};
+  planFix.filter(f=>f.year_month===ym).forEach(f=>{
+    const c=f.category||'미지정';
+    plan[c]=(plan[c]||0)+(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0));
+  });
+  // 실적: 그 달 통장 거래를 category(코드 관리에서 등록한 유형명) 그대로 항목명으로 합산 —
+  // 매출입금·매입지급·자본납입·기타입금(입금 계열)은 이 카드의 대상이 아니므로 제외.
+  const actual={};
+  detailAll.filter(t=>t.year_month===ym).forEach(t=>{
+    const c=t.category||'미분류';
+    if(['매출 입금','매출입금','매입 지급','매입지급','자본 납입','자본납입','기타 입금','기타입금'].includes(c)) return;
+    const outA=num(t.outflow_amt)||0; if(!outA) return;
+    actual[c]=(actual[c]||0)+outA;
+  });
+  const allItems=[...new Set([...Object.keys(plan),...Object.keys(actual)])]
+    .sort((a,b)=>(plan[b]||0)+(actual[b]||0)-((plan[a]||0)+(actual[a]||0)));
+  if(!allItems.length){ document.getElementById('fixCompareBody').innerHTML='<tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr>'; return; }
+  let tp=0,ta=0;
+  const rows=allItems.map(c=>{
+    const p=plan[c]||0, a=actual[c]||0; tp+=p; ta+=a;
+    const diff=a-p;
+    const tag=!plan[c]&&actual[c]?'<span style="font-size:10px;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:1px 4px;margin-left:4px">예산 외</span>'
+      :plan[c]&&!actual[c]?'<span style="font-size:10px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 4px;margin-left:4px">미집행</span>':'';
+    return `<tr><td>${c}${tag}</td><td style="text-align:right">${p?won(p,false):'─'}</td>
+      <td style="text-align:right">${a?won(a,false):'─'}</td>
+      <td style="text-align:right" class="${diff<=0?'pos':'neg'}">${diff===0?'─':(diff>0?'+':'')+won(diff,false)}</td></tr>`;
+  }).join('');
+  const totalRow=`<tr style="border-top:2px solid var(--border);font-weight:700"><td>합계</td>
+    <td style="text-align:right">${won(tp,false)}</td><td style="text-align:right">${won(ta,false)}</td>
+    <td style="text-align:right" class="${ta-tp<=0?'pos':'neg'}">${ta-tp===0?'─':(ta-tp>0?'+':'')+won(ta-tp,false)}</td></tr>`;
+  document.getElementById('fixCompareBody').innerHTML=rows+totalRow;
 }
 // v2.9.20: 마지막 청구 스케줄 변경 시각(S10.last_schedule_change_at, input.html이 청구 스케줄 재생성 성공 시 기록)과
 // 마지막 추정 재계산 시각(S02 각 행의 updated_at 중 최댓값)을 비교 — 스케줄 변경이 더 최근이면 재계산이 필요함을 안내.
@@ -1131,6 +1207,7 @@ function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 �
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
+  initFixCompareSelectors(); renderFixCompareItems();
 }
 // v2.5.7: 수동 매칭 후보 — 금액 일치(±1,000)는 날짜·건수 제한 없이 전부, 수금/지급예정일 오래된 순(선입 소진). 라벨에 연월·금액 표기(동액 다건 구분)
 function _cands(list,amt){
@@ -1445,7 +1522,7 @@ async function recalcEstimate(){
     if(ok){
       const er=await fetchSheet(...R.S02); estData=toObj(er);
       document.getElementById('recalcInfo').textContent=`마지막 재계산 ${today} (${weighted?'확도가중 ON':'확정분만'})`;
-      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderStaleEstBanner();
+      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderFixCompareItems(); renderStaleEstBanner();
     } else toast('재계산 저장 실패',true);
   }catch(e){toast('재계산 오류: '+e.message,true);}
   btn.disabled=false;btn.textContent='추정 재계산 실행';
