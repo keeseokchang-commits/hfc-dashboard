@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.42">
+<link rel="stylesheet" href="css/common.css?v=2.9.43">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -294,10 +294,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.42"></script>
-<script src="js/common.js?v=2.9.42"></script>
-<script src="js/calc.js?v=2.9.42"></script>
-<script src="js/nav.js?v=2.9.42"></script>
+<script src="js/schema.js?v=2.9.43"></script>
+<script src="js/common.js?v=2.9.43"></script>
+<script src="js/calc.js?v=2.9.43"></script>
+<script src="js/nav.js?v=2.9.43"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -749,13 +749,21 @@ function openDetailModal(ym){
       const wPart=inF-inSum;
       if(wPart>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
       h+=line('추정입금 소계',inF,'+');
-      // 출금 낱개: 매입 + 고정비 + VAT
+      // v2.9.43: "지급예정"이라는 라벨 하나로 세금계산서형 매입·계산서없음 매입(v2.9.36에서 견적
+      // 직접계산으로 합류)이 구분 없이 섞여 나와, 사용자가 이 목록에서 매입과 고정비를 구분하기
+      // 어렵다는 지적(자금수지 재작업 중 발견) — "매입"·"매입(계산서없음)" 유형을 명시.
       planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).forEach(c=>{
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 지급예정 ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(Math.round((num(c.amount)||0)*1.1))}</span></div>`;});
+        const isNoInv=String(c.cost_id||'').startsWith('NOINV-');
+        const label=isNoInv?'매입(계산서없음)':'매입';
+        const amt=isNoInv?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1);
+        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− ${label} ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(amt)}</span></div>`;});
       planFix.filter(f=>f.year_month===ym).forEach(f=>{
         h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(num(f.amount)||0)}</span></div>`;});
       if(vat) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
-      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0)
+      // v2.9.43: 계산서없음 매입(NOINV-)은 이미 VAT 없는 순수 금액인데 여기도 무조건 ×1.1을 곱해
+      // 검산 소계가 왜곡되던 결함(위 표시부와 동일 원인) — 함께 수정.
+      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
+        .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0)
         +planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0)+vat;
       const outW=outF-outKnown;
       if(outW>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
@@ -951,7 +959,11 @@ function renderPlanAct(){
   document.getElementById('planActBody').innerHTML=months.map(m=>{
     const ym=`${yr}-${m}`;
     const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
-    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0);
+    // v2.9.43: 핵심 결함 수정 — planCost에는 v2.9.36부터 계산서없음 매입(cost_id가 "NOINV-"로
+    // 시작, 이미 VAT 없는 순수 금액)이 섞여 있는데, 여기서 무조건 ×1.1을 곱해 "월별 계획 vs 실적
+    // 비교" 표의 계획출금 자체가 실제보다 부풀려지고 있었다 — 자금수지 값이 왜곡된 근본 원인 중 하나.
+    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
+      .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0);
     const pOutF=planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0);
     const pOut=pOutC+pOutF;
     const act=actData.find(a=>a.year_month===ym);
@@ -1359,8 +1371,9 @@ async function recalcEstimate(){
         const sellM=Math.round(un2(p.contract_amount)*1.1*pr/100/ms.length);
         inf2+=sellM; out2+=Math.round(sellM*estRatio(p));
       });
+      // v2.9.43: 위와 동일한 결함(계산서없음 매입에 무조건 ×1.1) — 추정 재계산 로직에서도 수정.
       const outCost=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===m)
-        .reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0);
+        .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0);
       const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(num(f.amount)||0),0);
       const vat=vatRows.filter(v=>(v.due_date||'').slice(0,7)===m)
         .reduce((s,v)=>s+(num(v.actual_payment)||num(v.estimated_payment)||0),0);
