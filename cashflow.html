@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.47">
+<link rel="stylesheet" href="css/common.css?v=2.9.49">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -289,7 +289,18 @@
     <button id="txBtnD" onclick="setTxMode('detail')" style="flex:1;padding:6px;border-radius:7px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-size:12px;cursor:pointer">건별 내역</button>
     <button id="txBtnS" onclick="setTxMode('sum')" style="flex:1;padding:6px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">유형별 집계</button>
   </div>
-  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text3)"><th style="text-align:left;padding:5px">일자</th><th style="text-align:left">적요</th><th>입금</th><th>출금</th><th>유형</th><th>대사</th></tr></thead><tbody id="txBody"></tbody></table></div>
+  <!-- v2.9.49: 가독성 재설계(사용자 지적 — "고정비"·"기타 지급(세금계산서)" 등 유형 드롭다운
+       텍스트가 좁은 컬럼 폭에 잘려 읽을 수 없었음). 각 컬럼에 콘텐츠가 실제로 필요로 하는 최소폭을
+       지정하고(유형 드롭다운은 가장 긴 유형명 "기타 지급(세금계산서)" 기준 108px), 테이블 자체는
+       min-width로 늘려 좁은 화면에서는 가로 스크롤(overflow-x:auto)로 넘기도록 함 — 컬럼을
+       억지로 욱여넣어 잘리게 하는 대신, 필요한 만큼의 공간을 확보하고 넘치면 스크롤한다. -->
+  <!-- v2.9.49: 근본 재설계(사용자 지적 — 좁은 컬럼에 유형 드롭다운 텍스트가 잘려 가독성이 없었음).
+       6컬럼 표는 모바일 폭(약 380px)에 "고정비"·"기타 지급(세금계산서)" 같은 유형명을 담을 여유가
+       없다 — 컬럼을 억지로 욱여넣거나 가로 스크롤을 강제하는 대신, 기존 "미분류·기타 재지정"
+       섹션과 동일한 카드형 레이아웃(정보 줄 + 유형 드롭다운을 별도 줄 전체 폭으로)으로 전면
+       재설계해 어떤 길이의 유형명도 잘리지 않고 표시되도록 함. 유형별 집계 모드는 그대로 표 유지
+       (긴 텍스트 컬럼이 없어 표 형태가 적합). -->
+  <div id="txBody"></div>
   <!-- v2.9.47: 이 팝업(건별 내역)의 "유형" 드롭다운으로 고른 재지정을 저장 — 미분류 재지정과
        동일한 saveReclass()를 호출(양쪽 접두사를 모두 처리하도록 확장됨). -->
   <div style="margin-top:10px;display:flex;justify-content:flex-end">
@@ -299,10 +310,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.47"></script>
-<script src="js/common.js?v=2.9.47"></script>
-<script src="js/calc.js?v=2.9.47"></script>
-<script src="js/nav.js?v=2.9.47"></script>
+<script src="js/schema.js?v=2.9.49"></script>
+<script src="js/common.js?v=2.9.49"></script>
+<script src="js/calc.js?v=2.9.49"></script>
+<script src="js/nav.js?v=2.9.49"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -960,9 +971,16 @@ function openPlanDetail(ym,dir){
         html+=row(pn(r.project_id),`발생 ${r.year_month} · 수금예정 ${r.cash_recv_date||'(미지정→발생월)'}`,a,r.is_received==='Y'?' · <span style="color:var(--green)">입금완료</span>':'');});
   }else{
     t.textContent=`${ym} 계획출금 구성 (지급예정일 기준 · VAT 포함)`;
+    // v2.9.48: 핵심 결함 수정 — 이 팝업(openPlanDetail, "N월 계획출금 구성")은 v2.9.43·v2.9.46에서
+    // 고친 openDetailModal("추정 잔액 구성")과는 완전히 별개의 함수였는데, 이 팝업만 NOINV- 여부를
+    // 확인하지 않고 무조건 ×1.1을 곱하는 v2.9.43 이전 결함이 그대로 남아 있었다 — 계산서없음
+    // 매입(급여형·사업소득형, 이미 VAT 없는 순수 금액)에도 부가세가 붙어 부산은행 프로젝트의
+    // 9월·10월 계획출금이 실제보다 10% 부풀려져 있었다(사용자가 화면 스크린샷으로 직접 확인·지적).
     planCost.filter(c2=>(((c2.payment_date||'').slice(0,7))||c2.year_month)===ym)
-      .forEach(c2=>{const a=Math.round((num(c2.amount)||0)*1.1);tot+=a;
-        html+=row(pn(c2.project_id)+(c2.person_name?' · '+c2.person_name:''),`발생 ${c2.year_month} · 지급예정 ${c2.payment_date||'(미지정→발생월)'}`,a,c2.pay_actual_date?' · <span style="color:var(--green)">지급완료</span>':'');});
+      .forEach(c2=>{const isNoInv=String(c2.cost_id||'').startsWith('NOINV-');
+        const a=isNoInv?(num(c2.amount)||0):Math.round((num(c2.amount)||0)*1.1);tot+=a;
+        const label=isNoInv?pn(c2.project_id)+'(계산서없음)':pn(c2.project_id);
+        html+=row(label+(c2.person_name?' · '+c2.person_name:''),`발생 ${c2.year_month} · 지급예정 ${c2.payment_date||'(미지정→발생월)'}`,a,c2.pay_actual_date?' · <span style="color:var(--green)">지급완료</span>':'');});
     planFix.filter(f=>f.year_month===ym)
       .forEach(f=>{const a=num(f.amount)||0;tot+=a;html+=row('고정비 · '+(f.category||''),`지급예정 ${f.payment_date||ym}`,a);});
   }
@@ -1159,38 +1177,49 @@ function renderTx(){
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
   const list=detailAll.filter(t=>(!m||t.year_month===m)&&(!ty||t.category===ty));
-  if(txMode==='sum'){ // v2.2: 유형별 집계 (월 필터 적용)
+  const body=document.getElementById('txBody');
+  if(txMode==='sum'){ // v2.2: 유형별 집계 (월 필터 적용) — 긴 텍스트 컬럼이 없어 표 형태 유지
     const agg={};
     list.forEach(t=>{const c=t.category||'미분류'; const a=agg[c]=agg[c]||{n:0,i:0,o:0};
       a.n++; a.i+=num(t.inflow_amt)||0; a.o+=num(t.outflow_amt)||0;});
     const rows=Object.entries(agg).sort((x,y)=>(y[1].o+y[1].i)-(x[1].o+x[1].i));
     const ti=rows.reduce((s,[,a])=>s+a.i,0), to=rows.reduce((s,[,a])=>s+a.o,0), tn=rows.reduce((s,[,a])=>s+a.n,0);
-    document.getElementById('txBody').innerHTML=(rows.length?rows.map(([c,a])=>`
-      <tr><td colspan="2" style="padding:6px 5px"><b>${c}</b></td>
+    body.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">`+(rows.length?rows.map(([c,a])=>`
+      <tr><td colspan="2" style="padding:6px 5px">${c}</td>
       <td style="text-align:right;color:var(--green)">${a.i?won(a.i):''}</td>
       <td style="text-align:right;color:var(--red)">${a.o?won(a.o):''}</td>
-      <td style="text-align:center;color:var(--text3)">${a.n}건</td><td></td></tr>`).join('')
+      <td style="text-align:center;color:var(--text3)">${a.n}건</td></tr>`).join('')
       +`<tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="2" style="padding:7px 5px">합계</td>
       <td style="text-align:right;color:var(--green)">${won(ti)}</td><td style="text-align:right;color:var(--red)">${won(to)}</td>
-      <td style="text-align:center">${tn}건</td><td></td></tr>`
-      :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>');
+      <td style="text-align:center">${tn}건</td></tr>`
+      :'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>')+`</table></div>`;
     return;
   }
-  // v2.9.47: "CSV 거래 내역" 팝업(건별 내역)에서 이미 분류된 거래도 포함해 유형을 직접 수정할 수
-  // 있도록 드롭다운 추가(사용자 확정 — 기존 "미분류·기타 재지정" UI는 그대로 유지하고, 이 팝업에서
-  // 별도로 전체 거래의 재지정을 지원). id 접두사를 "rct_"로 분리해, 같은 거래가 미분류 재지정
+  // v2.9.49: 근본 재설계(사용자 지적 — 6컬럼 표는 모바일 폭에 "고정비"·"기타 지급(세금계산서)"
+  // 같은 유형명을 담을 여유가 없어 드롭다운 텍스트가 잘렸다). 기존 "미분류·기타 재지정" 섹션과
+  // 동일한 카드형 레이아웃(정보 줄 + 유형 드롭다운을 전체 폭 별도 줄로)으로 전면 재설계 — 어떤
+  // 길이의 유형명도 잘리지 않고 표시된다. id 접두사를 "rct_"로 분리해, 같은 거래가 미분류 재지정
   // 목록에도 동시에 떠 있을 때 [id^=rc_] 중복 매치로 값이 서로 덮어쓰이는 것을 방지 — saveReclass()
-  // 쪽에서 두 접두사를 모두 훑도록 별도 확장.
-  document.getElementById('txBody').innerHTML=list.length?list.map(t=>{
+  // 쪽에서 두 접두사를 모두 훑도록 별도 확장(v2.9.47).
+  body.innerHTML=list.length?list.map(t=>{
     const st=mR.has(t.txn_id)?'수금매칭':(mC.has(t.txn_id)?'지급매칭':'');
-    return `<tr><td>${t.txn_date}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${t.description||t.recv||''}</td>
-    <td style="text-align:right;color:var(--green)">${(num(t.inflow_amt)||0)?won(t.inflow_amt):''}</td>
-    <td style="text-align:right;color:var(--red)">${(num(t.outflow_amt)||0)?won(t.outflow_amt):''}</td>
-    <td><select id="rct_${t.txn_id}" data-tid="${t.txn_id}" style="padding:3px;border:1px solid var(--border);border-radius:5px;font-size:11px;background:var(--surface);max-width:110px">
-      <option value="">${t.category||'미분류'}</option>
-      ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
-    </select></td><td style="color:var(--blue);font-size:11px">${st}</td></tr>`;}).join('')
-   :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>';
+    const desc=t.description||t.recv||'';
+    const amt=won(num(t.inflow_amt)||num(t.outflow_amt)||0);
+    const amtColor=(num(t.inflow_amt)||0)?'var(--green)':'var(--red)';
+    const badge=st?`<span style="display:inline-block;padding:2px 6px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-lt,#EFF6FF);color:var(--blue);white-space:nowrap;margin-left:6px">${st==='수금매칭'?'수금매칭':'지급매칭'}</span>`:'';
+    return `<div style="padding:8px 2px;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+        <span style="color:var(--text3);font-size:11px;white-space:nowrap">${String(t.txn_date||'').slice(0,10)}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</span>
+        <b style="color:${amtColor};white-space:nowrap">${amt}</b>${badge}
+      </div>
+      <div style="margin-top:5px">
+        <select id="rct_${t.txn_id}" data-tid="${t.txn_id}" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface)">
+          <option value="">${t.category||'미분류'}</option>
+          ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </div></div>`;}).join('')
+   :'<div style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</div>';
 }
 async function manualMatchCost(i){
   const t=unmatchedOut[i]; const cid=document.getElementById('mc_'+i).value;
