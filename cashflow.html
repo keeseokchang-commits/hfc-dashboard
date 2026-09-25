@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.53">
+<link rel="stylesheet" href="css/common.css?v=2.9.54">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -329,10 +329,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.53"></script>
-<script src="js/common.js?v=2.9.53"></script>
-<script src="js/calc.js?v=2.9.53"></script>
-<script src="js/nav.js?v=2.9.53"></script>
+<script src="js/schema.js?v=2.9.54"></script>
+<script src="js/common.js?v=2.9.54"></script>
+<script src="js/calc.js?v=2.9.54"></script>
+<script src="js/nav.js?v=2.9.54"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -522,23 +522,44 @@ function classify(desc,recv,branch,inAmt,outAmt){
 
 // ── 월별 집계 ─────────────────────────────────────────────────
 // v2.5.4: S08_DETAIL(원천) → 월별 실적 재파생 (SSOT — 저장된 분류·확정 순서 사용)
+// v2.9.54: 근본 재설계(사용자 지적: "AI 사용료가 0으로 나오잖아? 버킷에 없는 항목이라고 0이면
+// 버킷을 조정하든 보고서 항목을 조정하든 노력이 있어야" → "근본해결책으로 해야지. 편법은 안돼").
+// 기존에는 8개 고정 버킷(매출입금·자본납입·기타입금·매입지급·고정비·세금·법인카드·AI사용료·
+// 기타비용)에 강제로 밀어 넣어, 코드 관리에 등록되지 않은 유형(예: "AI사용료"라는 txn_type을
+// 아직 등록 안 함)은 조용히 0으로 사라지거나 다른 버킷에 뭉개졌다. 이제 유형명(category) 그대로를
+// 키로 하는 동적 객체(by)에 집계해 어떤 유형을 몇 개 등록하든 전부 정확히 반영되도록 한다 —
+// "고정비 항목별 계획 대비 실적" 카드(v2.9.53)와 정확히 같은 원칙: 계획과 실적이 같은 이름
+// 체계를 공유하고, 화면은 그 이름을 그대로 신뢰한다. 기존 8개 필드(outflow_fixed 등)는 하위
+// 호환을 위해 by에서 파생해 함께 제공하되, 새 코드는 by를 직접 참조해야 한다.
 function deriveActFromDetail(det){
   if(!det||!det.length) return [];
   const rows=[...det].sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
   const monthly={};
   rows.forEach(t=>{
     const ym=t.year_month||String(t.txn_date).slice(0,7);
-    const m=monthly[ym]=monthly[ym]||{year_month:ym,act_balance:0,act_inflow:0,act_outflow:0,inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,outflow_card:0,outflow_ai:0,outflow_etc:0,inflow_capital:0,inflow_etc:0,unclassified_cnt:0};
+    const m=monthly[ym]=monthly[ym]||{year_month:ym,act_balance:0,act_inflow:0,act_outflow:0,by:{},unclassified_cnt:0};
     const inA=num(t.inflow_amt)||0, outA=num(t.outflow_amt)||0, bal=num(t.balance)||0;
     m.act_inflow+=inA; m.act_outflow+=outA;
     if(bal>0) m.act_balance=bal; // 정렬 확정 순서의 마지막 거래 잔액 = 월말 잔액
-    // v2.9.45: 근본 재설계 — v2.9.44의 공백 제거는 "매출입금"류 우연한 불일치만 가리는 편법이었다
-    // (사용자 지적: "띄어쓰기가 문제인게 아니고, 등록된 유형을 기준으로 분류하도록 해야지"). 이제
-    // 하드코딩 문자열과 비교하지 않고, 코드 관리 화면에서 사용자가 각 유형에 명시적으로 지정한
-    // "집계 버킷"(bucketOf, S10의 description 컬럼)을 조회해 정확히 그 버킷에 집계한다 — 유형명이
-    // 무엇이든, 몇 개를 등록했든 항상 정확하다. 버킷을 지정하지 않은 유형(또는 미분류)은 기타로.
-    addToBucket(m, bucketOf(t.category), inA, outA);
-    if((bucketOf(t.category)==='기타비용'||bucketOf(t.category)==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
+    // v2.9.54: 유형명(category)을 그대로 키로 사용 — 코드 관리에 등록된 이름이면 무엇이든 정확히
+    // 잡힌다. 미분류(카테고리 없음)만 별도로 "미분류" 키에 모아 둔다.
+    const cat=t.category||'미분류';
+    const b=m.by[cat]=m.by[cat]||{in:0,out:0};
+    b.in+=inA; b.out+=outA;
+    // unclassified_cnt: 원래 로직(v2.9.45)이 "버킷이 기타비용·기타입금으로 떨어진 것"까지
+    // 경고 대상으로 삼았던 것과 동일하게, 미분류이거나 등록은 됐지만 버킷이 기타 계열인 경우 모두 포함.
+    const bkt=cat==='미분류'?'':bucketOf(cat);
+    if((cat==='미분류'||bkt==='기타비용'||bkt==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
+  });
+  // 하위 호환 필드 파생: 기존 8개 고정 버킷을 참조하던 코드(대시보드 배지·시트 기록 등)가 계속
+  // 동작하도록, bucketOf()로 유형명→버킷 매핑을 확인해 by에서 합산해 둔다.
+  Object.values(monthly).forEach(m=>{
+    m.inflow_revenue=0; m.outflow_cost=0; m.outflow_fixed=0; m.outflow_tax=0;
+    m.outflow_card=0; m.outflow_ai=0; m.outflow_etc=0; m.inflow_capital=0; m.inflow_etc=0;
+    Object.entries(m.by).forEach(([cat,v])=>{
+      if(cat==='미분류'){ if(v.out) m.outflow_etc+=v.out; else if(v.in) m.inflow_etc+=v.in; return; }
+      addToBucket(m, bucketOf(cat), v.in, v.out);
+    });
   });
   return Object.values(monthly).sort((a,b)=>a.year_month.localeCompare(b.year_month));
 }
@@ -590,12 +611,16 @@ function orderAndChain(txns){
   });
   return {seq:out,breaks};
 }
+// v2.9.54: 근본 재설계(사용자 지적) — deriveActFromDetail과 동일한 원칙으로, CSV 업로드 직후
+// 미리보기(대시보드 배지)를 만드는 이 함수도 8개 고정 버킷 대신 유형명 그대로의 동적 집계(by)를
+// 함께 채운다. 이 함수의 monthly 객체가 그대로 actData에 병합되므로(위 handleCsv 내부), by가
+// 없으면 showBreakdown이 새 유형을 보여줄 수 없다.
 function aggregateMonthly(txns){
   const monthly={};
   const monthTxns={};
   txns.forEach(t=>{
     if(!monthly[t.ym]){
-      monthly[t.ym]={act_balance:0,act_inflow:0,act_outflow:0,
+      monthly[t.ym]={act_balance:0,act_inflow:0,act_outflow:0,by:{},
         inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,
         outflow_card:0,outflow_ai:0,outflow_etc:0,inflow_capital:0,inflow_etc:0,
         unclassified_cnt:0};
@@ -609,6 +634,9 @@ function aggregateMonthly(txns){
     m.act_outflow+=t.outAmt;
     monthTxns[t.ym].push(t);
 
+    const cat=t.cat||'미분류';
+    const b=m.by[cat]=m.by[cat]||{in:0,out:0};
+    b.in+=t.inAmt; b.out+=t.outAmt;
     // v2.9.45: 위 aggregateMonthly(rows)와 동일한 근본 수정 — 코드 관리에서 지정한 집계 버킷으로 조회.
     addToBucket(m, bucketOf(t.cat), t.inAmt, t.outAmt);
   });
@@ -633,20 +661,25 @@ function aggregateMonthly(txns){
   }
 }
 
+// v2.9.54: 근본 재설계(사용자 지적) — 버킷별 색상은 유지하되(경영자가 한눈에 성격을 구분하도록),
+// 항목 목록 자체는 m.by(그 달 실제 등록된 유형명 전체)에서 만든다. 코드 관리에 새 유형을 등록하면
+// 자동으로 이 목록에 나타나며, 등록되지 않은 유형이 조용히 0으로 사라지는 일이 없다.
+const BUCKET_BADGE_CLS={'매출입금':'badge-green','자본납입':'badge-blue','기타입금':'badge-blue',
+  '매입지급':'badge-amber','고정비':'badge-amber','법인카드':'badge-amber','기타비용':'badge-amber',
+  '세금':'badge-red','AI사용료':'badge-blue'};
 function showBreakdown(ym, m){
   document.getElementById('breakdownCard').style.display='block';
   document.getElementById('breakdownMonth').textContent=ym;
-  const items=[
-    {label:'매출 입금',amt:m.inflow_revenue,dir:'in',cls:'badge-green'},
-    {label:'자본 납입',amt:m.inflow_capital,dir:'in',cls:'badge-blue'},
-    {label:'매입 지급',amt:m.outflow_cost,dir:'out',cls:'badge-amber'},
-    {label:'고정비',amt:m.outflow_fixed,dir:'out',cls:'badge-amber'},
-    {label:'세금',amt:m.outflow_tax,dir:'out',cls:'badge-red'},
-    {label:'법인카드',amt:m.outflow_card,dir:'out',cls:'badge-amber'},
-    {label:'AI 사용료',amt:m.outflow_ai,dir:'out',cls:'badge-blue'},
-    {label:'기타비용',amt:m.outflow_etc,dir:'out',cls:'badge-amber'},
-    {label:'기타입금',amt:m.inflow_etc,dir:'in',cls:'badge-blue'},
-  ].filter(i=>i.amt>0);
+  const items=[];
+  if(m.by){
+    Object.entries(m.by).forEach(([cat,v])=>{
+      const bkt=cat==='미분류'?'':bucketOf(cat);
+      const cls=BUCKET_BADGE_CLS[bkt]||'badge-amber';
+      if(v.in>0) items.push({label:cat,amt:v.in,dir:'in',cls:cat==='미분류'?'badge-blue':cls});
+      if(v.out>0) items.push({label:cat,amt:v.out,dir:'out',cls:cat==='미분류'?'badge-amber':cls});
+    });
+  }
+  items.sort((a,b)=>b.amt-a.amt);
 
   document.getElementById('breakdownList').innerHTML=items.map(i=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
@@ -748,18 +781,22 @@ function openDetailModal(ym){
   const actBal=act?num(act.act_balance)||0:null;
   const diff=estBal!==null&&actBal!==null?actBal-estBal:null;
   document.getElementById('detailTitle').textContent=`${ym} 상세`;
+  // v2.9.54: 근본 재설계(사용자 지적) — 8개 고정 버킷 대신, 그 달 통장 거래에 실제로 등록된
+  // 유형명(act.by)을 입금/출금으로 나눠 금액 큰 순으로 그대로 나열한다. 코드 관리에 어떤 이름을
+  // 몇 개 등록하든(예: "AI사용료"를 새로 등록해도) 자동으로 반영되며, 0으로 조용히 사라지는
+  // 유형이 생기지 않는다.
+  const byRows=[];
+  if(act&&act.by){
+    const ins=Object.entries(act.by).filter(([,v])=>v.in>0).sort((a,b)=>b[1].in-a[1].in);
+    const outs=Object.entries(act.by).filter(([,v])=>v.out>0).sort((a,b)=>b[1].out-a[1].out);
+    ins.forEach(([cat,v])=>byRows.push({k:cat,v:won(v.in,false)}));
+    outs.forEach(([cat,v])=>byRows.push({k:cat,v:won(v.out,false)}));
+  }
   const rows=[
     {k:'추정 잔액',v:estBal!==null?won(estBal,false):'─'},
     {k:'실잔액',v:actBal!==null?won(actBal,false):'─'},
     {k:'차이',v:diff!==null?(diff>=0?'+':'')+won(diff,false):'─'},
-    {k:'매출 입금',v:act?won(act.inflow_revenue,false):'─'},
-    {k:'자본 납입',v:act?won(act.inflow_capital,false):'─'},
-    {k:'매입 지급',v:act?won(act.outflow_cost,false):'─'},
-    {k:'고정비',v:act?won(act.outflow_fixed,false):'─'},
-    {k:'세금',v:act?won(act.outflow_tax,false):'─'},
-    {k:'법인카드',v:act?won(act.outflow_card,false):'─'},
-    {k:'AI 사용료',v:act?won(act.outflow_ai,false):'─'},
-    {k:'기타비용',v:act?won(act.outflow_etc,false):'─'},
+    ...byRows,
     {k:'총 입금',v:act?won(act.act_inflow,false):'─'},
     {k:'총 출금',v:act?won(act.act_outflow,false):'─'},
   ].filter(r=>r.v!=='─'||r.k==='추정 잔액'||r.k==='실잔액');
