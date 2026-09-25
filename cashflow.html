@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.56">
+<link rel="stylesheet" href="css/common.css?v=2.9.57">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -83,6 +83,38 @@
   .detail-row:last-child{border-bottom:none}
   .detail-label{color:var(--text2)}
   .detail-val{font-weight:500}
+  /* v2.9.57: "N월 상세" 팝업 UI/UX 정비(사용자 요청 — "프로답게 보일 수 있도록"). 가장 중요한
+     숫자(차이)에 시선이 먼저 가도록 KPI 스트립에서 그 셀만 색 배경으로 강조하고, 입금·출금
+     리스트는 각 줄 왼쪽에 방향을 나타내는 얇은 컬러 바를 둬 표 느낌 대신 카드 리스트의 질감을
+     냈다. 장식이 아니라 "이게 입금인지 출금인지, 좋은지 나쁜지"를 구조로 전달하는 것이 목표. */
+  .kpi-strip{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:10px;margin-bottom:18px}
+  .kpi-cell{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center}
+  .kpi-cell .kpi-label{font-size:10.5px;color:var(--text3);font-weight:600;letter-spacing:.2px}
+  .kpi-cell .kpi-num{font-size:16px;font-weight:700;margin-top:6px;line-height:1.25;word-break:keep-all;color:var(--text)}
+  .kpi-cell.diff-pos{background:var(--green-lt);border-color:var(--green-lt)}
+  .kpi-cell.diff-pos .kpi-num{color:var(--green)}
+  .kpi-cell.diff-neg{background:var(--red-lt);border-color:var(--red-lt)}
+  .kpi-cell.diff-neg .kpi-num{color:var(--red)}
+  .flow-section{margin-bottom:16px}
+  .flow-head{display:flex;align-items:baseline;justify-content:space-between;padding:2px 3px 9px}
+  .flow-head .flow-title{font-size:13px;font-weight:700;color:var(--text)}
+  .flow-head .flow-total{font-size:14.5px;font-weight:700;letter-spacing:-.1px}
+  .flow-list{border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface)}
+  .flow-item{display:flex;align-items:stretch;background:var(--surface)}
+  .flow-item+.flow-item{border-top:1px solid var(--border)}
+  .flow-item .flow-bar{width:3px;flex-shrink:0}
+  .flow-item .flow-body{flex:1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;min-width:0}
+  .flow-item .flow-text{min-width:0}
+  .flow-item .flow-name{font-size:12.5px;color:var(--text);font-weight:600}
+  .flow-item .flow-sub{font-size:10.5px;color:var(--text3);margin-top:2px}
+  .flow-item .flow-amt{font-size:13.5px;font-weight:700;white-space:nowrap;flex-shrink:0}
+  .flow-empty{padding:18px 12px;text-align:center;font-size:12px;color:var(--text3);background:var(--surface)}
+  .est-breakdown{margin-top:20px;border-radius:12px;background:var(--surface2);padding:15px 15px 13px;border:1px solid var(--border)}
+  .est-breakdown .est-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;margin-bottom:9px}
+  .est-breakdown .est-line{display:flex;justify-content:space-between;font-size:12px;padding:4px 2px}
+  .est-breakdown .est-sub{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);padding:2px 2px 2px 15px}
+  .est-breakdown .est-total{display:flex;justify-content:space-between;font-size:12.5px;padding:9px 2px 2px;margin-top:5px;border-top:1px solid var(--border);font-weight:700}
+  .est-breakdown .est-note{font-size:10px;color:var(--text3);padding:6px 2px 0;line-height:1.5}
 
   /* 탭바 */
   .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
@@ -329,10 +361,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.56"></script>
-<script src="js/common.js?v=2.9.56"></script>
-<script src="js/calc.js?v=2.9.56"></script>
-<script src="js/nav.js?v=2.9.56"></script>
+<script src="js/schema.js?v=2.9.57"></script>
+<script src="js/common.js?v=2.9.57"></script>
+<script src="js/calc.js?v=2.9.57"></script>
+<script src="js/nav.js?v=2.9.57"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -781,14 +813,13 @@ function openDetailModal(ym){
   const actBal=act?num(act.act_balance)||0:null;
   const diff=estBal!==null&&actBal!==null?actBal-estBal:null;
   document.getElementById('detailTitle').textContent=`${ym} 상세`;
-  // v2.9.55: 근본 재설계(사용자 지적: "법인카드가 두번 나오는거도 오류인거 같고, 이 보고서가
-  // 보여주려고 했던 양식 목표가 사라진 듯 해" → "그걸 설계하는게 너의 전문 영역이자나") — 이
-  // 화면의 유일한 목적은 "추정과 실제 잔액의 차이가 왜 발생했는지"를 보여주는 것이다. v2.9.54는
-  // 이 목적을 잊고 실적만 나열해 "그래서 뭐가 문제인지" 알 수 없게 만들었다(원칙42). 이제 매출
-  // 입금·매입 지급은 그 달 계획(planRev·planCost) 대비 실적으로, 고정비 세부 항목(급여·세금·
-  // 법인카드 등)은 계획(planFix) 대비 실적으로, "고정비 항목별 계획 대비 실적" 카드와 정확히
-  // 같은 원칙(이름을 그대로 조인 키로 사용)으로 비교한다. 입금·출금은 별도 섹션으로 명확히
-  // 나눠, 같은 이름이 양쪽에 있어도(예: 법인카드 환급 입금 + 카드값 출금) 혼란 없이 구분된다.
+  // v2.9.57: UI/UX 전면 정비(사용자 요청 — "프로답게 보일 수 있도록"). 구조를 세 블록으로 명확히
+  // 분리: ①추정/실잔액/차이를 3분할 KPI 스트립으로, ②입금 내역(통장에 실제 들어온 것을 그대로,
+  // 합계는 총입금), ③출금 내역(사용자 확정: "이전처럼 순지출로 표현하면 출금합계가 다름. 지출
+  // 내역 기준" — v2.9.56의 순지출 비교를 이 화면에서는 철회하고, 법인카드 등 한 유형에 입금·출금이
+  // 섞여 있어도 그 유형의 총출금을 그대로 보여줘 실제 통장 총출금과 합계가 정확히 일치하게 함).
+  // 계획 대비 비교(v2.9.55~56에서 도입)는 각 항목 옆에 옅은 보조 정보로 유지해 "예산과 얼마나
+  // 다른지"는 여전히 한눈에 보이돼, 주인공은 항상 "실제 통장에 무슨 일이 있었는가"가 되도록 함.
   const planIn=(planRev||[]).filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym)
     .reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
   const planOutCost=(planCost||[]).filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
@@ -800,94 +831,106 @@ function openDetailModal(ym){
     planFixByCat[c]=(planFixByCat[c]||0)+(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0));
   });
   const actBy=(act&&act.by)||{};
-  const FIXED_TXN_NAMES=['매출 입금','매출입금','매입 지급','매입지급']; // 이 두 대분류는 아래에서 별도 처리
-  const actInSum=Object.entries(actBy).filter(([c])=>['매출 입금','매출입금'].includes(c)).reduce((s,[,v])=>s+v.in,0);
-  // v2.9.56: 매입 지급도 같은 유형명으로 환불·취소 입금이 있을 수 있으니 순지출(net) 원칙을
-  // 동일하게 적용 — 위 고정비 세부 항목과 일관되게, 총출금이 아니라 (출금−입금)으로 계획과 비교.
-  const actOutCostSum=Object.entries(actBy).filter(([c])=>['매입 지급','매입지급'].includes(c)).reduce((s,[,v])=>s+(v.out-v.in),0);
-  const cmpRow=(label,plan,actual)=>{
+  const INFLOW_TXN_NAMES=['매출 입금','매출입금'], OUTFLOW_COST_NAMES=['매입 지급','매입지급'];
+  const actInSum=Object.entries(actBy).filter(([c])=>INFLOW_TXN_NAMES.includes(c)).reduce((s,[,v])=>s+v.in,0);
+  const actOutCostSum=Object.entries(actBy).filter(([c])=>OUTFLOW_COST_NAMES.includes(c)).reduce((s,[,v])=>s+v.out,0);
+
+  // KPI 스트립: 추정 잔액 / 실잔액 / 차이 — 가장 중요한 "차이"만 색 배경으로 강조해 시선을 먼저 끈다.
+  const diffCellCls=diff===null?'':(diff>=0?'diff-pos':'diff-neg');
+  const diffSign=diff!==null&&diff>=0?'+':'';
+  const kpiHtml=`<div class="kpi-strip">
+    <div class="kpi-cell"><div class="kpi-label">추정 잔액</div><div class="kpi-num">${estBal!==null?won(estBal,false):'─'}</div></div>
+    <div class="kpi-cell"><div class="kpi-label">실잔액</div><div class="kpi-num">${actBal!==null?won(actBal,false):'─'}</div></div>
+    <div class="kpi-cell ${diffCellCls}"><div class="kpi-label">차이</div><div class="kpi-num">${diff!==null?diffSign+won(diff,false):'─'}</div></div>
+  </div>`;
+
+  // 계획 대비 보조 텍스트(옅게 표시) — 계획이 없으면 생략
+  const planNote=(plan,actual)=>{
+    if(!plan) return '';
     const d=actual-plan;
-    return `<div class="detail-row" style="align-items:flex-start"><span class="detail-label">${label}</span>
-      <span class="detail-val" style="text-align:right;line-height:1.5">
-        <span style="color:var(--text3);font-size:11px">계획 ${plan?won(plan,false):'─'}</span><br>
-        실적 ${actual?won(actual,false):'─'}
-        ${plan||actual?`<br><span style="font-size:11px" class="${d<=0?'pos':'neg'}">${d===0?'차이 없음':(d>0?'+':'')+won(d,false)}</span>`:''}
-      </span></div>`;
+    const cls=d<=0?'pos':'neg';
+    return `<div class="flow-sub">계획 ${won(plan,false)} · <span class="${cls}">${d===0?'차이 없음':(d>0?'+':'')+won(d,false)}</span></div>`;
   };
-  // v2.9.56: 근본 결함 수정(사용자 지적: "법인카드 회수분이 있었다면 고정비 상세 화면은 회수분이
-  // 누락된거였네? 급여도 지급했다가 오지급으로 입금받고 재지급하고 했었거든") — 아래 "▸ 출금"
-  // 섹션에서 같은 유형명의 입금(카드값 환급, 급여 오지급 회수 등)을 빼지 않은 총출금만 계획과
-  // 비교하면, 위 "▸ 입금" 섹션에 그 회수분을 이미 별도로 보여주고 있는데도 출금 쪽 숫자가 실제
-  // 순지출보다 부풀려져 "예산 초과"로 잘못 보인다. "고정비 항목별 계획 대비 실적" 카드와 동일한
-  // 원칙(net = 출금 − 입금)으로 출금 섹션을 계획과 비교하되, 입금 섹션은 "이런 회수가 있었다"는
-  // 사실 자체를 알리는 참고 정보로 그대로 유지 — 두 섹션을 합쳐 읽으면 총액과 순액을 모두 확인
-  // 가능하다.
-  let byHtml='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">▸ 입금</div>';
-  byHtml+=cmpRow('매출 입금',planIn,actInSum);
-  Object.entries(actBy).forEach(([cat,v])=>{ if(v.in>0&&!['매출 입금','매출입금'].includes(cat)) byHtml+=cmpRow(cat+' (입금, 참고)',0,v.in); });
-  byHtml+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">▸ 출금 (순지출 = 출금 − 같은 유형 입금)</div>';
-  byHtml+=cmpRow('매입 지급',planOutCost,actOutCostSum);
-  const fixCats=new Set([...Object.keys(planFixByCat),...Object.entries(actBy).filter(([c,v])=>(v.out-v.in)!==0&&!['매입 지급','매입지급'].includes(c)&&!planFixByCat.hasOwnProperty(c)).map(([c])=>c)]);
-  const netOf=cat=>Math.max(0,(actBy[cat]?.out||0)-(actBy[cat]?.in||0));
-  [...fixCats].sort((a,b)=>(planFixByCat[b]||0)+netOf(b)-((planFixByCat[a]||0)+netOf(a)))
-    .forEach(cat=>byHtml+=cmpRow(cat,planFixByCat[cat]||0,netOf(cat)));
-  const rows=[
-    {k:'추정 잔액',v:estBal!==null?won(estBal,false):'─'},
-    {k:'실잔액',v:actBal!==null?won(actBal,false):'─'},
-    {k:'차이',v:diff!==null?(diff>=0?'+':'')+won(diff,false):'─'},
-  ].filter(r=>r.v!=='─'||r.k==='추정 잔액'||r.k==='실잔액');
-  document.getElementById('detailBody').innerHTML=rows.map(r=>`
-    <div class="detail-row"><span class="detail-label">${r.k}</span><span class="detail-val">${r.v}</span></div>`).join('')
-    + byHtml
-    + `<div class="detail-row" style="margin-top:10px;padding-top:8px;border-top:2px solid var(--border);font-weight:700"><span class="detail-label">총 입금</span><span class="detail-val">${act?won(act.act_inflow,false):'─'}</span></div>`
-    + `<div class="detail-row" style="font-weight:700"><span class="detail-label">총 출금</span><span class="detail-val">${act?won(act.act_outflow,false):'─'}</span></div>`;
-  // v2.4.6: 추정 잔액 구성(산식·낱개) — [추정 vs 실적] 신뢰도 검증용
+  // 각 줄 왼쪽에 방향(입금=초록/출금=빨강)을 나타내는 얇은 컬러 바를 둬, 표 대신 카드 리스트의
+  // 질감으로 "이게 들어온 돈인지 나간 돈인지"를 색으로 즉시 구분할 수 있게 한다.
+  const flowItem=(name,amt,plan,dir)=>`<div class="flow-item">
+      <div class="flow-bar" style="background:${dir==='in'?'var(--green)':'var(--red)'}"></div>
+      <div class="flow-body">
+        <div class="flow-text"><div class="flow-name">${name}</div>${planNote(plan||0,amt)}</div>
+        <div class="flow-amt" style="color:${dir==='in'?'var(--green)':'var(--red)'}">${dir==='in'?'+':'-'}${won(amt,false)}</div>
+      </div>
+    </div>`;
+
+  // 블록2: 입금 내역 — 통장에 실제 들어온 것을 그대로, 계획이 있는 항목(매출 입금)만 보조 비교 표시
+  const inEntries=Object.entries(actBy).filter(([,v])=>v.in>0).sort((a,b)=>b[1].in-a[1].in);
+  const inItemsHtml=inEntries.length
+    ? inEntries.map(([cat,v])=>flowItem(cat, v.in, INFLOW_TXN_NAMES.includes(cat)?planIn:0, 'in')).join('')
+    : '<div class="flow-empty">이번 달 입금 내역이 없습니다</div>';
+  const totalIn=act?num(act.act_inflow)||0:inEntries.reduce((s,[,v])=>s+v.in,0);
+
+  // 블록3: 출금 내역 — 사용자 확정: "지출 내역 기준"이므로 유형별 총출금을 그대로 표시하고
+  // 합계는 실제 통장 총출금(act.act_outflow)과 정확히 일치해야 한다(순지출로 바꾸지 않음).
+  const outEntries=Object.entries(actBy).filter(([,v])=>v.out>0).sort((a,b)=>b[1].out-a[1].out);
+  const planForOut=cat=>OUTFLOW_COST_NAMES.includes(cat)?planOutCost:(planFixByCat[cat]||0);
+  const outItemsHtml=outEntries.length
+    ? outEntries.map(([cat,v])=>flowItem(cat, v.out, planForOut(cat), 'out')).join('')
+    : '<div class="flow-empty">이번 달 출금 내역이 없습니다</div>';
+  const totalOut=act?num(act.act_outflow)||0:outEntries.reduce((s,[,v])=>s+v.out,0);
+
+  let html=kpiHtml;
+  html+=`<div class="flow-section">
+    <div class="flow-head"><div class="flow-title">입금 내역</div><div class="flow-total pos">+${won(totalIn,false)}</div></div>
+    <div class="flow-list">${inItemsHtml}</div>
+  </div>`;
+  html+=`<div class="flow-section">
+    <div class="flow-head"><div class="flow-title">출금 내역</div><div class="flow-total neg">-${won(totalOut,false)}</div></div>
+    <div class="flow-list">${outItemsHtml}</div>
+  </div>`;
+  document.getElementById('detailBody').innerHTML=html;
+
+  // v2.4.6: 추정 잔액 구성(산식·낱개) — [추정 vs 실적] 신뢰도 검증용. v2.9.57에서 카드 배경·여백을
+  // 정리해 위 두 블록과 시각적으로 통일된 하나의 화면처럼 보이도록 함.
   (function(){
     const bx=document.getElementById('detailBody');
     if(!est){return;}
     const anchor=(est.pipeline_basis||'').includes('기산 전')||(est.pipeline_basis||'').includes('실적 기준');
-    let h='<div style="margin-top:14px;padding-top:10px;border-top:2px solid var(--border);font-weight:700;font-size:12px">📐 추정 잔액 구성</div>';
+    let h='<div class="est-breakdown"><div class="est-title">📐 추정 잔액 구성</div>';
     if(anchor){
-      h+='<div style="font-size:12px;color:var(--text3);padding:6px 0">이 달은 <b>기산월 이전</b>입니다 — 추정은 설정된 기산월(기초 잔액)부터 누적됩니다.</div>';
+      h+='<div style="font-size:12px;color:var(--text3);padding:4px 2px">이 달은 <b>기산월 이전</b>입니다 — 추정은 설정된 기산월(기초 잔액)부터 누적됩니다.</div>';
     }else{
       const prevYm=(d=>{const[y,mm]=ym.split('-').map(Number);const p=new Date(y,mm-2,1);return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}`;})();
       const pe=estData.find(e=>e.year_month===prevYm&&e.est_balance!=='');
       const isBase=!pe;
       const A=pe?num(pe.est_balance):(num(settings.param_base_balance)||20000000);
       const inF=num(est.est_inflow)||0, outF=num(est.est_outflow)||0, vat=num(est.est_vat)||0;
-      const line=(l,v,sign)=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 2px"><span>${l}</span><b>${sign||''}${wonFull(Math.abs(v))}</b></div>`;
+      const line=(l,v,sign)=>`<div class="est-line"><span>${l}</span><b>${sign||''}${wonFull(Math.abs(v))}</b></div>`;
       h+=line(isBase?'기초 잔액 (기산월 자본금)':`전월(${prevYm}) 추정 잔액`,A);
-      // 입금 낱개: 재무 미수 수금예정
       const inRows=s04All.filter(r=>okPrjSet.has(r.project_id)&&(r.cash_recv_date||'').slice(0,7)===ym);
       let inSum=0;
       inRows.forEach(r=>{const a=num(r.cash_recv_amt)||0;inSum+=a;
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 수금예정 ${r.project_id} (${r.year_month}분)</span><span>${wonFull(a)}</span></div>`;});
+        h+=`<div class="est-sub"><span>+ 수금예정 ${r.project_id} (${r.year_month}분)</span><span>${wonFull(a)}</span></div>`;});
       const wPart=inF-inSum;
-      if(wPart>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
+      if(wPart>0) h+=`<div class="est-sub"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
       h+=line('추정입금 소계',inF,'+');
-      // v2.9.43: "지급예정"이라는 라벨 하나로 세금계산서형 매입·계산서없음 매입(v2.9.36에서 견적
-      // 직접계산으로 합류)이 구분 없이 섞여 나와, 사용자가 이 목록에서 매입과 고정비를 구분하기
-      // 어렵다는 지적(자금수지 재작업 중 발견) — "매입"·"매입(계산서없음)" 유형을 명시.
       planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).forEach(c=>{
         const isNoInv=String(c.cost_id||'').startsWith('NOINV-');
         const label=isNoInv?'매입(계산서없음)':'매입';
         const amt=isNoInv?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1);
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− ${label} ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(amt)}</span></div>`;});
+        h+=`<div class="est-sub"><span>− ${label} ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(amt)}</span></div>`;});
       planFix.filter(f=>f.year_month===ym).forEach(f=>{
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(num(f.amount)||0)}</span></div>`;});
-      if(vat) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
-      // v2.9.43: 계산서없음 매입(NOINV-)은 이미 VAT 없는 순수 금액인데 여기도 무조건 ×1.1을 곱해
-      // 검산 소계가 왜곡되던 결함(위 표시부와 동일 원인) — 함께 수정.
+        h+=`<div class="est-sub"><span>− 고정비 ${f.category||''}</span><span>${wonFull(num(f.amount)||0)}</span></div>`;});
+      if(vat) h+=`<div class="est-sub"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
       const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
         .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0)
         +planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0)+vat;
       const outW=outF-outKnown;
-      if(outW>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
+      if(outW>0) h+=`<div class="est-sub"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
       h+=line('추정출금 소계',outF,'−');
       const calc=A+inF-outF, ok=calc===(num(est.est_balance)||0);
-      h+=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 2px;border-top:1px solid var(--border);font-weight:700"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(num(est.est_balance)||0)}</span></div>`;
-      h+=`<div style="font-size:10px;color:var(--text3);padding:3px 2px">기준: ${est.pipeline_basis||''} · 산식 = 전월 추정 잔액(기산월은 기초 잔액) + 계획입금 − 계획출금(매입·고정비·VAT) · 실잔액 미혼합</div>`;
+      h+=`<div class="est-total"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(num(est.est_balance)||0)}</span></div>`;
+      h+=`<div class="est-note">기준: ${est.pipeline_basis||''} · 산식 = 전월 추정 잔액(기산월은 기초 잔액) + 계획입금 − 계획출금(매입·고정비·VAT) · 실잔액 미혼합</div>`;
     }
+    h+='</div>';
     bx.innerHTML+=h;
   })();
   document.getElementById('detailModal').classList.add('open');

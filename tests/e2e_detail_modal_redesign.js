@@ -1,11 +1,14 @@
-// tests/e2e_detail_modal_redesign.js — "N월 상세" 팝업(openDetailModal) 근본 재설계(v2.9.55) 회귀.
-// 배경: 사용자 지적 — "법인카드가 두번 나오는거도 오류인거 같고, 이 보고서가 보여주려고 했던
-// 양식 목표가 사라진 듯 해." v2.9.54는 8개 고정 버킷을 없애면서 통장 실적을 단순 나열만 하게
-// 됐는데, 이 화면의 원래 목적("추정과 실제 잔액의 차이가 왜 발생했는지 설명")을 놓쳤다. 같은
-// 유형명이 입금·출금 양쪽에 있으면(예: 법인카드 환급 입금 + 카드값 결제 출금) 라벨 구분 없이
-// 같은 이름이 두 번 나와 혼란스러웠다. v2.9.55: 매출 입금·매입 지급은 그 달 계획(planRev·
-// planCost) 대비 실적으로, 고정비 세부 항목은 계획(planFix) 대비 실적으로 비교해 보여주고,
-// 입금·출금 섹션을 명확히 분리하며 같은 이름이 양쪽에 있으면 "(입금)"/"(출금)"으로 구분한다.
+// tests/e2e_detail_modal_redesign.js — "N월 상세" 팝업(openDetailModal) 재설계 회귀(v2.9.55~57).
+// 배경: 사용자 지적(v2.9.55) — "법인카드가 두번 나오는거도 오류인거 같고, 이 보고서가 보여주려고
+// 했던 양식 목표가 사라진 듯 해." v2.9.54가 8개 고정 버킷을 없애면서 통장 실적을 단순 나열만 하게
+// 됐는데, 이 화면의 원래 목적("추정과 실제 잔액의 차이가 왜 발생했는지 설명")을 놓쳤다. v2.9.55는
+// 계획 대비 실적 비교를 도입했고, v2.9.56은 순지출(net) 원칙을 적용했다.
+// v2.9.57 최종 확정(사용자 요청 — "프로답게 보일 수 있도록" UI/UX 정비): 세 블록(KPI 스트립,
+// 입금 내역, 출금 내역)으로 명확히 구조화하고, 사용자가 "이전처럼 순지출로 표현하면 출금합계가
+// 다름. 지출내역 기준"이라고 확정한 대로, 이 화면의 출금 내역은 순지출이 아니라 유형별 총출금을
+// 그대로 보여줘 합계가 실제 통장 총출금과 정확히 일치하도록 정책을 바꿨다(순지출 원칙은 "고정비
+// 항목별 계획 대비 실적" 카드에만 남아 있음 — e2e_net_outflow.js, e2e_fix_compare_items.js 참고).
+// 계획 대비 비교는 각 항목 옆에 보조 정보로 유지.
 const path = require('path');
 const { portFor, openPage } = require('./_e2e_helpers');
 const { makeSuite } = require('./_helpers');
@@ -15,7 +18,7 @@ const ROOT = path.join(__dirname, '..');
 async function run() {
   const s = makeSuite('e2e_detail_modal_redesign');
 
-  // ── 같은 유형명(법인카드)이 입금·출금 양쪽에 있어도 라벨로 명확히 구분되고, 계획 대비 실적이 표시됨 ──
+  // ── KPI 스트립, 입금/출금 블록 구조, 총액 표시, 계획 대비 보조 정보가 모두 정확히 나타남 ──
   {
     const sheetData = {
       S01_PIPELINE: [['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'],
@@ -23,7 +26,7 @@ async function run() {
       S03_PROJECT: [['project_id','pipeline_id','project_name','client','contract_amount','start_date','end_date','status'],
         ['PRJ-1','PL-1','테스트','고객','30000000','2026-08-01','2026-08-31','수주']],
       S04_REVENUE: [['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'],
-        ['REV-1','PRJ-1','2026-08','30000000','33000000','2026-08-05','Y','','3000000','2026-08-05','2026-08-05','','']],
+        ['REV-1','PRJ-1','2026-08','30000000','33511500','2026-08-05','Y','','3000000','2026-08-05','2026-08-05','','']],
       S05_COST: [['cost_id']],
       S06_FIXED_COST: [['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt','matched_txn_id','pay_actual_date'],
         ['FIX-1','2026-08','기본급여','2700000','2026-08-10','','N','0','',''],
@@ -43,21 +46,33 @@ async function run() {
     await new Promise(r => setTimeout(r, 300));
     w.eval("openDetailModal('2026-08')");
     const html = d.getElementById('detailBody').innerHTML;
+    const act = w.eval("actData.find(a=>a.year_month==='2026-08')");
 
-    s.check(html.includes('법인카드 (입금, 참고)'), 'v2.9.56: 입금 계열의 법인카드가 "법인카드 (입금, 참고)"로 명확히 구분 표시됨');
-    s.check(html.includes('608,500'), 'v2.9.55: 법인카드 입금 금액(608,500원)이 정확히 표시됨');
-    s.check(html.includes('기본급여') && html.includes('2,700,000') && html.includes('15,389,870') && html.includes('+12,689,870'),
-      'v2.9.55: 기본급여의 계획(2,700,000원)·실적(15,389,870원)·차이(+12,689,870원)가 정확히 표시됨');
-    s.check(html.includes('매출 입금') && html.includes('33,000,000') && html.includes('33,511,500') && html.includes('+511,500'),
-      'v2.9.55: 매출 입금의 계획·실적·차이가 정확히 계산되어 표시됨');
-    s.check(html.includes('▸ 입금') && html.includes('▸ 출금'), 'v2.9.55: 입금·출금 섹션이 명확히 분리되어 표시됨');
+    s.check(d.querySelector('.kpi-strip') !== null,
+      'v2.9.57: 추정 잔액·실잔액·차이가 KPI 스트립(3분할 블록)으로 표시됨');
+    s.check(d.querySelectorAll('.flow-section').length === 2,
+      'v2.9.57: 입금 내역·출금 내역이 정확히 두 개의 블록으로 구성됨');
 
-    // v2.9.56: 근본 결함 수정(사용자 지적: "법인카드 회수분이 있었다면 고정비 상세 화면은
-    // 회수분이 누락된거였네?") — 출금 섹션의 법인카드는 총출금(4,766,460원)이 아니라 순지출
-    // (출금 4,766,460원 − 입금 608,500원 = 4,157,960원)로 계획과 비교되어야 한다.
-    const cardOutMatch = html.match(/법인카드<\/span>[\s\S]*?계획 2,500,000원[\s\S]*?실적 4,157,960원/);
-    s.check(!!cardOutMatch, 'v2.9.56: 출금 계열의 법인카드가 계획(2,500,000원) 대비 순지출(4,157,960원=출금-입금)으로 정확히 비교 표시됨');
-    s.check(!html.includes('4,766,460'), 'v2.9.56: 출금 섹션에 회수분을 반영하지 않은 총출금(4,766,460원)이 더 이상 나타나지 않음');
+    s.check(html.includes('법인카드') && html.includes('608,500'),
+      'v2.9.57: 입금 내역에 법인카드 환급(608,500원)이 그대로 표시됨');
+    s.check(html.includes('15,389,870') && html.includes('2,700,000') && html.includes('+12,689,870'),
+      'v2.9.57: 출금 내역의 기본급여에 계획(2,700,000원)·실적(15,389,870원)·차이(+12,689,870원)가 보조 정보로 표시됨');
+    s.check(html.includes('33,511,500'),
+      'v2.9.57: 매출 입금의 실적(33,511,500원)이 정확히 표시됨');
+
+    // v2.9.57: 사용자 확정("지출내역 기준") — 법인카드는 순지출이 아니라 총출금(4,766,460원)
+    // 그대로 표시되어야 하고, 출금 합계는 실제 통장 총출금과 정확히 일치해야 한다.
+    s.check(html.includes('4,766,460'),
+      'v2.9.57: 출금 내역의 법인카드가 순지출이 아니라 총출금(4,766,460원) 그대로 표시됨');
+    s.check(!html.includes('4,157,960'),
+      'v2.9.57: 법인카드 순지출 값(4,157,960원)이 더 이상 나타나지 않음(총액 방식으로 전환)');
+
+    const totalOutText = act.act_outflow.toLocaleString() + '원';
+    s.check(html.includes(totalOutText),
+      'v2.9.57: 출금 내역 합계가 실제 통장 총출금(' + totalOutText + ')과 정확히 일치');
+    const totalInText = act.act_inflow.toLocaleString() + '원';
+    s.check(html.includes(totalInText),
+      'v2.9.57: 입금 내역 합계가 실제 통장 총입금(' + totalInText + ')과 정확히 일치');
   }
 
   return s;

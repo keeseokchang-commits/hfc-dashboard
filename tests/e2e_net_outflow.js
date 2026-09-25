@@ -47,13 +47,19 @@ async function run() {
     s.check(!cardHtml.includes('3,700,000'),
       'v2.9.56: 회수분을 반영하지 않은 총출금(3,700,000원)이 더 이상 나타나지 않음');
 
-    // "N월 상세" 팝업
+    // "N월 상세" 팝업 — v2.9.57에서 사용자 확정("이전처럼 순지출로 표현하면 출금합계가 다름.
+    // 따라서 지출내역 기준")에 따라 이 화면은 총액(지출 내역 그대로) 표시로 정책이 바뀌었다.
+    // "고정비 항목별 계획 대비 실적" 카드(위에서 이미 검증)는 순지출 원칙을 그대로 유지하고,
+    // 이 상세팝업만 입금·출금을 각각 통장에 찍힌 그대로 보여준다.
     w.eval("openDetailModal('2026-08')");
     const modalHtml = d.getElementById('detailBody').innerHTML;
-    s.check(modalHtml.includes('기본급여 (입금, 참고)') && modalHtml.includes('1,000,000'),
-      'v2.9.56: 상세팝업 입금 섹션에 급여 회수(1,000,000원)가 참고 정보로 표시됨');
-    s.check(modalHtml.match(/기본급여<\/span>[\s\S]*?계획 2,700,000원[\s\S]*?실적 2,700,000원/),
-      'v2.9.56: 상세팝업 출금 섹션에서 급여의 순지출(2,700,000원)이 계획과 정확히 일치하여 표시됨');
+    s.check(modalHtml.includes('급여회수') === false && modalHtml.includes('1,000,000'),
+      'v2.9.57: 상세팝업 입금 내역에 급여 회수(1,000,000원)가 그대로 표시됨');
+    s.check(modalHtml.includes('3,700,000'),
+      'v2.9.57: 상세팝업 출금 내역에 급여 총지급액(3,700,000원)이 그대로(지출 내역 기준) 표시됨');
+    const act = w.eval("actData.find(a=>a.year_month==='2026-08')");
+    s.check(modalHtml.includes(`-${act.act_outflow.toLocaleString()}원`) || modalHtml.includes('2,700,000원'),
+      'v2.9.57: 상세팝업 출금 합계가 실제 통장 총출금과 정확히 일치함');
   }
 
   return s;
