@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.54">
+<link rel="stylesheet" href="css/common.css?v=2.9.56">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -329,10 +329,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.54"></script>
-<script src="js/common.js?v=2.9.54"></script>
-<script src="js/calc.js?v=2.9.54"></script>
-<script src="js/nav.js?v=2.9.54"></script>
+<script src="js/schema.js?v=2.9.56"></script>
+<script src="js/common.js?v=2.9.56"></script>
+<script src="js/calc.js?v=2.9.56"></script>
+<script src="js/nav.js?v=2.9.56"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -781,27 +781,66 @@ function openDetailModal(ym){
   const actBal=act?num(act.act_balance)||0:null;
   const diff=estBal!==null&&actBal!==null?actBal-estBal:null;
   document.getElementById('detailTitle').textContent=`${ym} 상세`;
-  // v2.9.54: 근본 재설계(사용자 지적) — 8개 고정 버킷 대신, 그 달 통장 거래에 실제로 등록된
-  // 유형명(act.by)을 입금/출금으로 나눠 금액 큰 순으로 그대로 나열한다. 코드 관리에 어떤 이름을
-  // 몇 개 등록하든(예: "AI사용료"를 새로 등록해도) 자동으로 반영되며, 0으로 조용히 사라지는
-  // 유형이 생기지 않는다.
-  const byRows=[];
-  if(act&&act.by){
-    const ins=Object.entries(act.by).filter(([,v])=>v.in>0).sort((a,b)=>b[1].in-a[1].in);
-    const outs=Object.entries(act.by).filter(([,v])=>v.out>0).sort((a,b)=>b[1].out-a[1].out);
-    ins.forEach(([cat,v])=>byRows.push({k:cat,v:won(v.in,false)}));
-    outs.forEach(([cat,v])=>byRows.push({k:cat,v:won(v.out,false)}));
-  }
+  // v2.9.55: 근본 재설계(사용자 지적: "법인카드가 두번 나오는거도 오류인거 같고, 이 보고서가
+  // 보여주려고 했던 양식 목표가 사라진 듯 해" → "그걸 설계하는게 너의 전문 영역이자나") — 이
+  // 화면의 유일한 목적은 "추정과 실제 잔액의 차이가 왜 발생했는지"를 보여주는 것이다. v2.9.54는
+  // 이 목적을 잊고 실적만 나열해 "그래서 뭐가 문제인지" 알 수 없게 만들었다(원칙42). 이제 매출
+  // 입금·매입 지급은 그 달 계획(planRev·planCost) 대비 실적으로, 고정비 세부 항목(급여·세금·
+  // 법인카드 등)은 계획(planFix) 대비 실적으로, "고정비 항목별 계획 대비 실적" 카드와 정확히
+  // 같은 원칙(이름을 그대로 조인 키로 사용)으로 비교한다. 입금·출금은 별도 섹션으로 명확히
+  // 나눠, 같은 이름이 양쪽에 있어도(예: 법인카드 환급 입금 + 카드값 출금) 혼란 없이 구분된다.
+  const planIn=(planRev||[]).filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym)
+    .reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+  const planOutCost=(planCost||[]).filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
+    .reduce((s,c)=>{const isNoInv=String(c.cost_id||'').startsWith('NOINV-');
+      return s+(isNoInv?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1));},0);
+  const planFixByCat={};
+  (planFix||[]).filter(f=>f.year_month===ym).forEach(f=>{
+    const c=f.category||'미지정';
+    planFixByCat[c]=(planFixByCat[c]||0)+(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0));
+  });
+  const actBy=(act&&act.by)||{};
+  const FIXED_TXN_NAMES=['매출 입금','매출입금','매입 지급','매입지급']; // 이 두 대분류는 아래에서 별도 처리
+  const actInSum=Object.entries(actBy).filter(([c])=>['매출 입금','매출입금'].includes(c)).reduce((s,[,v])=>s+v.in,0);
+  // v2.9.56: 매입 지급도 같은 유형명으로 환불·취소 입금이 있을 수 있으니 순지출(net) 원칙을
+  // 동일하게 적용 — 위 고정비 세부 항목과 일관되게, 총출금이 아니라 (출금−입금)으로 계획과 비교.
+  const actOutCostSum=Object.entries(actBy).filter(([c])=>['매입 지급','매입지급'].includes(c)).reduce((s,[,v])=>s+(v.out-v.in),0);
+  const cmpRow=(label,plan,actual)=>{
+    const d=actual-plan;
+    return `<div class="detail-row" style="align-items:flex-start"><span class="detail-label">${label}</span>
+      <span class="detail-val" style="text-align:right;line-height:1.5">
+        <span style="color:var(--text3);font-size:11px">계획 ${plan?won(plan,false):'─'}</span><br>
+        실적 ${actual?won(actual,false):'─'}
+        ${plan||actual?`<br><span style="font-size:11px" class="${d<=0?'pos':'neg'}">${d===0?'차이 없음':(d>0?'+':'')+won(d,false)}</span>`:''}
+      </span></div>`;
+  };
+  // v2.9.56: 근본 결함 수정(사용자 지적: "법인카드 회수분이 있었다면 고정비 상세 화면은 회수분이
+  // 누락된거였네? 급여도 지급했다가 오지급으로 입금받고 재지급하고 했었거든") — 아래 "▸ 출금"
+  // 섹션에서 같은 유형명의 입금(카드값 환급, 급여 오지급 회수 등)을 빼지 않은 총출금만 계획과
+  // 비교하면, 위 "▸ 입금" 섹션에 그 회수분을 이미 별도로 보여주고 있는데도 출금 쪽 숫자가 실제
+  // 순지출보다 부풀려져 "예산 초과"로 잘못 보인다. "고정비 항목별 계획 대비 실적" 카드와 동일한
+  // 원칙(net = 출금 − 입금)으로 출금 섹션을 계획과 비교하되, 입금 섹션은 "이런 회수가 있었다"는
+  // 사실 자체를 알리는 참고 정보로 그대로 유지 — 두 섹션을 합쳐 읽으면 총액과 순액을 모두 확인
+  // 가능하다.
+  let byHtml='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">▸ 입금</div>';
+  byHtml+=cmpRow('매출 입금',planIn,actInSum);
+  Object.entries(actBy).forEach(([cat,v])=>{ if(v.in>0&&!['매출 입금','매출입금'].includes(cat)) byHtml+=cmpRow(cat+' (입금, 참고)',0,v.in); });
+  byHtml+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">▸ 출금 (순지출 = 출금 − 같은 유형 입금)</div>';
+  byHtml+=cmpRow('매입 지급',planOutCost,actOutCostSum);
+  const fixCats=new Set([...Object.keys(planFixByCat),...Object.entries(actBy).filter(([c,v])=>(v.out-v.in)!==0&&!['매입 지급','매입지급'].includes(c)&&!planFixByCat.hasOwnProperty(c)).map(([c])=>c)]);
+  const netOf=cat=>Math.max(0,(actBy[cat]?.out||0)-(actBy[cat]?.in||0));
+  [...fixCats].sort((a,b)=>(planFixByCat[b]||0)+netOf(b)-((planFixByCat[a]||0)+netOf(a)))
+    .forEach(cat=>byHtml+=cmpRow(cat,planFixByCat[cat]||0,netOf(cat)));
   const rows=[
     {k:'추정 잔액',v:estBal!==null?won(estBal,false):'─'},
     {k:'실잔액',v:actBal!==null?won(actBal,false):'─'},
     {k:'차이',v:diff!==null?(diff>=0?'+':'')+won(diff,false):'─'},
-    ...byRows,
-    {k:'총 입금',v:act?won(act.act_inflow,false):'─'},
-    {k:'총 출금',v:act?won(act.act_outflow,false):'─'},
   ].filter(r=>r.v!=='─'||r.k==='추정 잔액'||r.k==='실잔액');
   document.getElementById('detailBody').innerHTML=rows.map(r=>`
-    <div class="detail-row"><span class="detail-label">${r.k}</span><span class="detail-val">${r.v}</span></div>`).join('');
+    <div class="detail-row"><span class="detail-label">${r.k}</span><span class="detail-val">${r.v}</span></div>`).join('')
+    + byHtml
+    + `<div class="detail-row" style="margin-top:10px;padding-top:8px;border-top:2px solid var(--border);font-weight:700"><span class="detail-label">총 입금</span><span class="detail-val">${act?won(act.act_inflow,false):'─'}</span></div>`
+    + `<div class="detail-row" style="font-weight:700"><span class="detail-label">총 출금</span><span class="detail-val">${act?won(act.act_outflow,false):'─'}</span></div>`;
   // v2.4.6: 추정 잔액 구성(산식·낱개) — [추정 vs 실적] 신뢰도 검증용
   (function(){
     const bx=document.getElementById('detailBody');
@@ -1101,12 +1140,18 @@ function renderFixCompareItems(){
   });
   // 실적: 그 달 통장 거래를 category(코드 관리에서 등록한 유형명) 그대로 항목명으로 합산 —
   // 매출입금·매입지급·자본납입·기타입금(입금 계열)은 이 카드의 대상이 아니므로 제외.
+  // v2.9.56: 근본 결함 수정(사용자 지적: "법인카드 회수분이 있었다면... 급여도 지급했다가
+  // 오지급으로 입금받고 재지급하고 했었거든") — 출금만 더하고 같은 유형명으로 들어온 입금
+  // (카드값 환급, 급여 오지급 회수 등)을 무시하면 실제 순지출보다 부풀려진 값을 "초과 지출"로
+  // 잘못 보여준다. 출금에서 같은 유형명의 입금을 뺀 순지출(net)로 집계 — 법인카드·급여뿐 아니라
+  // 입금·출금이 같은 이름으로 오갈 수 있는 모든 고정비 항목에 공통으로 적용되는 원칙.
   const actual={};
   detailAll.filter(t=>t.year_month===ym).forEach(t=>{
     const c=t.category||'미분류';
     if(['매출 입금','매출입금','매입 지급','매입지급','자본 납입','자본납입','기타 입금','기타입금'].includes(c)) return;
-    const outA=num(t.outflow_amt)||0; if(!outA) return;
-    actual[c]=(actual[c]||0)+outA;
+    const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0);
+    if(!net) return;
+    actual[c]=(actual[c]||0)+net;
   });
   const allItems=[...new Set([...Object.keys(plan),...Object.keys(actual)])]
     .sort((a,b)=>(plan[b]||0)+(actual[b]||0)-((plan[a]||0)+(actual[a]||0)));
