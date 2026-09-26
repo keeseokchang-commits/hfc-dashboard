@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.59">
+<link rel="stylesheet" href="css/common.css?v=2.9.60">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -56,6 +56,39 @@
   .gen-table{width:100%;border-collapse:collapse;font-size:12px}
   .gen-table th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
   .gen-table td{padding:5px 3px;border-bottom:1px solid var(--border);vertical-align:middle}
+  /* v2.9.60: 고정비 목록 테이블 줄바꿈/가독성 개선(사용자 지적 — "PC에서도 줄이 바뀌고
+     모바일은 더 보기 힘든 구조"). 원인: .dtable이 컬럼 폭 지정 없이 내용 길이에 따라
+     들쭉날쭉 줄바꿈되고 있었다(배지가 붙은 "항목", 긴 "메모", 액션 버튼 3개가 특히 취약).
+     고정 폭 테이블로 바꿔 각 컬럼이 항상 같은 자리를 차지하게 하고, 줄바꿈이 필요 없는
+     셀(월·금액·지급예정일·액션)은 nowrap으로 강제 고정, 줄바꿈이 허용되어야 할 셀(항목의
+     배지, 메모)만 선택적으로 줄바꿈되게 분리했다. */
+  #fxTableWrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #fxTable{table-layout:fixed;min-width:640px}
+  #fxTable col.c-sel{width:32px}
+  #fxTable col.c-ym{width:64px}
+  #fxTable col.c-cat{width:auto}
+  #fxTable col.c-amt{width:96px}
+  #fxTable col.c-pay{width:88px}
+  #fxTable col.c-memo{width:140px}
+  #fxTable col.c-act{width:120px}
+  #fxTable td,#fxTable th{overflow:hidden}
+  #fxTable td.nowrap,#fxTable th.nowrap{white-space:nowrap;text-overflow:ellipsis}
+  #fxTable td.wrap{white-space:normal;word-break:break-word;line-height:1.4}
+  #fxTable td.cell-cat{white-space:normal;word-break:keep-all;line-height:1.4}
+  #fxTable td.cell-cat .badge-tag{display:inline-block;white-space:nowrap;margin-top:2px}
+  /* v2.9.60: 액션 버튼 3개(수정/지급 해제/삭제)가 좁은 컬럼 안에서 가로로 겹치며 줄바꿈되던
+     문제 — flex-wrap 대신 세로 스택으로 고정해 폭에 상관없이 항상 같은 모양을 유지한다. */
+  #fxTable td.cell-act{white-space:nowrap;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding-top:6px;padding-bottom:6px}
+  /* v2.9.60: 좁은 화면(모바일)에서는 7컬럼이 다 들어갈 공간이 없다. 메모 컬럼을 숨기되
+     정보를 완전히 잃지 않도록, 항목 셀 아래에 메모를 작은 보조 텍스트로 함께 보여준다
+     (재무 UI 원칙: 정보를 숨기는 것과 표시 위치를 바꾸는 것은 다르다 — 숫자·메모 등 실무
+     판단에 쓰는 정보는 화면이 좁아져도 어딘가에는 남아 있어야 한다). */
+  #fxTable td.cell-cat .cat-memo{display:none;font-size:10px;color:var(--text3);margin-top:2px;white-space:normal;word-break:keep-all}
+  @media(max-width:480px){
+    #fxTable col.c-memo{width:0}
+    #fxTable td.cell-memo,#fxTable th.th-memo{display:none}
+    #fxTable td.cell-cat .cat-memo{display:block}
+  }
   .gen-table input{width:100%;padding:6px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;background:var(--surface)}
   .ms-row{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:6px;align-items:center;font-size:12px}
   .ms-row input{padding:7px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;width:100%}
@@ -102,7 +135,15 @@
       <button onclick="bulkDelFx()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--red);background:var(--surface);color:var(--red);cursor:pointer">선택 삭제</button>
       <button onclick="clearFxSel()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:none;background:none;color:var(--text3);cursor:pointer">선택 해제</button>
     </div>
-    <div style="overflow-x:auto"><table class="dtable"><thead><tr><th style="width:32px"><input type="checkbox" id="fxSelAll" onchange="toggleFxSelAll(this.checked)"></th><th>월</th><th>항목</th><th>금액</th><th>지급예정일</th><th>메모</th><th></th></tr></thead><tbody id="fxBody"></tbody></table></div>
+    <div id="fxTableWrap"><table class="dtable" id="fxTable">
+      <colgroup><col class="c-sel"><col class="c-ym"><col class="c-cat"><col class="c-amt"><col class="c-pay"><col class="c-memo"><col class="c-act"></colgroup>
+      <thead><tr>
+        <th class="nowrap"><input type="checkbox" id="fxSelAll" onchange="toggleFxSelAll(this.checked)"></th>
+        <th class="nowrap">월</th><th class="nowrap">항목</th><th class="nowrap" style="text-align:right">금액</th>
+        <th class="nowrap">지급예정일</th><th class="nowrap th-memo">메모</th><th class="nowrap"></th>
+      </tr></thead>
+      <tbody id="fxBody"></tbody>
+    </table></div>
   </div>
 </main>
 <div class="modal-overlay" id="fxModal"><div class="modal">
@@ -129,10 +170,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.59"></script>
-<script src="js/common.js?v=2.9.59"></script>
-<script src="js/calc.js?v=2.9.59"></script>
-<script src="js/nav.js?v=2.9.59"></script>
+<script src="js/schema.js?v=2.9.60"></script>
+<script src="js/common.js?v=2.9.60"></script>
+<script src="js/calc.js?v=2.9.60"></script>
+<script src="js/nav.js?v=2.9.60"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -165,10 +206,13 @@ function renderFx(){
   // v2.9.41: 통장 대사(자금수지 화면)로 확인된 실제 지급 여부를 여기서도 보여준다 — 매입 화면과
   // 동일하게 "지급 완료" 배지 + 실지급일, 그리고 대사를 잘못 확인한 경우 여기서 직접 해제 가능.
   document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
-    <tr><td><input type="checkbox" class="fx-sel" data-id="${x.fixed_id}" onchange="onFxSelChange('${x.fixed_id}',this.checked)" ${fxSelected.has(x.fixed_id)?'checked':''}></td>
-    <td>${x.year_month}</td><td>${x.category}${x.has_tax_invoice==='Y'?` <span style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}</td><td style="text-align:right">${comma(x.amount)}원</td>
-    <td>${x.payment_date||'─'}</td><td style="color:var(--text3)">${x.memo||''}</td>
-    <td><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;margin-right:6px">수정</button>${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;margin-right:6px">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">삭제</button></td></tr>`).join('')
+    <tr><td class="nowrap"><input type="checkbox" class="fx-sel" data-id="${x.fixed_id}" onchange="onFxSelChange('${x.fixed_id}',this.checked)" ${fxSelected.has(x.fixed_id)?'checked':''}></td>
+    <td class="nowrap">${x.year_month}</td>
+    <td class="cell-cat">${x.category}${x.has_tax_invoice==='Y'?` <span class="badge-tag" style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span class="badge-tag" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}${x.memo?`<div class="cat-memo">${x.memo}</div>`:''}</td>
+    <td class="nowrap" style="text-align:right">${comma(x.amount)}원</td>
+    <td class="nowrap">${x.payment_date||'─'}</td>
+    <td class="wrap cell-memo" style="color:var(--text3)" title="${(x.memo||'').replace(/"/g,'&quot;')}">${x.memo||''}</td>
+    <td class="cell-act"><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;padding:0">수정</button>${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;padding:0">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer;padding:0">삭제</button></td></tr>`).join('')
     :'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
   const selAll=document.getElementById('fxSelAll'); if(selAll) selAll.checked=list.length>0&&list.every(x=>fxSelected.has(x.fixed_id));
   updateFxBulkBar();
