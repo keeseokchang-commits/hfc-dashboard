@@ -14,33 +14,48 @@ function addMonthsKeepDay(d,k){
   if(nd.getDate()!==day) return new Date(y,m+1,0); // 월말 보정 (1/31+1개월→2/28)
   return nd;
 }
+// v2.9.62: 투입일 앵커 방식(구 SI 관례)으로 재복귀(사용자 확정, 2026-09-27) — v2.9.19에서
+// "캘린더 월(1일~말일) 기준 일할"로 전면 교체했던 결정을 다시 번복한다.
+// 번복 이유: v2.9.19 방식은 시작월과 종료월의 "총일수"가 서로 다르면(전형적으로 31일↔28일,
+// 즉 2월이 시작월이나 종료월에 걸리면) 실제 근무일수를 다 더하면 정확히 30일=1개월인데도
+// 결과가 정수로 안 떨어지는 구조적 오차가 있었다(예: 10/26~익년2/25 — 6일(10월,31일 기준)+
+// 24일(11,12,1월 각 만근)+25일(2월,28일 기준) = 실제로는 6+25=31일=정확히 1개월인데
+// 6/31+25/28로 계산하면 4.09가 나옴). 사용자가 실무에서 기대하는 계산은 "투입일과 같은 날짜를
+// 매달의 경계로 고정"하는 방식 — 10/26~11/25, 11/26~12/25, 12/26~1/25, 1/26~2/25 각각을
+// 예외 없이 정확히 1개월(1.00)로 본다. 이 방식은 월의 총일수가 서로 달라도 "그 구간의 실제
+// 일수를 다음 앵커 구간의 일수로 나누는" 방식이라 이런 왜곡이 생기지 않는다.
+// 검증(사용자 확정 사례): 3/12~9/11=6.00, 3/12~11/11=8.00(v2.9.19 도입 전 원래 값),
+// 10/26~2/25=4.00(2026-09-27 이번 사례로 재확인).
 function mmTotal(s,e){
-  // v2.9.19: 실무 방식으로 재정의(사용자 지정, 2026-09-14 확정) — 투입일 앵커 방식(구 SI 관례) 폐기.
-  // 캘린더 월(1일~말일)을 고정 단위로 삼는다:
-  //   ①완전월(월초~월말 만근)=1.00  ②시작월(중간투입)=(그 달 말일-투입일+1)/그 달 총일수
-  //   ③종료월(중간철수)=철수일/그 달 총일수  ④총MM=시작월+중간완전월 개수+종료월(각 항을 합산 후 소수 2자리 반올림)
-  // ymList()와 동일한 원칙(캘린더 월 기준 일할)이며, 시작월·종료월을 각각 독립 계산하므로
-  // 구 방식(투입일~투입일-1=1개월 고정)과 달리 시작월+종료월 합이 정수로 안 떨어질 수 있다(예: 6.01).
-  if(!s||!e) return 0;
+  if(!s||!e) return '0.00';
   const a=new Date(s), b=new Date(e);
-  if(isNaN(a)||isNaN(b)||b<a) return 0;
-  if(a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()){
-    const dim=new Date(a.getFullYear(),a.getMonth()+1,0).getDate();
-    return ((b.getDate()-a.getDate()+1)/dim).toFixed(2);
+  if(isNaN(a)||isNaN(b)||b<a) return '0.00';
+  // 완전월 개수: addMonthsKeepDay(a,k)에서 시작해 "다음 앵커 하루 전"까지가 매번 정확히 1개월.
+  // b가 그 하루 전 날짜 이상이면 그 달은 만근(1.00)으로 센다.
+  let months=0;
+  while(true){
+    const nextAnchor=addMonthsKeepDay(a,months+1);
+    const lastDayOfThisMonth=new Date(nextAnchor.getFullYear(),nextAnchor.getMonth(),nextAnchor.getDate()-1);
+    if(lastDayOfThisMonth<=b){ months++; } else break;
   }
-  const dimStart=new Date(a.getFullYear(),a.getMonth()+1,0).getDate();
-  const startFrac=(dimStart-a.getDate()+1)/dimStart;
-  const dimEnd=new Date(b.getFullYear(),b.getMonth()+1,0).getDate();
-  const endFrac=b.getDate()/dimEnd;
-  let mid=0, cy=a.getFullYear(), cm=a.getMonth()+1; // 0-based month+1 = 다음 달부터 카운트 시작
-  while(!(cy===b.getFullYear()&&cm===b.getMonth())){ mid++; cm++; if(cm>11){cm=0;cy++;} }
-  return (startFrac+mid+endFrac).toFixed(2);
+  const anchor=addMonthsKeepDay(a,months);
+  if(anchor>b) return months.toFixed(2); // 안전망(위 while 로직상 이론적으로 도달하지 않음)
+  const nextAnchor=addMonthsKeepDay(a,months+1);
+  const denom=Math.round((nextAnchor-anchor)/86400000); // 다음 앵커까지의 실제 일수(=1개월 단위 길이)
+  const daysPartial=Math.round((b-anchor)/86400000)+1; // 앵커일 포함, b까지의 실제 경과일수
+  const frac=daysPartial/denom;
+  return (months+frac).toFixed(2);
 }
 function mmMonthly(sd,ed){
-  // v2.9.19: 시작월은 캘린더 월 기준 일할(실무 방식) 그대로 독립 계산하되, 마지막 달은 총MM에서
-  // 앞선 달들의 합을 뺀 잔여값으로 역산한다(사용자 확정, 2026-09-14) — 시작월·종료월을 각각 독립
-  // 반올림하면 총합이 mmTotal과 0.01 정도 어긋날 수 있어(예: 6.02 vs 6.01), 총 MM(견적서 표시값)과
-  // 월별 배분 합계가 항상 정확히 일치하도록 오차를 마지막 달에 흡수시킨다.
+  // v2.9.62: 총MM은 위 mmTotal(투입일 앵커 방식)로 구하되, 월별 배분은 앵커 구간을 캘린더월로
+  // 다시 쪼개려 하지 않는다 — 앵커 구간(예: 3/12~4/11)의 길이는 그 구간이 걸친 두 캘린더월의
+  // 일수와 다를 수 있어서(3월 31일, 4월 30일), 구간의 날짜 수를 그대로 캘린더월에 배분하면
+  // 완전월인 4월조차 1.00이 아니라 0.99·1.01처럼 어긋나는 문제가 재발한다(실제로 시도해보고
+  // 발견). 대신 v2.9.19 이전부터 쓰던 훨씬 단순하고 안전한 방식을 그대로 재사용한다: 시작월은
+  // "그 달의 잔여일수/그 달 총일수"로 캘린더 기준 일할, 중간에 완전히 걸치는 달은 전부 1.00,
+  // 마지막 달은 총MM(anchor 방식)에서 앞선 달들의 합을 뺀 잔여값으로 역산한다. 이렇게 하면
+  // ①완전월은 예외 없이 정확히 1.00 ②월별 합계가 총MM(정수로 딱 떨어지는 anchor 계산 결과)과
+  // 항상 정확히 일치 ③시작월의 표시값만 실제 근무일수 기준 소수로 자연스럽게 남는다.
   const a=new Date(sd), b=new Date(ed);
   if(isNaN(a)||isNaN(b)||b<a) return [];
   const total=parseFloat(mmTotal(sd,ed));

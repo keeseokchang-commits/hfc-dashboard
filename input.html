@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.60">
+<link rel="stylesheet" href="css/common.css?v=2.9.62">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -212,13 +212,39 @@
   </div>
 </div>
 
+<!-- v2.9.62: 매출 발행/매입 수취 개별 건의 날짜·금액·메모 직접 수정 팝업 신설(사용자 지적 —
+     "세금계산서 관리에서 해당 스케줄건의 날짜 정보를 바꾸는 기능이 없어"). v2.9.35에서 개별
+     입력 폼(saveRev/saveCost)이 삭제된 뒤, "청구 스케줄 생성"으로 전체 재계산하거나 상태만
+     바꾸는 버튼(발행완료·발행취소·입금해제 등)만 남아 개별 건의 예정일 하나만 미루는 방법이
+     사라져 있었다(고정비에는 editFix가 대칭으로 있었는데 매출·매입에만 없던 결함).
+     확정된 값(발행일·입금일·지급일 등 실제로 이미 일어난 사실)은 이 팝업에서 건드리지 않고
+     읽기 전용으로만 보여준다 — "확정된 데이터는 재수정 경로에서 필터로 원천 차단하라" 원칙. -->
+<div class="modal-overlay" id="revEditModal"><div class="modal">
+  <div class="modal-title">매출 청구 건 수정 <button onclick="closeRevEdit()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+  <div id="revEditLocked" style="display:none;font-size:12px;color:var(--text3);background:var(--surface2);border-radius:8px;padding:8px 10px;margin-bottom:12px"></div>
+  <div class="form-row"><label class="form-label">발행예정일</label><input class="form-input" type="date" id="re_plan"></div>
+  <div class="form-row"><label class="form-label">수금예정일</label><input class="form-input" type="date" id="re_recv"></div>
+  <div class="form-row"><label class="form-label">공급가액 (원)</label><input class="form-input" id="re_supply" inputmode="numeric" oninput="this.value=comma(this.value)" style="text-align:right"></div>
+  <div class="form-row"><label class="form-label">메모</label><input class="form-input" id="re_memo"></div>
+  <button onclick="saveRevEdit()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px">수정 저장</button>
+</div></div>
+<div class="modal-overlay" id="costEditModal"><div class="modal">
+  <div class="modal-title">매입 청구 건 수정 <button onclick="closeCostEdit()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+  <div id="costEditLocked" style="display:none;font-size:12px;color:var(--text3);background:var(--surface2);border-radius:8px;padding:8px 10px;margin-bottom:12px"></div>
+  <div class="form-row"><label class="form-label">수취예정일</label><input class="form-input" type="date" id="ce_plan"></div>
+  <div class="form-row"><label class="form-label">지급예정일</label><input class="form-input" type="date" id="ce_pay"></div>
+  <div class="form-row"><label class="form-label">공급가액 (원)</label><input class="form-input" id="ce_supply" inputmode="numeric" oninput="this.value=comma(this.value)" style="text-align:right"></div>
+  <div class="form-row"><label class="form-label">메모</label><input class="form-input" id="ce_memo"></div>
+  <button onclick="saveCostEdit()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px">수정 저장</button>
+</div></div>
+
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.60"></script>
-<script src="js/common.js?v=2.9.60"></script>
-<script src="js/calc.js?v=2.9.60"></script>
-<script src="js/nav.js?v=2.9.60"></script>
+<script src="js/schema.js?v=2.9.62"></script>
+<script src="js/common.js?v=2.9.62"></script>
+<script src="js/calc.js?v=2.9.62"></script>
+<script src="js/nav.js?v=2.9.62"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -301,6 +327,7 @@ function renderLists(){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
       <span class="li-amt">합계 ${wf(r.cash_recv_amt)} <span style="font-size:10px;color:var(--text3)">(예정 ${r.cash_recv_date||'─'})</span></span>
       <span style="display:flex;gap:6px">
+        <button class="btn-edit" onclick="openRevEdit('${r.revenue_id}')">수정</button>
         ${!r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markInvoiced('${r.revenue_id}')">발행 완료</button>`:''}
         ${r.is_received==='Y'?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkRecv('${r.revenue_id}')">입금 해제</button>`:''}
         ${r.invoice_date&&r.is_received!=='Y'?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelInvoice('${r.revenue_id}')">발행 취소</button>`:''}</span></div></div>`;}).join('')
@@ -328,6 +355,7 @@ function renderLists(){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
       <span class="li-amt">합계 ${wf(num(c.amount)+num(c.vat_amt||0))} <span style="font-size:10px;color:var(--text3)">(지급예정 ${c.payment_date||'─'})</span></span>
       <span style="display:flex;gap:6px">
+        <button class="btn-edit" onclick="openCostEdit('${c.cost_id}')">수정</button>
         ${!c.invoice_date?`<button class="btn-edit" style="background:var(--green-lt);color:var(--green);border-color:#A7F3D0" onclick="markCostInvoiced('${c.cost_id}')">수취 완료</button>`:''}
         ${c.pay_actual_date?`<button class="btn-edit" style="color:var(--red)" onclick="unmarkPay('${c.cost_id}')">지급 해제</button>`:''}
         ${c.invoice_date&&!c.pay_actual_date?`<button class="btn-edit" style="color:var(--amber)" onclick="cancelReceipt('${c.cost_id}')">수취 취소</button>`:''}</span></div></div>`;}).join('')
@@ -734,6 +762,94 @@ async function markScheduleChanged(){
     const next=[...list.filter(r=>r.setting_key!==key),{setting_key:key,setting_value:now,category:'system',description:'마지막 매출·매입 청구 스케줄 변경 시각(자금수지 추정 재계산 필요 여부 판단용)',updated_at:now.slice(0,10)}];
     await clearAndWrite(...W.S10,[HEADERS.S10,...rowsFor(HEADERS.S10,next)]);
   }catch(e){ /* 부가 정보라 실패해도 본 저장 흐름에 영향 없음 — 단, 절대 데이터를 밀어쓰지 않는다 */ }
+}
+// v2.9.62: 매출 청구 건 개별 수정(발행예정일·수금예정일·공급가액·메모) — 사용자 지적("세금계산서
+// 관리에서 해당 스케줄건의 날짜 정보를 바꾸는 기능이 없어")으로 신설. "청구 스케줄 생성"은 계약
+// 조건 전체를 다시 계산해 회차를 통째로 재생성하므로, 중도금 하나만 늦추는 것처럼 한 건의 날짜만
+// 조정하고 싶을 때는 오히려 다른 회차까지 건드릴 위험이 있다 — 이 팝업은 딱 그 건 하나만 고친다.
+// 원칙(확정된 데이터는 재수정 경로에서 필터로 원천 차단): 이미 입금 완료(is_received==='Y')된
+// 건은 실제로 돈이 들어온 사실이 바뀌면 안 되므로, 날짜·금액 입력을 읽기 전용으로 잠그고 메모만
+// 고칠 수 있게 한다 — 발행 완료(invoice_date 있음, 아직 미입금)까지는 예정일·금액 수정을 허용한다
+// (발행 후에도 실제 입금 전이라면 수금예정일이 밀리는 것은 흔한 정상 상황).
+let editingRevId=null;
+function openRevEdit(id){
+  const r=revenues.find(x=>x.revenue_id===id); if(!r) return;
+  editingRevId=id;
+  const locked=r.is_received==='Y';
+  const box=document.getElementById('revEditLocked');
+  if(locked){
+    box.style.display='block';
+    box.textContent=`입금 완료(${r.recv_actual_date||'실입금일 미기록'}) 건입니다 — 날짜·금액은 잠겨 있고 메모만 수정할 수 있습니다. 날짜를 바꾸려면 먼저 "입금 해제"로 되돌리세요.`;
+  } else box.style.display='none';
+  document.getElementById('re_plan').value=r.invoice_plan_date||'';
+  document.getElementById('re_plan').disabled=locked;
+  document.getElementById('re_recv').value=r.cash_recv_date||'';
+  document.getElementById('re_recv').disabled=locked;
+  document.getElementById('re_supply').value=comma(r.tax_invoice_amt||'');
+  document.getElementById('re_supply').disabled=locked;
+  document.getElementById('re_memo').value=r.memo||'';
+  document.getElementById('revEditModal').classList.add('open');
+}
+function closeRevEdit(){editingRevId=null;document.getElementById('revEditModal').classList.remove('open');}
+async function saveRevEdit(){
+  if(!editingRevId) return;
+  const r=revenues.find(x=>x.revenue_id===editingRevId); if(!r) return;
+  const locked=r.is_received==='Y';
+  const memo=document.getElementById('re_memo').value;
+  let patch={memo};
+  if(!locked){
+    const plan=document.getElementById('re_plan').value, recv=document.getElementById('re_recv').value;
+    const supply=num(document.getElementById('re_supply').value);
+    if(!supply){toast('공급가액을 입력하세요',true);return;}
+    // v2.9.34 UI 표준(매출 카드): 합계=공급가액×1.1(VAT포함), vat_amt=공급가액의 10% — 기존
+    // "청구 스케줄 생성"·markInvoiced와 동일한 계산 방식을 그대로 따라 화면 간 금액 산식을 통일한다.
+    patch={...patch,invoice_plan_date:plan,cash_recv_date:recv,tax_invoice_amt:supply,
+      vat_amt:Math.round(supply*.1),cash_recv_amt:Math.round(supply*1.1)};
+  }
+  const next=revenues.map(x=>x.revenue_id===editingRevId?{...x,...patch}:x);
+  const ok=await clearAndWrite(...W.S04,[H4,...rowsFor(H4,dedupe(next,'revenue_id'))]);
+  if(ok){revenues=dedupe(next,'revenue_id');toast('✓ 수정 완료');closeRevEdit();renderLists();await markScheduleChanged();}
+  else toast('저장 실패',true);
+}
+// v2.9.62: 매입 청구 건 개별 수정 — 매출과 대칭(위 주석 참고). 지급 완료(pay_actual_date 있음)
+// 건은 실제 지급 사실이 바뀌면 안 되므로 날짜·금액을 잠그고 메모만 허용한다.
+let editingCostId=null;
+function openCostEdit(id){
+  const c=costs.find(x=>x.cost_id===id); if(!c) return;
+  editingCostId=id;
+  const locked=!!c.pay_actual_date;
+  const box=document.getElementById('costEditLocked');
+  if(locked){
+    box.style.display='block';
+    box.textContent=`지급 완료(${c.pay_actual_date}) 건입니다 — 날짜·금액은 잠겨 있고 메모만 수정할 수 있습니다. 날짜를 바꾸려면 먼저 "지급 해제"로 되돌리세요.`;
+  } else box.style.display='none';
+  document.getElementById('ce_plan').value=c.invoice_plan_date||'';
+  document.getElementById('ce_plan').disabled=locked;
+  document.getElementById('ce_pay').value=c.payment_date||'';
+  document.getElementById('ce_pay').disabled=locked;
+  document.getElementById('ce_supply').value=comma(c.amount||'');
+  document.getElementById('ce_supply').disabled=locked;
+  document.getElementById('ce_memo').value=c.memo||'';
+  document.getElementById('costEditModal').classList.add('open');
+}
+function closeCostEdit(){editingCostId=null;document.getElementById('costEditModal').classList.remove('open');}
+async function saveCostEdit(){
+  if(!editingCostId) return;
+  const c=costs.find(x=>x.cost_id===editingCostId); if(!c) return;
+  const locked=!!c.pay_actual_date;
+  const memo=document.getElementById('ce_memo').value;
+  let patch={memo};
+  if(!locked){
+    const plan=document.getElementById('ce_plan').value, pay=document.getElementById('ce_pay').value;
+    const supply=num(document.getElementById('ce_supply').value);
+    if(!supply){toast('공급가액을 입력하세요',true);return;}
+    // v2.9.36: 이 화면(세금계산서 관리) 매입은 전부 세금계산서형이므로 vat_amt=공급가액의 10%로 함께 갱신.
+    patch={...patch,invoice_plan_date:plan,payment_date:pay,amount:supply,vat_amt:Math.round(supply*.1)};
+  }
+  const next=costs.map(x=>x.cost_id===editingCostId?{...x,...patch}:x);
+  const ok=await clearAndWrite(...W.S05,[H5,...rowsFor(H5,dedupe(next,'cost_id'))]);
+  if(ok){costs=dedupe(next,'cost_id');toast('✓ 수정 완료');closeCostEdit();renderLists();await markScheduleChanged();}
+  else toast('저장 실패',true);
 }
 // v2.4.2: 오매칭 복구 — 입금/지급 확인 해제(매칭 정보 제거, 발행 정보는 보존)
 // v2.4.9: 발행/수취 상태 되돌리기(입금·지급 전 건만)
