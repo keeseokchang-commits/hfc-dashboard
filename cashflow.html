@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.29">
+<link rel="stylesheet" href="css/common.css?v=2.9.64">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -83,6 +83,38 @@
   .detail-row:last-child{border-bottom:none}
   .detail-label{color:var(--text2)}
   .detail-val{font-weight:500}
+  /* v2.9.57: "N월 상세" 팝업 UI/UX 정비(사용자 요청 — "프로답게 보일 수 있도록"). 가장 중요한
+     숫자(차이)에 시선이 먼저 가도록 KPI 스트립에서 그 셀만 색 배경으로 강조하고, 입금·출금
+     리스트는 각 줄 왼쪽에 방향을 나타내는 얇은 컬러 바를 둬 표 느낌 대신 카드 리스트의 질감을
+     냈다. 장식이 아니라 "이게 입금인지 출금인지, 좋은지 나쁜지"를 구조로 전달하는 것이 목표. */
+  .kpi-strip{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:10px;margin-bottom:18px}
+  .kpi-cell{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center}
+  .kpi-cell .kpi-label{font-size:10.5px;color:var(--text3);font-weight:600;letter-spacing:.2px}
+  .kpi-cell .kpi-num{font-size:16px;font-weight:700;margin-top:6px;line-height:1.25;word-break:keep-all;color:var(--text)}
+  .kpi-cell.diff-pos{background:var(--green-lt);border-color:var(--green-lt)}
+  .kpi-cell.diff-pos .kpi-num{color:var(--green)}
+  .kpi-cell.diff-neg{background:var(--red-lt);border-color:var(--red-lt)}
+  .kpi-cell.diff-neg .kpi-num{color:var(--red)}
+  .flow-section{margin-bottom:16px}
+  .flow-head{display:flex;align-items:baseline;justify-content:space-between;padding:2px 3px 9px}
+  .flow-head .flow-title{font-size:13px;font-weight:700;color:var(--text)}
+  .flow-head .flow-total{font-size:14.5px;font-weight:700;letter-spacing:-.1px}
+  .flow-list{border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface)}
+  .flow-item{display:flex;align-items:stretch;background:var(--surface)}
+  .flow-item+.flow-item{border-top:1px solid var(--border)}
+  .flow-item .flow-bar{width:3px;flex-shrink:0}
+  .flow-item .flow-body{flex:1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;min-width:0}
+  .flow-item .flow-text{min-width:0}
+  .flow-item .flow-name{font-size:12.5px;color:var(--text);font-weight:600}
+  .flow-item .flow-sub{font-size:10.5px;color:var(--text3);margin-top:2px}
+  .flow-item .flow-amt{font-size:13.5px;font-weight:700;white-space:nowrap;flex-shrink:0}
+  .flow-empty{padding:18px 12px;text-align:center;font-size:12px;color:var(--text3);background:var(--surface)}
+  .est-breakdown{margin-top:20px;border-radius:12px;background:var(--surface2);padding:15px 15px 13px;border:1px solid var(--border)}
+  .est-breakdown .est-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;margin-bottom:9px}
+  .est-breakdown .est-line{display:flex;justify-content:space-between;font-size:12px;padding:4px 2px}
+  .est-breakdown .est-sub{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);padding:2px 2px 2px 15px}
+  .est-breakdown .est-total{display:flex;justify-content:space-between;font-size:12.5px;padding:9px 2px 2px;margin-top:5px;border-top:1px solid var(--border);font-weight:700}
+  .est-breakdown .est-note{font-size:10px;color:var(--text3);padding:6px 2px 0;line-height:1.5}
 
   /* 탭바 */
   .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
@@ -150,6 +182,25 @@
       <table class="cf-table">
         <thead><tr><th>월</th><th>계획입금</th><th>실입금</th><th>계획출금</th><th>실출금</th></tr></thead>
         <tbody id="planActBody"><tr><td colspan="5"><div class="empty-state">CSV 업로드 후 표시됩니다</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- v2.9.53: 고정비 항목별 계획 대비 실적(사용자 확정) — "월별 계획 vs 실적"이 전체 입출금
+       총액만 비교하는 것과 달리, 이 카드는 fixed.html에서 등록한 세부 항목명(급여·세금·법인카드
+       등)을 그대로 기준으로 그 달의 계획 합계와 실제 통장 지출 합계를 항목별로 나란히 보여준다.
+       "세금은 예산보다 많이 냈다", "법인카드는 덜 썼다" 같은 경영 인사이트를 위한 화면 — 대사
+       (건별 매칭) 여부와 무관하게, 그 달 발생한 통장 거래를 계획과 같은 이름 기준으로 그대로
+       재집계한다(계획과 실적이 같은 이름 체계를 공유한다는 원칙, 원칙40 참고). -->
+  <div class="card">
+    <div class="card-title">고정비 항목별 계획 대비 실적 <span style="font-size:11px;color:var(--text3)">※ 항목명이 코드 관리에서 등록한 유형명과 일치해야 정확히 비교됨</span>
+      <select id="fciYear" onchange="renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select>
+      <select id="fciMonth" onchange="renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></select>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="cf-table">
+        <thead><tr><th>항목</th><th>계획</th><th>실적</th><th>차이</th></tr></thead>
+        <tbody id="fixCompareBody"><tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -289,15 +340,31 @@
     <button id="txBtnD" onclick="setTxMode('detail')" style="flex:1;padding:6px;border-radius:7px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-size:12px;cursor:pointer">건별 내역</button>
     <button id="txBtnS" onclick="setTxMode('sum')" style="flex:1;padding:6px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">유형별 집계</button>
   </div>
-  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text3)"><th style="text-align:left;padding:5px">일자</th><th style="text-align:left">적요</th><th>입금</th><th>출금</th><th>유형</th><th>대사</th></tr></thead><tbody id="txBody"></tbody></table></div>
+  <!-- v2.9.49: 가독성 재설계(사용자 지적 — "고정비"·"기타 지급(세금계산서)" 등 유형 드롭다운
+       텍스트가 좁은 컬럼 폭에 잘려 읽을 수 없었음). 각 컬럼에 콘텐츠가 실제로 필요로 하는 최소폭을
+       지정하고(유형 드롭다운은 가장 긴 유형명 "기타 지급(세금계산서)" 기준 108px), 테이블 자체는
+       min-width로 늘려 좁은 화면에서는 가로 스크롤(overflow-x:auto)로 넘기도록 함 — 컬럼을
+       억지로 욱여넣어 잘리게 하는 대신, 필요한 만큼의 공간을 확보하고 넘치면 스크롤한다. -->
+  <!-- v2.9.49: 근본 재설계(사용자 지적 — 좁은 컬럼에 유형 드롭다운 텍스트가 잘려 가독성이 없었음).
+       6컬럼 표는 모바일 폭(약 380px)에 "고정비"·"기타 지급(세금계산서)" 같은 유형명을 담을 여유가
+       없다 — 컬럼을 억지로 욱여넣거나 가로 스크롤을 강제하는 대신, 기존 "미분류·기타 재지정"
+       섹션과 동일한 카드형 레이아웃(정보 줄 + 유형 드롭다운을 별도 줄 전체 폭으로)으로 전면
+       재설계해 어떤 길이의 유형명도 잘리지 않고 표시되도록 함. 유형별 집계 모드는 그대로 표 유지
+       (긴 텍스트 컬럼이 없어 표 형태가 적합). -->
+  <div id="txBody"></div>
+  <!-- v2.9.47: 이 팝업(건별 내역)의 "유형" 드롭다운으로 고른 재지정을 저장 — 미분류 재지정과
+       동일한 saveReclass()를 호출(양쪽 접두사를 모두 처리하도록 확장됨). -->
+  <div style="margin-top:10px;display:flex;justify-content:flex-end">
+    <button onclick="saveReclass()" style="font-size:12px;padding:7px 14px;border-radius:7px;border:none;background:var(--blue);color:#fff;cursor:pointer;font-weight:600">재지정 저장</button>
+  </div>
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.29"></script>
-<script src="js/common.js?v=2.9.29"></script>
-<script src="js/calc.js?v=2.9.29"></script>
-<script src="js/nav.js?v=2.9.29"></script>
+<script src="js/schema.js?v=2.9.64"></script>
+<script src="js/common.js?v=2.9.64"></script>
+<script src="js/calc.js?v=2.9.64"></script>
+<script src="js/nav.js?v=2.9.64"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -456,12 +523,16 @@ function processBankRows(rows,rawNum){
 // ── 분류 엔진 ─────────────────────────────────────────────────
 function kws(key,def){ return (settings[key]||def||'').split(',').map(k=>k.trim()).filter(Boolean); }
 function classify(desc,recv,branch,inAmt,outAmt){
-  // v1.2(#13,#15): 설정 코드 마스터 우선 적용
-  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.value)){
-    if((r.value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.key;
+  // v2.9.40: 필드명 불일치 결함 수정 — S10 시트는 setting_key/setting_value 헤더로 통일되어
+  // 있는데(v2.9.9), 이 함수는 옛 key/value 필드명을 참조해 코드 관리 화면(①거래유형&키워드,
+  // ②거래점 분류규칙)에서 등록한 데이터가 여기 전혀 반영되지 않고 있었다(전수조사로 발견 —
+  // 실제로 "세금납부"라는 사용자 정의 유형을 등록해도 분류 결과는 하드코딩된 기본 유형명
+  // "세금"으로만 나왔음). setting_key/setting_value로 정정.
+  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.setting_value)){
+    if((r.setting_value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.setting_key;
   }
-  for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.key)){
-    if((branch||'').includes(b.key)) return b.value||'기타비용';
+  for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.setting_key)){
+    if((branch||'').includes(b.setting_key)) return b.setting_value||'기타비용';
   }
   const d=desc, rv=recv, br=branch;
   // v2.2 §4: S10 설정만 참조 (하드코딩 없음)
@@ -483,31 +554,66 @@ function classify(desc,recv,branch,inAmt,outAmt){
 
 // ── 월별 집계 ─────────────────────────────────────────────────
 // v2.5.4: S08_DETAIL(원천) → 월별 실적 재파생 (SSOT — 저장된 분류·확정 순서 사용)
+// v2.9.54: 근본 재설계(사용자 지적: "AI 사용료가 0으로 나오잖아? 버킷에 없는 항목이라고 0이면
+// 버킷을 조정하든 보고서 항목을 조정하든 노력이 있어야" → "근본해결책으로 해야지. 편법은 안돼").
+// 기존에는 8개 고정 버킷(매출입금·자본납입·기타입금·매입지급·고정비·세금·법인카드·AI사용료·
+// 기타비용)에 강제로 밀어 넣어, 코드 관리에 등록되지 않은 유형(예: "AI사용료"라는 txn_type을
+// 아직 등록 안 함)은 조용히 0으로 사라지거나 다른 버킷에 뭉개졌다. 이제 유형명(category) 그대로를
+// 키로 하는 동적 객체(by)에 집계해 어떤 유형을 몇 개 등록하든 전부 정확히 반영되도록 한다 —
+// "고정비 항목별 계획 대비 실적" 카드(v2.9.53)와 정확히 같은 원칙: 계획과 실적이 같은 이름
+// 체계를 공유하고, 화면은 그 이름을 그대로 신뢰한다. 기존 8개 필드(outflow_fixed 등)는 하위
+// 호환을 위해 by에서 파생해 함께 제공하되, 새 코드는 by를 직접 참조해야 한다.
 function deriveActFromDetail(det){
   if(!det||!det.length) return [];
   const rows=[...det].sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
   const monthly={};
   rows.forEach(t=>{
     const ym=t.year_month||String(t.txn_date).slice(0,7);
-    const m=monthly[ym]=monthly[ym]||{year_month:ym,act_balance:0,act_inflow:0,act_outflow:0,inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,outflow_card:0,outflow_ai:0,outflow_etc:0,inflow_capital:0,inflow_etc:0,unclassified_cnt:0};
+    const m=monthly[ym]=monthly[ym]||{year_month:ym,act_balance:0,act_inflow:0,act_outflow:0,by:{},unclassified_cnt:0};
     const inA=num(t.inflow_amt)||0, outA=num(t.outflow_amt)||0, bal=num(t.balance)||0;
     m.act_inflow+=inA; m.act_outflow+=outA;
     if(bal>0) m.act_balance=bal; // 정렬 확정 순서의 마지막 거래 잔액 = 월말 잔액
-    switch(t.category){
-      case '매출입금': m.inflow_revenue+=inA; break;
-      case '자본납입': m.inflow_capital+=inA; break;
-      case '기타입금': m.inflow_etc+=inA; break;
-      case '매입지급': m.outflow_cost+=outA; break;
-      case '고정비':   m.outflow_fixed+=outA; break;
-      case '급여':     m.outflow_fixed+=outA; break;
-      case '세금':     m.outflow_tax+=outA; break;
-      case '법인카드': m.outflow_card+=outA; break;
-      case 'AI사용료': m.outflow_ai+=outA; break;
-      default:         if(outA) m.outflow_etc+=outA; else if(inA) m.inflow_etc+=inA;
-    }
-    if((t.category==='기타비용'||t.category==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
+    // v2.9.54: 유형명(category)을 그대로 키로 사용 — 코드 관리에 등록된 이름이면 무엇이든 정확히
+    // 잡힌다. 미분류(카테고리 없음)만 별도로 "미분류" 키에 모아 둔다.
+    const cat=t.category||'미분류';
+    const b=m.by[cat]=m.by[cat]||{in:0,out:0};
+    b.in+=inA; b.out+=outA;
+    // unclassified_cnt: 원래 로직(v2.9.45)이 "버킷이 기타비용·기타입금으로 떨어진 것"까지
+    // 경고 대상으로 삼았던 것과 동일하게, 미분류이거나 등록은 됐지만 버킷이 기타 계열인 경우 모두 포함.
+    const bkt=cat==='미분류'?'':bucketOf(cat);
+    if((cat==='미분류'||bkt==='기타비용'||bkt==='기타입금')&&(inA+outA)>=100000) m.unclassified_cnt++;
+  });
+  // 하위 호환 필드 파생: 기존 8개 고정 버킷을 참조하던 코드(대시보드 배지·시트 기록 등)가 계속
+  // 동작하도록, bucketOf()로 유형명→버킷 매핑을 확인해 by에서 합산해 둔다.
+  Object.values(monthly).forEach(m=>{
+    m.inflow_revenue=0; m.outflow_cost=0; m.outflow_fixed=0; m.outflow_tax=0;
+    m.outflow_card=0; m.outflow_ai=0; m.outflow_etc=0; m.inflow_capital=0; m.inflow_etc=0;
+    Object.entries(m.by).forEach(([cat,v])=>{
+      if(cat==='미분류'){ if(v.out) m.outflow_etc+=v.out; else if(v.in) m.inflow_etc+=v.in; return; }
+      addToBucket(m, bucketOf(cat), v.in, v.out);
+    });
   });
   return Object.values(monthly).sort((a,b)=>a.year_month.localeCompare(b.year_month));
+}
+// v2.9.45: 유형명 → 집계 버킷 조회(코드 관리에서 사용자가 명시적으로 지정한 매핑, S10의 category=
+// 'txn_type' 행의 description 컬럼). 지정이 없으면(구버전 데이터·미분류) 기타로 폴백.
+function bucketOf(category){
+  const r=(s10All||[]).find(x=>x.category==='txn_type'&&x.setting_key===category);
+  return (r&&r.description)||'';
+}
+function addToBucket(m,bucket,inA,outA){
+  switch(bucket){
+    case '매출입금': m.inflow_revenue+=inA; break;
+    case '자본납입': m.inflow_capital+=inA; break;
+    case '기타입금': m.inflow_etc+=inA; break;
+    case '매입지급': m.outflow_cost+=outA; break;
+    case '고정비':   m.outflow_fixed+=outA; break;
+    case '세금':     m.outflow_tax+=outA; break;
+    case '법인카드': m.outflow_card+=outA; break;
+    case 'AI사용료': m.outflow_ai+=outA; break;
+    case '기타비용': m.outflow_etc+=outA; break;
+    default:         if(outA) m.outflow_etc+=outA; else if(inA) m.inflow_etc+=inA;
+  }
 }
 
 // v2.5.2: 시간 오름차순 재배열 + 동일 일시 그룹은 잔액 체이닝(직전잔액+입금−출금=잔액)으로 순서 확정
@@ -537,12 +643,16 @@ function orderAndChain(txns){
   });
   return {seq:out,breaks};
 }
+// v2.9.54: 근본 재설계(사용자 지적) — deriveActFromDetail과 동일한 원칙으로, CSV 업로드 직후
+// 미리보기(대시보드 배지)를 만드는 이 함수도 8개 고정 버킷 대신 유형명 그대로의 동적 집계(by)를
+// 함께 채운다. 이 함수의 monthly 객체가 그대로 actData에 병합되므로(위 handleCsv 내부), by가
+// 없으면 showBreakdown이 새 유형을 보여줄 수 없다.
 function aggregateMonthly(txns){
   const monthly={};
   const monthTxns={};
   txns.forEach(t=>{
     if(!monthly[t.ym]){
-      monthly[t.ym]={act_balance:0,act_inflow:0,act_outflow:0,
+      monthly[t.ym]={act_balance:0,act_inflow:0,act_outflow:0,by:{},
         inflow_revenue:0,outflow_cost:0,outflow_fixed:0,outflow_tax:0,
         outflow_card:0,outflow_ai:0,outflow_etc:0,inflow_capital:0,inflow_etc:0,
         unclassified_cnt:0};
@@ -556,21 +666,15 @@ function aggregateMonthly(txns){
     m.act_outflow+=t.outAmt;
     monthTxns[t.ym].push(t);
 
-    switch(t.cat){
-      case '매출입금':  m.inflow_revenue+=t.inAmt; break;
-      case '자본납입':  m.inflow_capital+=t.inAmt; break;
-      case '기타입금':  m.inflow_etc+=t.inAmt; break;
-      case '매입지급':  m.outflow_cost+=t.outAmt; break;
-      case '고정비':    m.outflow_fixed+=t.outAmt; break;
-      case '세금':      m.outflow_tax+=t.outAmt; break;
-      case '법인카드':  m.outflow_card+=t.outAmt; break;
-      case 'AI사용료':  m.outflow_ai+=t.outAmt; break;
-      case '기타비용':  m.outflow_etc+=t.outAmt; break;
-    }
+    const cat=t.cat||'미분류';
+    const b=m.by[cat]=m.by[cat]||{in:0,out:0};
+    b.in+=t.inAmt; b.out+=t.outAmt;
+    // v2.9.45: 위 aggregateMonthly(rows)와 동일한 근본 수정 — 코드 관리에서 지정한 집계 버킷으로 조회.
+    addToBucket(m, bucketOf(t.cat), t.inAmt, t.outAmt);
   });
 
   // 미분류 체크 (기타비용·기타입금 중 금액 큰 것)
-  unclassified=txns.filter(t=>t.cat==='기타비용'&&t.outAmt>=50000);
+  unclassified=txns.filter(t=>bucketOf(t.cat)==='기타비용'&&t.outAmt>=50000);
   parsedMonthly=monthly;
   // v2.4.3: 병합 원칙 — 기존 시트의 월 실적은 보존하고, 이번 CSV에 등장한 월만 갱신
   const _newAct=Object.entries(monthly).map(([ym,v])=>({year_month:ym,...v}));
@@ -589,20 +693,25 @@ function aggregateMonthly(txns){
   }
 }
 
+// v2.9.54: 근본 재설계(사용자 지적) — 버킷별 색상은 유지하되(경영자가 한눈에 성격을 구분하도록),
+// 항목 목록 자체는 m.by(그 달 실제 등록된 유형명 전체)에서 만든다. 코드 관리에 새 유형을 등록하면
+// 자동으로 이 목록에 나타나며, 등록되지 않은 유형이 조용히 0으로 사라지는 일이 없다.
+const BUCKET_BADGE_CLS={'매출입금':'badge-green','자본납입':'badge-blue','기타입금':'badge-blue',
+  '매입지급':'badge-amber','고정비':'badge-amber','법인카드':'badge-amber','기타비용':'badge-amber',
+  '세금':'badge-red','AI사용료':'badge-blue'};
 function showBreakdown(ym, m){
   document.getElementById('breakdownCard').style.display='block';
   document.getElementById('breakdownMonth').textContent=ym;
-  const items=[
-    {label:'매출 입금',amt:m.inflow_revenue,dir:'in',cls:'badge-green'},
-    {label:'자본 납입',amt:m.inflow_capital,dir:'in',cls:'badge-blue'},
-    {label:'매입 지급',amt:m.outflow_cost,dir:'out',cls:'badge-amber'},
-    {label:'고정비',amt:m.outflow_fixed,dir:'out',cls:'badge-amber'},
-    {label:'세금',amt:m.outflow_tax,dir:'out',cls:'badge-red'},
-    {label:'법인카드',amt:m.outflow_card,dir:'out',cls:'badge-amber'},
-    {label:'AI 사용료',amt:m.outflow_ai,dir:'out',cls:'badge-blue'},
-    {label:'기타비용',amt:m.outflow_etc,dir:'out',cls:'badge-amber'},
-    {label:'기타입금',amt:m.inflow_etc,dir:'in',cls:'badge-blue'},
-  ].filter(i=>i.amt>0);
+  const items=[];
+  if(m.by){
+    Object.entries(m.by).forEach(([cat,v])=>{
+      const bkt=cat==='미분류'?'':bucketOf(cat);
+      const cls=BUCKET_BADGE_CLS[bkt]||'badge-amber';
+      if(v.in>0) items.push({label:cat,amt:v.in,dir:'in',cls:cat==='미분류'?'badge-blue':cls});
+      if(v.out>0) items.push({label:cat,amt:v.out,dir:'out',cls:cat==='미분류'?'badge-amber':cls});
+    });
+  }
+  items.sort((a,b)=>b.amt-a.amt);
 
   document.getElementById('breakdownList').innerHTML=items.map(i=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
@@ -704,62 +813,124 @@ function openDetailModal(ym){
   const actBal=act?num(act.act_balance)||0:null;
   const diff=estBal!==null&&actBal!==null?actBal-estBal:null;
   document.getElementById('detailTitle').textContent=`${ym} 상세`;
-  const rows=[
-    {k:'추정 잔액',v:estBal!==null?won(estBal,false):'─'},
-    {k:'실잔액',v:actBal!==null?won(actBal,false):'─'},
-    {k:'차이',v:diff!==null?(diff>=0?'+':'')+won(diff,false):'─'},
-    {k:'매출 입금',v:act?won(act.inflow_revenue,false):'─'},
-    {k:'자본 납입',v:act?won(act.inflow_capital,false):'─'},
-    {k:'매입 지급',v:act?won(act.outflow_cost,false):'─'},
-    {k:'고정비',v:act?won(act.outflow_fixed,false):'─'},
-    {k:'세금',v:act?won(act.outflow_tax,false):'─'},
-    {k:'법인카드',v:act?won(act.outflow_card,false):'─'},
-    {k:'AI 사용료',v:act?won(act.outflow_ai,false):'─'},
-    {k:'기타비용',v:act?won(act.outflow_etc,false):'─'},
-    {k:'총 입금',v:act?won(act.act_inflow,false):'─'},
-    {k:'총 출금',v:act?won(act.act_outflow,false):'─'},
-  ].filter(r=>r.v!=='─'||r.k==='추정 잔액'||r.k==='실잔액');
-  document.getElementById('detailBody').innerHTML=rows.map(r=>`
-    <div class="detail-row"><span class="detail-label">${r.k}</span><span class="detail-val">${r.v}</span></div>`).join('');
-  // v2.4.6: 추정 잔액 구성(산식·낱개) — [추정 vs 실적] 신뢰도 검증용
+  // v2.9.57: UI/UX 전면 정비(사용자 요청 — "프로답게 보일 수 있도록"). 구조를 세 블록으로 명확히
+  // 분리: ①추정/실잔액/차이를 3분할 KPI 스트립으로, ②입금 내역(통장에 실제 들어온 것을 그대로,
+  // 합계는 총입금), ③출금 내역(사용자 확정: "이전처럼 순지출로 표현하면 출금합계가 다름. 지출
+  // 내역 기준" — v2.9.56의 순지출 비교를 이 화면에서는 철회하고, 법인카드 등 한 유형에 입금·출금이
+  // 섞여 있어도 그 유형의 총출금을 그대로 보여줘 실제 통장 총출금과 합계가 정확히 일치하게 함).
+  // 계획 대비 비교(v2.9.55~56에서 도입)는 각 항목 옆에 옅은 보조 정보로 유지해 "예산과 얼마나
+  // 다른지"는 여전히 한눈에 보이돼, 주인공은 항상 "실제 통장에 무슨 일이 있었는가"가 되도록 함.
+  const planIn=(planRev||[]).filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym)
+    .reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+  const planOutCost=(planCost||[]).filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
+    .reduce((s,c)=>{const isNoInv=String(c.cost_id||'').startsWith('NOINV-');
+      return s+(isNoInv?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1));},0);
+  const planFixByCat={};
+  (planFix||[]).filter(f=>f.year_month===ym).forEach(f=>{
+    const c=f.category||'미지정';
+    planFixByCat[c]=(planFixByCat[c]||0)+(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0));
+  });
+  const actBy=(act&&act.by)||{};
+  const INFLOW_TXN_NAMES=['매출 입금','매출입금'], OUTFLOW_COST_NAMES=['매입 지급','매입지급'];
+  const actInSum=Object.entries(actBy).filter(([c])=>INFLOW_TXN_NAMES.includes(c)).reduce((s,[,v])=>s+v.in,0);
+  const actOutCostSum=Object.entries(actBy).filter(([c])=>OUTFLOW_COST_NAMES.includes(c)).reduce((s,[,v])=>s+v.out,0);
+
+  // KPI 스트립: 추정 잔액 / 실잔액 / 차이 — 가장 중요한 "차이"만 색 배경으로 강조해 시선을 먼저 끈다.
+  const diffCellCls=diff===null?'':(diff>=0?'diff-pos':'diff-neg');
+  const diffSign=diff!==null&&diff>=0?'+':'';
+  const kpiHtml=`<div class="kpi-strip">
+    <div class="kpi-cell"><div class="kpi-label">추정 잔액</div><div class="kpi-num">${estBal!==null?won(estBal,false):'─'}</div></div>
+    <div class="kpi-cell"><div class="kpi-label">실잔액</div><div class="kpi-num">${actBal!==null?won(actBal,false):'─'}</div></div>
+    <div class="kpi-cell ${diffCellCls}"><div class="kpi-label">차이</div><div class="kpi-num">${diff!==null?diffSign+won(diff,false):'─'}</div></div>
+  </div>`;
+
+  // 계획 대비 보조 텍스트(옅게 표시) — 계획이 없으면 생략
+  const planNote=(plan,actual)=>{
+    if(!plan) return '';
+    const d=actual-plan;
+    const cls=d<=0?'pos':'neg';
+    return `<div class="flow-sub">계획 ${won(plan,false)} · <span class="${cls}">${d===0?'차이 없음':(d>0?'+':'')+won(d,false)}</span></div>`;
+  };
+  // 각 줄 왼쪽에 방향(입금=초록/출금=빨강)을 나타내는 얇은 컬러 바를 둬, 표 대신 카드 리스트의
+  // 질감으로 "이게 들어온 돈인지 나간 돈인지"를 색으로 즉시 구분할 수 있게 한다.
+  const flowItem=(name,amt,plan,dir)=>`<div class="flow-item">
+      <div class="flow-bar" style="background:${dir==='in'?'var(--green)':'var(--red)'}"></div>
+      <div class="flow-body">
+        <div class="flow-text"><div class="flow-name">${name}</div>${planNote(plan||0,amt)}</div>
+        <div class="flow-amt" style="color:${dir==='in'?'var(--green)':'var(--red)'}">${dir==='in'?'+':'-'}${won(amt,false)}</div>
+      </div>
+    </div>`;
+
+  // 블록2: 입금 내역 — 통장에 실제 들어온 것을 그대로, 계획이 있는 항목(매출 입금)만 보조 비교 표시
+  const inEntries=Object.entries(actBy).filter(([,v])=>v.in>0).sort((a,b)=>b[1].in-a[1].in);
+  const inItemsHtml=inEntries.length
+    ? inEntries.map(([cat,v])=>flowItem(cat, v.in, INFLOW_TXN_NAMES.includes(cat)?planIn:0, 'in')).join('')
+    : '<div class="flow-empty">이번 달 입금 내역이 없습니다</div>';
+  const totalIn=act?num(act.act_inflow)||0:inEntries.reduce((s,[,v])=>s+v.in,0);
+
+  // 블록3: 출금 내역 — 사용자 확정: "지출 내역 기준"이므로 유형별 총출금을 그대로 표시하고
+  // 합계는 실제 통장 총출금(act.act_outflow)과 정확히 일치해야 한다(순지출로 바꾸지 않음).
+  const outEntries=Object.entries(actBy).filter(([,v])=>v.out>0).sort((a,b)=>b[1].out-a[1].out);
+  const planForOut=cat=>OUTFLOW_COST_NAMES.includes(cat)?planOutCost:(planFixByCat[cat]||0);
+  const outItemsHtml=outEntries.length
+    ? outEntries.map(([cat,v])=>flowItem(cat, v.out, planForOut(cat), 'out')).join('')
+    : '<div class="flow-empty">이번 달 출금 내역이 없습니다</div>';
+  const totalOut=act?num(act.act_outflow)||0:outEntries.reduce((s,[,v])=>s+v.out,0);
+
+  let html=kpiHtml;
+  html+=`<div class="flow-section">
+    <div class="flow-head"><div class="flow-title">입금 내역</div><div class="flow-total pos">+${won(totalIn,false)}</div></div>
+    <div class="flow-list">${inItemsHtml}</div>
+  </div>`;
+  html+=`<div class="flow-section">
+    <div class="flow-head"><div class="flow-title">출금 내역</div><div class="flow-total neg">-${won(totalOut,false)}</div></div>
+    <div class="flow-list">${outItemsHtml}</div>
+  </div>`;
+  document.getElementById('detailBody').innerHTML=html;
+
+  // v2.4.6: 추정 잔액 구성(산식·낱개) — [추정 vs 실적] 신뢰도 검증용. v2.9.57에서 카드 배경·여백을
+  // 정리해 위 두 블록과 시각적으로 통일된 하나의 화면처럼 보이도록 함.
   (function(){
     const bx=document.getElementById('detailBody');
     if(!est){return;}
     const anchor=(est.pipeline_basis||'').includes('기산 전')||(est.pipeline_basis||'').includes('실적 기준');
-    let h='<div style="margin-top:14px;padding-top:10px;border-top:2px solid var(--border);font-weight:700;font-size:12px">📐 추정 잔액 구성</div>';
+    let h='<div class="est-breakdown"><div class="est-title">📐 추정 잔액 구성</div>';
     if(anchor){
-      h+='<div style="font-size:12px;color:var(--text3);padding:6px 0">이 달은 <b>기산월 이전</b>입니다 — 추정은 설정된 기산월(기초 잔액)부터 누적됩니다.</div>';
+      h+='<div style="font-size:12px;color:var(--text3);padding:4px 2px">이 달은 <b>기산월 이전</b>입니다 — 추정은 설정된 기산월(기초 잔액)부터 누적됩니다.</div>';
     }else{
       const prevYm=(d=>{const[y,mm]=ym.split('-').map(Number);const p=new Date(y,mm-2,1);return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}`;})();
       const pe=estData.find(e=>e.year_month===prevYm&&e.est_balance!=='');
       const isBase=!pe;
       const A=pe?num(pe.est_balance):(num(settings.param_base_balance)||20000000);
       const inF=num(est.est_inflow)||0, outF=num(est.est_outflow)||0, vat=num(est.est_vat)||0;
-      const line=(l,v,sign)=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 2px"><span>${l}</span><b>${sign||''}${wonFull(Math.abs(v))}</b></div>`;
+      const line=(l,v,sign)=>`<div class="est-line"><span>${l}</span><b>${sign||''}${wonFull(Math.abs(v))}</b></div>`;
       h+=line(isBase?'기초 잔액 (기산월 자본금)':`전월(${prevYm}) 추정 잔액`,A);
-      // 입금 낱개: 재무 미수 수금예정
       const inRows=s04All.filter(r=>okPrjSet.has(r.project_id)&&(r.cash_recv_date||'').slice(0,7)===ym);
       let inSum=0;
       inRows.forEach(r=>{const a=num(r.cash_recv_amt)||0;inSum+=a;
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 수금예정 ${r.project_id} (${r.year_month}분)</span><span>${wonFull(a)}</span></div>`;});
+        h+=`<div class="est-sub"><span>+ 수금예정 ${r.project_id} (${r.year_month}분)</span><span>${wonFull(a)}</span></div>`;});
       const wPart=inF-inSum;
-      if(wPart>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
+      if(wPart>0) h+=`<div class="est-sub"><span>+ 기회 확도가중·확정(스케줄 미생성) 월할분</span><span>${wonFull(wPart)}</span></div>`;
       h+=line('추정입금 소계',inF,'+');
-      // 출금 낱개: 매입 + 고정비 + VAT
       planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).forEach(c=>{
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 지급예정 ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(Math.round((num(c.amount)||0)*1.1))}</span></div>`;});
+        const isNoInv=String(c.cost_id||'').startsWith('NOINV-');
+        const label=isNoInv?'매입(계산서없음)':'매입';
+        const amt=isNoInv?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1);
+        h+=`<div class="est-sub"><span>− ${label} ${c.project_id}${c.person_name?' · '+c.person_name:''}</span><span>${wonFull(amt)}</span></div>`;});
       planFix.filter(f=>f.year_month===ym).forEach(f=>{
-        h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 고정비 ${f.category||''}</span><span>${wonFull(num(f.amount)||0)}</span></div>`;});
-      if(vat) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
-      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0)
+        h+=`<div class="est-sub"><span>− 고정비 ${f.category||''}</span><span>${wonFull(num(f.amount)||0)}</span></div>`;});
+      if(vat) h+=`<div class="est-sub"><span>− 부가세 납부</span><span>${wonFull(vat)}</span></div>`;
+      const outKnown=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
+        .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0)
         +planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0)+vat;
       const outW=outF-outKnown;
-      if(outW>0) h+=`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:2px 2px 2px 16px"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
+      if(outW>0) h+=`<div class="est-sub"><span>− 기회 확도가중·확정(스케줄 미생성) 매입 월할분</span><span>${wonFull(outW)}</span></div>`;
       h+=line('추정출금 소계',outF,'−');
       const calc=A+inF-outF, ok=calc===(num(est.est_balance)||0);
-      h+=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 2px;border-top:1px solid var(--border);font-weight:700"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(num(est.est_balance)||0)}</span></div>`;
-      h+=`<div style="font-size:10px;color:var(--text3);padding:3px 2px">기준: ${est.pipeline_basis||''} · 산식 = 전월 추정 잔액(기산월은 기초 잔액) + 계획입금 − 계획출금(매입·고정비·VAT) · 실잔액 미혼합</div>`;
+      h+=`<div class="est-total"><span>= 추정 잔액 ${ok?'<span style="color:var(--green)">검산 일치 ✓</span>':'<span style="color:var(--red)">검산 불일치 ⚠</span>'}</span><span>${wonFull(num(est.est_balance)||0)}</span></div>`;
+      h+=`<div class="est-note">기준: ${est.pipeline_basis||''} · 산식 = 전월 추정 잔액(기산월은 기초 잔액) + 계획입금 − 계획출금(매입·고정비·VAT) · 실잔액 미혼합</div>`;
     }
+    h+='</div>';
     bx.innerHTML+=h;
   })();
   document.getElementById('detailModal').classList.add('open');
@@ -767,7 +938,10 @@ function openDetailModal(ym){
 function closeDetailModal(){ document.getElementById('detailModal').classList.remove('open'); }
 
 function txnTypeNames(){
-  const c=s10All.filter(r=>r.category==='txn_type'&&r.key).map(r=>r.key);
+  // v2.9.42: classify()·fixed.html의 항목 자동완성과 동일했던 필드명 불일치 결함(r.key/r.value →
+  // setting_key/setting_value) — 미분류 거래 재지정 드롭다운도 코드 관리에서 등록한 거래유형을
+  // 전혀 못 읽고 항상 하드코딩 기본값만 보여주고 있었다(사용자 지적으로 전수재확인 중 발견).
+  const c=s10All.filter(r=>r.category==='txn_type'&&r.setting_key).map(r=>r.setting_key);
   return c.length?c:['매출입금','매입지급','고정비','급여','세금','법인카드','AI사용료','기타비용','기타입금'];
 }
 function openUnclassModal(){
@@ -848,7 +1022,7 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],detailAll=[],s10All=[],estAll=[];
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],unmatchedFix=[],detailAll=[],s10All=[],estAll=[];
 async function loadSheets(){
   try{
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR,esR]=await Promise.all([
@@ -876,16 +1050,55 @@ async function loadSheets(){
     s04All=dedupe(toObj(rvRows).filter(r=>r.revenue_id),'revenue_id');
     planRev=s04All.filter(r=>okPrj.has(r.project_id));
     s05All=dedupe(toObj(csRows).filter(c=>c.cost_id),'cost_id');
-    planCost=s05All.filter(c=>okPrj.has(c.project_id));
-    detailAll=toObj(dtR).filter(t=>t.txn_id);
+    estAll=toObj(esR).filter(e=>e.estimate_id);
+    // v2.9.36: 계산서없음 매입(사업소득형·급여형·미수취 기타경비)은 "세금계산서" 화면(input.html)의
+    // 청구 스케줄에 더 이상 만들어지지 않는다(사용자 확정 — 그 화면은 세금계산서 관리에만 집중해야
+    // 함). 대신 자금수지가 견적(S12)에서 직접 월별로 계산해 지출 계획에 반영한다 — 견적을 저장하는
+    // 즉시(청구 스케줄 재생성 없이도) 자금수지에 정확히 나타나는 장점도 있다.
+    const isInvoiceType=e=>{
+      if(e.comp_type==='인건비') return !e.memo||e.memo==='';
+      return !(e.memo||'').startsWith('_NOINVOICE_');
+    };
+    const noInvoiceCosts=[];
+    prjAll.filter(p=>okPrj.has(p.project_id)).forEach(prj=>{
+      const items=estAll.filter(e=>e.pipeline_id===prj.pipeline_id&&e.comp_type!=='_EMPTY'&&!isInvoiceType(e));
+      if(!items.length) return;
+      const byM=monthlyProfile(items,'buy_price',prj.start_date,prj.end_date);
+      // v2.9.46: 지급일 규칙 확정(사용자 확정, 2026-09-16) — 계산서없음 매입(급여형·사업소득형)은
+      // 세금계산서형처럼 명시적 청구 조건이 없으므로 지급 시점을 별도로 정해야 했다. "세금계산서
+      // 매출·매입은 수금일·지급일이 명시되어 논의 불필요, 세금계산서가 아닌 매입분만 지급 시기를
+      // 정하면 된다"는 것으로 논의 범위를 좁힌 뒤, "회사 급여일이 매월 10일이고 전월 근무 이력을
+      // 당월 10일에 지급한다"는 실제 운영 규칙에 따라 확정: 귀속월의 익월 10일 지급.
+      // (v2.9.36~45의 "익월말" 가정은 폐기 — 부산은행 프로젝트의 8월 선지급분이 9월로 밀려 8월
+      // 계획출금에서 누락되는 오류로 발견됨.)
+      Object.keys(byM).forEach(ym=>{
+        if(!byM[ym]) return;
+        const [yy,mm]=ym.split('-').map(Number);
+        const nextMonth=new Date(yy,mm,10); // Date의 month는 0-based라 mm(1-based)을 그대로 넣으면 다음달, day=10 → 익월 10일
+        const payDate=`${nextMonth.getFullYear()}-${String(nextMonth.getMonth()+1).padStart(2,'0')}-10`;
+        noInvoiceCosts.push({cost_id:`NOINV-${prj.project_id}-${ym}`,project_id:prj.project_id,year_month:ym,
+          cost_type:'인건비(계산서없음)',person_name:'',unit_price:'',mm:'',amount:Math.round(byM[ym]),
+          payment_date:payDate,memo:'견적 기준 자동계산(계산서없음, 전월 근무분 당월 10일 지급)',
+          vat_amt:0,invoice_plan_date:'',invoice_date:'',matched_txn_id:'',pay_actual_date:''});
+      });
+    });
+    planCost=[...s05All.filter(c=>okPrj.has(c.project_id)),...noInvoiceCosts];
+    // v2.9.52: 근본 결함 수정(사용자 지적 — 실제 시트에는 "자본 납입"이 1건뿐인데 화면에는 7건,
+    // 22,963,120원으로 부풀려져 보임) — s04All·s05All은 dedupe(...,'revenue_id'/'cost_id')로
+    // 중복 제거를 하는데 detailAll만 이 처리가 빠져 있었다. 시트에 같은 txn_id가 중복 저장되는
+    // 경로가 한 번이라도 생기면(예: CSV 재업로드 시 지문 매칭 실패, 수동 편집 등) 화면의 모든
+    // 집계(유형별 집계·건별 내역·실적 파생)가 그 중복을 그대로 다 세어 실제보다 부풀려지고,
+    // saveReclass()가 이 부풀려진 배열을 그대로 다시 저장하면 중복이 시트에 영구히 남는다.
+    detailAll=dedupe(toObj(dtR).filter(t=>t.txn_id),'txn_id');
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
-    estAll=toObj(esR).filter(e=>e.estimate_id);
     // v2.5.4 SSOT: 실적 표시는 항상 원천(S08_DETAIL)에서 재파생 — 원천 삭제·수정이 즉시 반영. S08_ACT는 기록용.
     actData=deriveActFromDetail(detailAll);
     renderAll();
     renderPlanAct();
+    initFixCompareSelectors();
+    renderFixCompareItems();
     renderStaleEstBanner();
     renderVatBanner();
     renderAging();
@@ -904,9 +1117,16 @@ function openPlanDetail(ym,dir){
         html+=row(pn(r.project_id),`발생 ${r.year_month} · 수금예정 ${r.cash_recv_date||'(미지정→발생월)'}`,a,r.is_received==='Y'?' · <span style="color:var(--green)">입금완료</span>':'');});
   }else{
     t.textContent=`${ym} 계획출금 구성 (지급예정일 기준 · VAT 포함)`;
+    // v2.9.48: 핵심 결함 수정 — 이 팝업(openPlanDetail, "N월 계획출금 구성")은 v2.9.43·v2.9.46에서
+    // 고친 openDetailModal("추정 잔액 구성")과는 완전히 별개의 함수였는데, 이 팝업만 NOINV- 여부를
+    // 확인하지 않고 무조건 ×1.1을 곱하는 v2.9.43 이전 결함이 그대로 남아 있었다 — 계산서없음
+    // 매입(급여형·사업소득형, 이미 VAT 없는 순수 금액)에도 부가세가 붙어 부산은행 프로젝트의
+    // 9월·10월 계획출금이 실제보다 10% 부풀려져 있었다(사용자가 화면 스크린샷으로 직접 확인·지적).
     planCost.filter(c2=>(((c2.payment_date||'').slice(0,7))||c2.year_month)===ym)
-      .forEach(c2=>{const a=Math.round((num(c2.amount)||0)*1.1);tot+=a;
-        html+=row(pn(c2.project_id)+(c2.person_name?' · '+c2.person_name:''),`발생 ${c2.year_month} · 지급예정 ${c2.payment_date||'(미지정→발생월)'}`,a,c2.pay_actual_date?' · <span style="color:var(--green)">지급완료</span>':'');});
+      .forEach(c2=>{const isNoInv=String(c2.cost_id||'').startsWith('NOINV-');
+        const a=isNoInv?(num(c2.amount)||0):Math.round((num(c2.amount)||0)*1.1);tot+=a;
+        const label=isNoInv?pn(c2.project_id)+'(계산서없음)':pn(c2.project_id);
+        html+=row(label+(c2.person_name?' · '+c2.person_name:''),`발생 ${c2.year_month} · 지급예정 ${c2.payment_date||'(미지정→발생월)'}`,a,c2.pay_actual_date?' · <span style="color:var(--green)">지급완료</span>':'');});
     planFix.filter(f=>f.year_month===ym)
       .forEach(f=>{const a=num(f.amount)||0;tot+=a;html+=row('고정비 · '+(f.category||''),`지급예정 ${f.payment_date||ym}`,a);});
   }
@@ -920,7 +1140,11 @@ function renderPlanAct(){
   document.getElementById('planActBody').innerHTML=months.map(m=>{
     const ym=`${yr}-${m}`;
     const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
-    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0);
+    // v2.9.43: 핵심 결함 수정 — planCost에는 v2.9.36부터 계산서없음 매입(cost_id가 "NOINV-"로
+    // 시작, 이미 VAT 없는 순수 금액)이 섞여 있는데, 여기서 무조건 ×1.1을 곱해 "월별 계획 vs 실적
+    // 비교" 표의 계획출금 자체가 실제보다 부풀려지고 있었다 — 자금수지 값이 왜곡된 근본 원인 중 하나.
+    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
+      .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0);
     const pOutF=planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0);
     const pOut=pOutC+pOutF;
     const act=actData.find(a=>a.year_month===ym);
@@ -934,6 +1158,61 @@ function renderPlanAct(){
       <td>${pOut?`<span style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" onclick="openPlanDetail('${ym}','out')">${won(pOut,false)}</span>`:'─'}</td>
       <td>${aOut!==null?`${won(aOut,false)}<br><span style="font-size:10px" class="${dOut<=0?'pos':'neg'}">${dOut>=0?'+':''}${won(dOut,false)}</span>`:'─'}</td></tr>`;
   }).join('')||'<tr><td colspan="5"><div class="empty-state">데이터 없음</div></td></tr>';
+}
+// v2.9.53: 고정비 항목별 계획 대비 실적(사용자 확정) — 계획(fixed.html의 category)과 실적
+// (통장 거래의 category)이 같은 이름 체계를 공유한다는 원칙에 따라, 이름을 그대로 조인 키로
+// 사용해 매칭 없이 그 달의 계획 합계와 실적 합계를 항목별로 비교한다. 계획에 없던 항목이 실제로
+// 나가면 "예산 외 지출"로, 계획은 있는데 실적이 0이면 "미집행"으로 표시.
+function initFixCompareSelectors(){
+  const ys=document.getElementById('fciYear'), ms=document.getElementById('fciMonth');
+  const yrs=[...new Set(planFix.map(f=>(f.year_month||'').slice(0,4)).filter(Boolean))].sort();
+  const now=new Date(); const curY=String(now.getFullYear()), curM=String(now.getMonth()+1).padStart(2,'0');
+  ys.innerHTML=(yrs.length?yrs:[curY]).map(y=>`<option ${y===curY?'selected':''}>${y}</option>`).join('');
+  ms.innerHTML=['01','02','03','04','05','06','07','08','09','10','11','12']
+    .map(m=>`<option value="${m}" ${m===curM?'selected':''}>${parseInt(m)}월</option>`).join('');
+}
+function renderFixCompareItems(){
+  const y=document.getElementById('fciYear').value, m=document.getElementById('fciMonth').value;
+  if(!y||!m){ document.getElementById('fixCompareBody').innerHTML='<tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr>'; return; }
+  const ym=`${y}-${m}`;
+  // 계획: 그 달 고정비 계획을 항목명(category)별로 합산
+  const plan={};
+  planFix.filter(f=>f.year_month===ym).forEach(f=>{
+    const c=f.category||'미지정';
+    plan[c]=(plan[c]||0)+(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0));
+  });
+  // 실적: 그 달 통장 거래를 category(코드 관리에서 등록한 유형명) 그대로 항목명으로 합산 —
+  // 매출입금·매입지급·자본납입·기타입금(입금 계열)은 이 카드의 대상이 아니므로 제외.
+  // v2.9.56: 근본 결함 수정(사용자 지적: "법인카드 회수분이 있었다면... 급여도 지급했다가
+  // 오지급으로 입금받고 재지급하고 했었거든") — 출금만 더하고 같은 유형명으로 들어온 입금
+  // (카드값 환급, 급여 오지급 회수 등)을 무시하면 실제 순지출보다 부풀려진 값을 "초과 지출"로
+  // 잘못 보여준다. 출금에서 같은 유형명의 입금을 뺀 순지출(net)로 집계 — 법인카드·급여뿐 아니라
+  // 입금·출금이 같은 이름으로 오갈 수 있는 모든 고정비 항목에 공통으로 적용되는 원칙.
+  const actual={};
+  detailAll.filter(t=>t.year_month===ym).forEach(t=>{
+    const c=t.category||'미분류';
+    if(['매출 입금','매출입금','매입 지급','매입지급','자본 납입','자본납입','기타 입금','기타입금'].includes(c)) return;
+    const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0);
+    if(!net) return;
+    actual[c]=(actual[c]||0)+net;
+  });
+  const allItems=[...new Set([...Object.keys(plan),...Object.keys(actual)])]
+    .sort((a,b)=>(plan[b]||0)+(actual[b]||0)-((plan[a]||0)+(actual[a]||0)));
+  if(!allItems.length){ document.getElementById('fixCompareBody').innerHTML='<tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr>'; return; }
+  let tp=0,ta=0;
+  const rows=allItems.map(c=>{
+    const p=plan[c]||0, a=actual[c]||0; tp+=p; ta+=a;
+    const diff=a-p;
+    const tag=!plan[c]&&actual[c]?'<span style="font-size:10px;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:1px 4px;margin-left:4px">예산 외</span>'
+      :plan[c]&&!actual[c]?'<span style="font-size:10px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 4px;margin-left:4px">미집행</span>':'';
+    return `<tr><td>${c}${tag}</td><td style="text-align:right">${p?won(p,false):'─'}</td>
+      <td style="text-align:right">${a?won(a,false):'─'}</td>
+      <td style="text-align:right" class="${diff<=0?'pos':'neg'}">${diff===0?'─':(diff>0?'+':'')+won(diff,false)}</td></tr>`;
+  }).join('');
+  const totalRow=`<tr style="border-top:2px solid var(--border);font-weight:700"><td>합계</td>
+    <td style="text-align:right">${won(tp,false)}</td><td style="text-align:right">${won(ta,false)}</td>
+    <td style="text-align:right" class="${ta-tp<=0?'pos':'neg'}">${ta-tp===0?'─':(ta-tp>0?'+':'')+won(ta-tp,false)}</td></tr>`;
+  document.getElementById('fixCompareBody').innerHTML=rows+totalRow;
 }
 // v2.9.20: 마지막 청구 스케줄 변경 시각(S10.last_schedule_change_at, input.html이 청구 스케줄 재생성 성공 시 기록)과
 // 마지막 추정 재계산 시각(S02 각 행의 updated_at 중 최댓값)을 비교 — 스케줄 변경이 더 최근이면 재계산이 필요함을 안내.
@@ -959,11 +1238,17 @@ function renderVatBanner(){
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
+// v2.9.41: 고정비도 매출·매입과 동일하게 통장 대사 대상(사용자 확정) — S06 헤더에 matched_txn_id·
+// pay_actual_date 추가(js/schema.js와 동일 순서 유지).
+const H6C=['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt','matched_txn_id','pay_actual_date'];
 async function saveS05(next){
   return await clearAndWrite(...W.S05,[H5C,...rowsFor(H5C,dedupe(next,'cost_id'))]);
 }
 async function saveS04(next){
   return await clearAndWrite(...W.S04,[H4C,...rowsFor(H4C,dedupe(next,'revenue_id'))]);
+}
+async function saveS06(next){
+  return await clearAndWrite(...W.S06,[H6C,...rowsFor(H6C,dedupe(next,'fixed_id'))]);
 }
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
@@ -1008,19 +1293,46 @@ async function reconcile(){
     if(ok){s05All=dedupe(next,'cost_id');toast(`💸 지급 대사: ${cMatches.length}건 자동 확인`);}
     else toast('지급 대사 저장 실패',true);
   }
-  renderRecon(matches.length,cMatches.length);
+  // ── v2.9.41: 고정비 지급 대사(매입 지급 대사와 동일 원칙, 사용자 확정) — 세금계산서 수취 항목만
+  // amount+vat_amt(부가세 포함 실지급액), 미수취 항목은 amount 그대로가 실제 지급액. 매입처럼
+  // 발행/수취 개념이 없으므로 "이미 대사되지 않은 모든 고정비 계획"이 대상.
+  const foutS=parsedTxns.filter(t=>t.cat==='고정비'&&t.outAmt>0);
+  const fixedEligible=()=>planFix.filter(f=>!f.pay_actual_date);
+  unmatchedFix=[]; const fMatches=[];
+  const usedF=new Set();
+  const usedTxnF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean));
+  foutS.forEach(t=>{
+    if(t.txnId&&usedTxnF.has(t.txnId)){return;}
+    const cands=fixedEligible().filter(f=>!usedF.has(f.fixed_id)
+      &&Math.abs((f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0))-t.outAmt)<=1000
+      &&f.payment_date&&Math.abs(dDiff(f.payment_date,t.date))<=45);
+    if(cands.length===1){usedF.add(cands[0].fixed_id);fMatches.push([t,cands[0]]);}
+    else unmatchedFix.push(t);
+  });
+  if(fMatches.length){
+    const next=planFix.map(f=>{const m=fMatches.find(x=>x[1].fixed_id===f.fixed_id);
+      return m?{...f,pay_actual_date:m[0].date,matched_txn_id:m[0].txnId||''}:f;});
+    const ok=await saveS06(next);
+    if(ok){planFix=dedupe(next,'fixed_id');toast(`🏢 고정비 대사: ${fMatches.length}건 자동 확인`);}
+    else toast('고정비 대사 저장 실패',true);
+  }
+  renderRecon(matches.length,cMatches.length,fMatches.length);
   renderAging();
 }
 function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 화면 상시 재구성
   if(!detailAll.length) return;
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
+  const mF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean)); // v2.9.41
   unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:num(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
+  unmatchedFix=detailAll.filter(t=>t.category==='고정비'&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+    .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
+  initFixCompareSelectors(); renderFixCompareItems();
 }
 // v2.5.7: 수동 매칭 후보 — 금액 일치(±1,000)는 날짜·건수 제한 없이 전부, 수금/지급예정일 오래된 순(선입 소진). 라벨에 연월·금액 표기(동액 다건 구분)
 function _cands(list,amt){
@@ -1031,16 +1343,23 @@ function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.match
   return _cands(open,t.inAmt).map(c=>`<button onclick="quickPick('mr_${i}','${c.id}')" title="수금예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt);color:var(--blue);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
 function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&!c.matched_txn_id).map(c=>({id:c.cost_id,a:Math.round((num(c.amount)||0)*1.1),d:c.payment_date,ym:c.year_month}));
   return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mc_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber-lt);color:var(--amber);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
+// v2.9.41: 고정비 대사 후보(매입 대사와 동일 패턴) — 세금계산서 수취 항목은 amount+vat_amt, 미수취는 amount 그대로.
+function fixCands(t,i){const open=planFix.filter(f=>!f.pay_actual_date&&!f.matched_txn_id).map(f=>({id:f.fixed_id,a:f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0),d:f.payment_date,ym:f.year_month,cat:f.category}));
+  return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mf_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--text2);background:var(--bg2,#F3F4F6);color:var(--text2);cursor:pointer">👍 ${c.ym} ${c.cat||''} ${won(c.a)}</button>`).join(' ');}
 function quickPick(sel,val){const el=document.getElementById(sel);if(el)el.value=val;}
 async function saveReclass(){
   let n=0;
-  document.querySelectorAll('[id^=rc_]').forEach(el=>{const t=detailAll.find(x=>x.txn_id===el.dataset.tid);
+  // v2.9.47: 미분류 재지정 목록(id="rc_...")과 CSV 거래 내역 팝업(id="rct_...") 양쪽의 드롭다운을
+  // 모두 훑어 저장 — 두 UI 모두 [id^=rc_]로 매치되는 문제를 피하기 위해 접두사를 명시적으로 분리.
+  document.querySelectorAll('[id^="rc_"], [id^="rct_"]').forEach(el=>{const t=detailAll.find(x=>x.txn_id===el.dataset.tid);
     if(t&&el.value&&el.value!==t.category){t.category=el.value;n++;}});
   if(!n){toast('변경된 분류가 없습니다');return;}
   const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
   const ok=await clearAndWrite(...W.S08_DETAIL,[H,...rowsFor(H,detailAll)]);
   toast(ok?`분류 재지정 ${n}건 저장 ✓`:'저장 실패',!ok);
-  if(ok) rebuildRecon();
+  if(ok){ rebuildRecon(); if(document.getElementById('txModal').classList.contains('open')) renderTx(); }
+  // v2.9.47: CSV 팝업이 열려 있으면 저장된 새 분류로 팝업 내용도 다시 그려 드롭다운 선택값이
+  // 최신 상태를 반영하도록 함(닫혀 있으면 불필요한 렌더를 건너뜀).
 }
 function openTxModal(){
   const yms=[...new Set(detailAll.map(t=>t.year_month).filter(Boolean))].sort();
@@ -1060,30 +1379,49 @@ function renderTx(){
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
   const list=detailAll.filter(t=>(!m||t.year_month===m)&&(!ty||t.category===ty));
-  if(txMode==='sum'){ // v2.2: 유형별 집계 (월 필터 적용)
+  const body=document.getElementById('txBody');
+  if(txMode==='sum'){ // v2.2: 유형별 집계 (월 필터 적용) — 긴 텍스트 컬럼이 없어 표 형태 유지
     const agg={};
     list.forEach(t=>{const c=t.category||'미분류'; const a=agg[c]=agg[c]||{n:0,i:0,o:0};
       a.n++; a.i+=num(t.inflow_amt)||0; a.o+=num(t.outflow_amt)||0;});
     const rows=Object.entries(agg).sort((x,y)=>(y[1].o+y[1].i)-(x[1].o+x[1].i));
     const ti=rows.reduce((s,[,a])=>s+a.i,0), to=rows.reduce((s,[,a])=>s+a.o,0), tn=rows.reduce((s,[,a])=>s+a.n,0);
-    document.getElementById('txBody').innerHTML=(rows.length?rows.map(([c,a])=>`
-      <tr><td colspan="2" style="padding:6px 5px"><b>${c}</b></td>
+    body.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">`+(rows.length?rows.map(([c,a])=>`
+      <tr><td colspan="2" style="padding:6px 5px">${c}</td>
       <td style="text-align:right;color:var(--green)">${a.i?won(a.i):''}</td>
       <td style="text-align:right;color:var(--red)">${a.o?won(a.o):''}</td>
-      <td style="text-align:center;color:var(--text3)">${a.n}건</td><td></td></tr>`).join('')
+      <td style="text-align:center;color:var(--text3)">${a.n}건</td></tr>`).join('')
       +`<tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="2" style="padding:7px 5px">합계</td>
       <td style="text-align:right;color:var(--green)">${won(ti)}</td><td style="text-align:right;color:var(--red)">${won(to)}</td>
-      <td style="text-align:center">${tn}건</td><td></td></tr>`
-      :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>');
+      <td style="text-align:center">${tn}건</td></tr>`
+      :'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>')+`</table></div>`;
     return;
   }
-  document.getElementById('txBody').innerHTML=list.length?list.map(t=>{
+  // v2.9.49: 근본 재설계(사용자 지적 — 6컬럼 표는 모바일 폭에 "고정비"·"기타 지급(세금계산서)"
+  // 같은 유형명을 담을 여유가 없어 드롭다운 텍스트가 잘렸다). 기존 "미분류·기타 재지정" 섹션과
+  // 동일한 카드형 레이아웃(정보 줄 + 유형 드롭다운을 전체 폭 별도 줄로)으로 전면 재설계 — 어떤
+  // 길이의 유형명도 잘리지 않고 표시된다. id 접두사를 "rct_"로 분리해, 같은 거래가 미분류 재지정
+  // 목록에도 동시에 떠 있을 때 [id^=rc_] 중복 매치로 값이 서로 덮어쓰이는 것을 방지 — saveReclass()
+  // 쪽에서 두 접두사를 모두 훑도록 별도 확장(v2.9.47).
+  body.innerHTML=list.length?list.map(t=>{
     const st=mR.has(t.txn_id)?'수금매칭':(mC.has(t.txn_id)?'지급매칭':'');
-    return `<tr><td>${t.txn_date}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${t.description||t.recv||''}</td>
-    <td style="text-align:right;color:var(--green)">${(num(t.inflow_amt)||0)?won(t.inflow_amt):''}</td>
-    <td style="text-align:right;color:var(--red)">${(num(t.outflow_amt)||0)?won(t.outflow_amt):''}</td>
-    <td>${t.category||'미분류'}</td><td style="color:var(--blue);font-size:11px">${st}</td></tr>`;}).join('')
-   :'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</td></tr>';
+    const desc=t.description||t.recv||'';
+    const amt=won(num(t.inflow_amt)||num(t.outflow_amt)||0);
+    const amtColor=(num(t.inflow_amt)||0)?'var(--green)':'var(--red)';
+    const badge=st?`<span style="display:inline-block;padding:2px 6px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-lt,#EFF6FF);color:var(--blue);white-space:nowrap;margin-left:6px">${st==='수금매칭'?'수금매칭':'지급매칭'}</span>`:'';
+    return `<div style="padding:8px 2px;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+        <span style="color:var(--text3);font-size:11px;white-space:nowrap">${String(t.txn_date||'').slice(0,10)}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</span>
+        <b style="color:${amtColor};white-space:nowrap">${amt}</b>${badge}
+      </div>
+      <div style="margin-top:5px">
+        <select id="rct_${t.txn_id}" data-tid="${t.txn_id}" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface)">
+          <option value="">${t.category||'미분류'}</option>
+          ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </div></div>`;}).join('')
+   :'<div style="text-align:center;color:var(--text3);padding:14px">해당 거래 없음</div>';
 }
 async function manualMatchCost(i){
   const t=unmatchedOut[i]; const cid=document.getElementById('mc_'+i).value;
@@ -1092,6 +1430,16 @@ async function manualMatchCost(i){
   const next=s05All.map(c=>c.cost_id===cid?{...c,pay_actual_date:t.date,matched_txn_id:t.txnId||''}:c);
   const ok=await saveS05(next);
   if(ok){s05All=dedupe(next,'cost_id');unmatchedOut.splice(i,1);toast('지급 수동 매칭 ✓');renderRecon();renderAging();}
+  else toast('저장 실패',true);
+}
+// v2.9.41: 고정비 수동 매칭(매입 수동 매칭과 동일 패턴)
+async function manualMatchFix(i){
+  const t=unmatchedFix[i]; const fid=document.getElementById('mf_'+i).value;
+  if(!fid){toast('고정비 항목을 선택하세요',true);return;}
+  if(t.txnId&&planFix.some(f=>f.matched_txn_id===t.txnId)){toast('이 출금은 이미 다른 고정비 건에 매칭되어 있습니다. 먼저 [지급 해제]하세요.',true);return;}
+  const next=planFix.map(f=>f.fixed_id===fid?{...f,pay_actual_date:t.date,matched_txn_id:t.txnId||''}:f);
+  const ok=await saveS06(next);
+  if(ok){planFix=dedupe(next,'fixed_id');unmatchedFix.splice(i,1);toast('고정비 수동 매칭 ✓');renderRecon();renderAging();}
   else toast('저장 실패',true);
 }
 // v2.5.8: 매칭 불변식 감사 — 하나의 거래ID는 청구 1건에만. 중복(과거 오염) 검출·정리
@@ -1161,12 +1509,12 @@ async function fixDupMatches(){
     toast('중복 매칭 정리 완료 ✓'); renderDupAudit(); renderRecon(); renderAging(); }
   else toast('정리 저장 실패 — 데이터 변경 없음',true);
 }
-function renderRecon(autoCnt,costCnt){
+function renderRecon(autoCnt,costCnt,fixCnt){
   const card=document.getElementById('reconCard');
   const openRows=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id).sort((a,b)=>String(a.cash_recv_date||'9999').localeCompare(String(b.cash_recv_date||'9999')));
   card.style.display='block';
   renderDupAudit();
-  document.getElementById('reconSummary').textContent=`수금 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건 | 지급 매칭 ${costCnt||0}건 · 미매칭 출금 ${unmatchedOut.length}건`;
+  document.getElementById('reconSummary').textContent=`수금 매칭 ${autoCnt||0}건 · 미매칭 입금 ${unmatchedDep.length}건 | 지급 매칭 ${costCnt||0}건 · 미매칭 출금 ${unmatchedOut.length}건 | 고정비 매칭 ${fixCnt||0}건 · 미매칭 ${unmatchedFix.length}건`;
   document.getElementById('reconUnmatched').innerHTML=unmatchedDep.length?unmatchedDep.map((t,i)=>`
     <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
       <span style="flex:1;min-width:150px">${t.date} <b>${(t.inAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
@@ -1185,6 +1533,17 @@ function renderRecon(autoCnt,costCnt){
         ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((num(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
       </select>
       ${costCands(t,i)} <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
+    </div>`).join('')):'';
+  // v2.9.41: 고정비 미매칭 출금(매입지급과 동일 UI 패턴, 사용자 확정 — 고정비도 통장 대사 대상)
+  const eligF=planFix.filter(f=>!f.pay_actual_date&&!f.matched_txn_id).sort((a,b)=>String(a.payment_date||'9999').localeCompare(String(b.payment_date||'9999')));
+  document.getElementById('reconUnmatched').innerHTML+=unmatchedFix.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미매칭 출금 (고정비 분류)</div>'+unmatchedFix.map((t,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
+      <span style="flex:1;min-width:150px">${t.date} <b>${(t.outAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
+      <select id="mf_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
+        <option value="">고정비 계획 선택…</option>
+        ${eligF.map(f=>`<option value="${f.fixed_id}">${f.year_month} ${f.category} ${(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0)).toLocaleString()}원</option>`).join('')}
+      </select>
+      ${fixCands(t,i)} <button onclick="manualMatchFix(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--text2);color:#fff;cursor:pointer">매칭</button>
     </div>`).join('')):'';
   // v1.2(#13): 미분류·기타 재지정 (상시)
   const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);
@@ -1272,8 +1631,9 @@ async function recalcEstimate(){
         const sellM=Math.round(un2(p.contract_amount)*1.1*pr/100/ms.length);
         inf2+=sellM; out2+=Math.round(sellM*estRatio(p));
       });
+      // v2.9.43: 위와 동일한 결함(계산서없음 매입에 무조건 ×1.1) — 추정 재계산 로직에서도 수정.
       const outCost=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===m)
-        .reduce((s,c)=>s+Math.round((num(c.amount)||0)*1.1),0);
+        .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0);
       const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(num(f.amount)||0),0);
       const vat=vatRows.filter(v=>(v.due_date||'').slice(0,7)===m)
         .reduce((s,v)=>s+(num(v.actual_payment)||num(v.estimated_payment)||0),0);
@@ -1287,7 +1647,7 @@ async function recalcEstimate(){
     if(ok){
       const er=await fetchSheet(...R.S02); estData=toObj(er);
       document.getElementById('recalcInfo').textContent=`마지막 재계산 ${today} (${weighted?'확도가중 ON':'확정분만'})`;
-      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderStaleEstBanner();
+      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderFixCompareItems(); renderStaleEstBanner();
     } else toast('재계산 저장 실패',true);
   }catch(e){toast('재계산 오류: '+e.message,true);}
   btn.disabled=false;btn.textContent='추정 재계산 실행';
