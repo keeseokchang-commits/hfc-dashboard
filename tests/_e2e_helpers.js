@@ -36,7 +36,7 @@ async function openPage(root, _portIgnored, htmlFile, sheetData, opts = {}) {
     beforeParse(w) {
       w.confirm = opts.confirm || (() => true);
       w.HTMLElement.prototype.scrollIntoView = function () {};
-      w.fetch = async (u, o) => {
+      const defaultFetch = async (u, o) => {
         const us = String(u);
         if (o && o.method === 'PUT') {
           const key = Object.keys(sheetData).find(k => us.includes(k));
@@ -47,6 +47,17 @@ async function openPage(root, _portIgnored, htmlFile, sheetData, opts = {}) {
         const key = Object.keys(sheetData).find(k => us.includes(k));
         return { ok: true, json: async () => ({ values: key ? sheetData[key] : [[]] }) };
       };
+      // fetchFailFor: 이 문자열을 포함하는 GET(비-PUT/POST) 요청만 실패(400)시켜 fetchSheetSafe가
+      // null을 반환하는 상황(읽기 실패)을 재현 — beforeParse 시점부터 적용되어야 loadAll()에서도 반영됨.
+      w.fetch = opts.fetchFailFor
+        ? async (u, o) => {
+            const us = String(u);
+            if (us.includes(opts.fetchFailFor) && !(o && (o.method === 'PUT' || o.method === 'POST'))) {
+              throw new Error('오류 400: 시뮬레이션(' + opts.fetchFailFor + ')');
+            }
+            return defaultFetch(u, o);
+          }
+        : defaultFetch;
       w.google = { accounts: { oauth2: { initTokenClient: () => ({ requestAccessToken() {} }) } } };
       if (opts.Chart) w.Chart = Object.assign(function () { return { destroy() {}, update() {} }; }, { register: () => {} });
     }
