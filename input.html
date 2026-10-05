@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.62">
+<link rel="stylesheet" href="css/common.css?v=2.9.65">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -107,6 +107,7 @@
       <div class="list-toolbar">
         <select id="revStFilter" onchange="renderLists()"><option value="">전체 상태</option><option>발행대기</option><option>발행완료</option><option>입금완료</option></select>
         <select id="revYearFilter" onchange="renderLists()"><option value="">전체 연도</option></select>
+        <select id="revMonthFilter" onchange="renderLists()"><option value="">전체 월</option></select>
         <select id="revPrjFilter" class="tb-grow" onchange="renderLists()"><option value="">전체 프로젝트</option></select>
         <button class="tb-reset" onclick="resetFilters('rev')">필터 초기화</button>
       </div>
@@ -120,6 +121,7 @@
       <div class="list-toolbar">
         <select id="costStFilter" onchange="renderLists()"><option value="">전체 상태</option><option>수취대기</option><option>수취완료</option><option>지급완료</option></select>
         <select id="costYearFilter" onchange="renderLists()"><option value="">전체 연도</option></select>
+        <select id="costMonthFilter" onchange="renderLists()"><option value="">전체 월</option></select>
         <select id="costPrjFilter" class="tb-grow" onchange="renderLists()"><option value="">전체 프로젝트</option></select>
         <button class="tb-reset" onclick="resetFilters('cost')">필터 초기화</button>
       </div>
@@ -212,7 +214,7 @@
   </div>
 </div>
 
-<!-- v2.9.62: 매출 발행/매입 수취 개별 건의 날짜·금액·메모 직접 수정 팝업 신설(사용자 지적 —
+<!-- v2.9.64: 매출 발행/매입 수취 개별 건의 날짜·금액·메모 직접 수정 팝업 신설(사용자 지적 —
      "세금계산서 관리에서 해당 스케줄건의 날짜 정보를 바꾸는 기능이 없어"). v2.9.35에서 개별
      입력 폼(saveRev/saveCost)이 삭제된 뒤, "청구 스케줄 생성"으로 전체 재계산하거나 상태만
      바꾸는 버튼(발행완료·발행취소·입금해제 등)만 남아 개별 건의 예정일 하나만 미루는 방법이
@@ -241,10 +243,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.62"></script>
-<script src="js/common.js?v=2.9.62"></script>
-<script src="js/calc.js?v=2.9.62"></script>
-<script src="js/nav.js?v=2.9.62"></script>
+<script src="js/schema.js?v=2.9.65"></script>
+<script src="js/common.js?v=2.9.65"></script>
+<script src="js/calc.js?v=2.9.65"></script>
+<script src="js/nav.js?v=2.9.65"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -297,11 +299,17 @@ function fillPrjFilters(){
   ['revYearFilter','costYearFilter'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;
     el.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
     if([...el.options].some(o=>o.value===v))el.value=v;});
+  // v2.9.64(사용자 요청, 2026-09-30): "검색 필터에 월 추가 — 해당월의 계산서 발행 및 수취여부를
+  // 확인해보려는 목적". 월은 1~12 고정 옵션(연도처럼 실데이터에서 뽑지 않음 — 특정 연도에 존재하지
+  // 않는 월도 다른 연도 선택 시 바로 쓸 수 있어야 하므로).
+  const monthOpts='<option value="">전체 월</option>'+Array.from({length:12},(_,i)=>pad2(i+1)).map(m=>`<option value="${m}">${parseInt(m)}월</option>`).join('');
+  ['revMonthFilter','costMonthFilter'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;
+    el.innerHTML=monthOpts; if([...el.options].some(o=>o.value===v))el.value=v;});
   const opts='<option value="">전체 프로젝트</option>'+financePrjs.map(p=>`<option value="${p.project_id}">${p.project_name||p.project_id}</option>`).join('');
   ['revPrjFilter','costPrjFilter'].forEach(id=>{const el=document.getElementById(id);const v=el.value;el.innerHTML=opts;
     if([...el.options].some(o=>o.value===v))el.value=v;});
 }
-function resetFilters(p){['StFilter','YearFilter','PrjFilter'].forEach(k=>{const el=document.getElementById(p+k);if(el)el.value='';});renderLists();}
+function resetFilters(p){['StFilter','YearFilter','MonthFilter','PrjFilter'].forEach(k=>{const el=document.getElementById(p+k);if(el)el.value='';});renderLists();}
 // v2.9.32: UI 표준(매출·매입 대칭) — S04.memo에 인코딩된 유형·항목명·단가·MM을 안전하게 분해.
 // 청구 스케줄 자동생성 등 이 포맷이 아닌 기존 memo(순수 텍스트)는 그대로 note로만 취급(하위호환).
 function decodeRevMemo(memo){
@@ -312,11 +320,13 @@ function decodeRevMemo(memo){
 function renderLists(){
   const okIds=new Set(financePrjs.map(p=>p.project_id));
   const gv=id=>(document.getElementById(id)||{}).value||'';
-  const ry=gv('revYearFilter'), rf=gv('revPrjFilter'), rst=gv('revStFilter');
-  const cy=gv('costYearFilter'), cf=gv('costPrjFilter'), cst=gv('costStFilter');
+  const ry=gv('revYearFilter'), rm=gv('revMonthFilter'), rf=gv('revPrjFilter'), rst=gv('revStFilter');
+  const cy=gv('costYearFilter'), cm=gv('costMonthFilter'), cf=gv('costPrjFilter'), cst=gv('costStFilter');
   const revSt=r=>r.is_received==='Y'?'입금완료':(r.invoice_date?'발행완료':'발행대기');
   const costSt=c=>c.pay_actual_date?'지급완료':(c.invoice_date?'수취완료':'수취대기');
-  const rv=revenues.filter(r=>r.revenue_id&&okIds.has(r.project_id)&&(!ry||(r.year_month||'').startsWith(ry))&&(!rf||r.project_id===rf)&&(!rst||revSt(r)===rst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  // v2.9.64: 월 필터는 연도 필터와 독립적으로 조합 가능 — 연도 미선택+월만 선택 시 "모든 연도의
+  // 그 달"(예: 9월)을, 연도+월 모두 선택 시 특정 연월(예: 2026년 9월)만 좁혀서 보여준다.
+  const rv=revenues.filter(r=>r.revenue_id&&okIds.has(r.project_id)&&(!ry||(r.year_month||'').startsWith(ry))&&(!rm||(r.year_month||'').slice(5,7)===rm)&&(!rf||r.project_id===rf)&&(!rst||revSt(r)===rst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('rev_cnt').textContent=`(${rv.length}건)`;
   document.getElementById('rev_list').innerHTML=rv.length?rv.map(r=>{
     const st=r.is_received==='Y'?['badge-on','입금완료']:(r.invoice_date?['badge-on','발행완료·수금대기']:['badge-hold','발행예정']);
@@ -340,7 +350,7 @@ function renderLists(){
   // invoice_plan_date(발행/수취 예정일)는 세금계산서형 매입에서만 채워진다(계산서없음은 공란) —
   // vat_amt로 판별하면 면세 등 실제로 0원인 세금계산서형 케이스를 오판할 위험이 있어 이 필드를 쓴다.
   const isInvoiceCost=c=>!!c.invoice_plan_date||!!c.invoice_date;
-  const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&isInvoiceCost(c)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
+  const cs=costs.filter(c=>c.cost_id&&okIds.has(c.project_id)&&isInvoiceCost(c)&&(!cy||(c.year_month||'').startsWith(cy))&&(!cm||(c.year_month||'').slice(5,7)===cm)&&(!cf||c.project_id===cf)&&(!cst||costSt(c)===cst)).sort((a,b)=>(b.year_month||'').localeCompare(a.year_month||''));
   document.getElementById('cost_cnt').textContent=`(${cs.length}건)`;
   document.getElementById('cost_list').innerHTML=cs.length?cs.map(c=>{
     const st=c.pay_actual_date?['badge-on','지급완료']:(c.invoice_date?['badge-on','수취완료']:['badge-hold','수취예정']);
@@ -510,21 +520,25 @@ function buildGen(){
     ensureMsRows(c); msCalc();
   } else {
     document.getElementById('msArea').style.display='none';
-    const revBase=(document.querySelector('input[name=genRevBase]:checked')||{}).value||'contract';
-    // ── 매출: 견적 항목 기간 기반 월별 합산 (v2.4 보정) ──
+    // ── 매출: 프로젝트 계약기간(c.start~c.end) 기준 캘린더 월 안분 ──
+    // v2.9.64(사용자 확정, 2026-09-29): "매출과 매입의 기간은 일치하지 않아도 된다. 기간은 달라도
+    // 매출 합계 금액이 맞으면 된다. 매출 청구는 프로젝트 기간으로 안분해야 하고 매입 청구는 견적에
+    // 기재된 내용으로 배정되어야 한다"는 지적에 따라 재설계. 이전(v2.4~v2.9.32)에는 견적이 있으면
+    // 매출도 견적 인건비 각 항목의 개별 시작·종료일(monthlyProfile)을 따라갔는데, 이는 매입(인력
+    // 투입 일정)에는 맞는 기준이지만 매출(고객에게 청구하는 금액)에는 맞지 않는 기준이었다 — 실제
+    // 사례(부산은행, PRJ-2026-007)에서 인건비 5개 항목의 기간을 다 합쳐도 계약기간(9/3~4/2)의 마지막
+    // 달(4월)을 못 채워서, 매출 청구 스케줄이 7건만 생성되고 8번째(4월분)가 통째로 누락되는 결함으로
+    // 이어졌다. 매출은 이제 견적 유무와 무관하게 항상 프로젝트 계약기간(c.start~c.end)을 캘린더 월로
+    // 안분(ymList)한다 — 총액(c.revAmt, genCtx에서 이미 견적 매출 합계·계약금액 중 라디오 선택에 따라
+    // 확정되어 넘어옴)은 그대로 정확히 나눠 담기되, 어떤 인력이 몇 달 일했는지와 무관하게 계약기간
+    // 전체가 청구 대상이 된다. 매입은 이 변경과 무관하게 기존 그대로(견적 각 인력의 실제 투입 기간
+    // 기준, monthlyProfile) 유지.
     genRows=[];
     if(document.getElementById('genDoRev').checked&&c.revAmt){
       // v2.9.32: UI 표준(매출·매입 대칭) — 매입 미리보기의 "항목" 컬럼과 동일하게 매출도 항목명을 유지.
-      if(c.hasEst){
-        const sellByM=monthlyProfile(c.items,'unit_price',c.start,c.end);
-        // 견적 기준=프로파일 그대로 / 계약금액 기준=프로파일 패턴 유지+계약금액 스케일
-        genRows=profileToRows(sellByM, revBase==='est'?c.eSell:c.amt)
-          .map(r=>({plan:r.plan,name:r.name.replace('합산','매출 합산'),supply:r.supply,recv:r.recv}));
-      } else {
-        const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
-        genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.revAmt-acc:cut100(c.revAmt*x.w/totW);acc+=sup;
-          const plan=lastDayStr(x.y,x.m);return {plan,name:`${x.y}-${pad2(x.m)} 매출 합산`,supply:sup,recv:recvDue(plan)};});
-      }
+      const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
+      genRows=ms.map((x,i)=>{let sup=(i===ms.length-1)?c.revAmt-acc:cut100(c.revAmt*x.w/totW);acc+=sup;
+        const plan=lastDayStr(x.y,x.m);return {plan,name:`${x.y}-${pad2(x.m)} 매출 합산`,supply:sup,recv:recvDue(plan)};});
     }
     // ── 매입: 견적 있으면 항목 기간 기반 정밀 분배, 직접입력이면 기간 균등 분배(매출의 견적없음 경로와 동일 방식) ──
     // v2.9.36: "청구 스케줄 생성"은 세금계산서형 매입만 만든다(사용자 확정) — 계산서없음(사업소득형·
@@ -763,7 +777,7 @@ async function markScheduleChanged(){
     await clearAndWrite(...W.S10,[HEADERS.S10,...rowsFor(HEADERS.S10,next)]);
   }catch(e){ /* 부가 정보라 실패해도 본 저장 흐름에 영향 없음 — 단, 절대 데이터를 밀어쓰지 않는다 */ }
 }
-// v2.9.62: 매출 청구 건 개별 수정(발행예정일·수금예정일·공급가액·메모) — 사용자 지적("세금계산서
+// v2.9.64: 매출 청구 건 개별 수정(발행예정일·수금예정일·공급가액·메모) — 사용자 지적("세금계산서
 // 관리에서 해당 스케줄건의 날짜 정보를 바꾸는 기능이 없어")으로 신설. "청구 스케줄 생성"은 계약
 // 조건 전체를 다시 계산해 회차를 통째로 재생성하므로, 중도금 하나만 늦추는 것처럼 한 건의 날짜만
 // 조정하고 싶을 때는 오히려 다른 회차까지 건드릴 위험이 있다 — 이 팝업은 딱 그 건 하나만 고친다.
@@ -811,7 +825,7 @@ async function saveRevEdit(){
   if(ok){revenues=dedupe(next,'revenue_id');toast('✓ 수정 완료');closeRevEdit();renderLists();await markScheduleChanged();}
   else toast('저장 실패',true);
 }
-// v2.9.62: 매입 청구 건 개별 수정 — 매출과 대칭(위 주석 참고). 지급 완료(pay_actual_date 있음)
+// v2.9.64: 매입 청구 건 개별 수정 — 매출과 대칭(위 주석 참고). 지급 완료(pay_actual_date 있음)
 // 건은 실제 지급 사실이 바뀌면 안 되므로 날짜·금액을 잠그고 메모만 허용한다.
 let editingCostId=null;
 function openCostEdit(id){

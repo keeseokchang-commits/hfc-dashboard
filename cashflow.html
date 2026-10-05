@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.62">
+<link rel="stylesheet" href="css/common.css?v=2.9.65">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -361,10 +361,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.62"></script>
-<script src="js/common.js?v=2.9.62"></script>
-<script src="js/calc.js?v=2.9.62"></script>
-<script src="js/nav.js?v=2.9.62"></script>
+<script src="js/schema.js?v=2.9.65"></script>
+<script src="js/common.js?v=2.9.65"></script>
+<script src="js/calc.js?v=2.9.65"></script>
+<script src="js/nav.js?v=2.9.65"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1235,6 +1235,19 @@ function renderVatBanner(){
 }
 
 // ═══ 통장 대사 엔진 (v2.3 §5) ═══
+// v2.9.65: 매칭 0건 결함(사용자 신고) — 원인은 코드관리(①거래유형&키워드)에 등록한 유형명(setting_key)이
+// 하드코딩 canonical 문자열과 표기만 다를 때(예: "매출 입금"/"매입 지급" — 공백 포함. 실가입 데이터로 확인:
+// 매출 입금 키워드="이노라인,비플레이스,아시아나아이디티", 매입 지급 키워드="오벳소프트,김기황") classify()가
+// 그 표기 그대로를 t.cat/t.category에 저장하는데, 이 함수들 아래 매칭 로직은 '매출입금'/'매입지급'(공백 없음)
+// 리터럴과 엄격 일치(===)만 검사해 단 1건도 걸리지 않았다 — 9월 CSV에 (주)이노라인 25,591,500원 입금,
+// (주)오벳소프트 24,200,500원 출금이 미수금/미지급 Aging과 사실상 정확히 일치하는데도 대사 후보에
+// 아예 들어가지 못한 것으로 실데이터 확인. 같은 문제를 월별 실적 집계(deriveActFromDetail)는 이미
+// bucketOf()(v2.9.45 — s10의 setting_key→description 매핑으로 사용자 등록 표기를 canonical로 환산)로
+// 올바르게 피해가고 있었는데, 대사 엔진(reconcile/rebuildRecon)만 그 SSOT를 재사용하지 않고 직접
+// 리터럴 비교를 중복 구현한 것이 근본 원인(PRINCIPLES.md #49와 동일한 유형의 SSOT 분기 결함).
+// isCat()으로 두 함수 모두 bucketOf()를 거치도록 통일 — 코드관리에 등록이 없어 하드코딩 폴백이 그대로
+// canonical 문자열을 반환하는 기존 케이스(raw===canon)도 그대로 보존되어 회귀 없음.
+function isCat(raw,canon){ return raw===canon || bucketOf(raw)===canon; }
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
@@ -1253,7 +1266,7 @@ async function saveS06(next){
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
   // v2.4.2 보수 원칙(매입과 대칭): 발행 완료 건만 · 후보 정확히 1건일 때만 자동 · 사용된 거래ID 재매칭 금지
-  const deps=parsedTxns.filter(t=>t.cat==='매출입금'&&t.inAmt>0);
+  const deps=parsedTxns.filter(t=>isCat(t.cat,'매출입금')&&t.inAmt>0);
   const usedTxnR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const open=s04All.filter(r=>r.is_received!=='Y'&&r.invoice_date);
   const used=new Set(); unmatchedDep=[]; const matches=[];
@@ -1273,7 +1286,7 @@ async function reconcile(){
     else toast('대사 결과 저장 실패',true);
   }
   // ── 매입 지급 대사 (승인 범위: 재무 프로젝트 + 세금계산서 수취완료 건만 · 후보 1건일 때만 자동) ──
-  const outs=parsedTxns.filter(t=>t.cat==='매입지급'&&t.outAmt>0);
+  const outs=parsedTxns.filter(t=>isCat(t.cat,'매입지급')&&t.outAmt>0);
   const eligible=()=>s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
   unmatchedOut=[]; const cMatches=[];
   const usedC=new Set();
@@ -1296,7 +1309,7 @@ async function reconcile(){
   // ── v2.9.41: 고정비 지급 대사(매입 지급 대사와 동일 원칙, 사용자 확정) — 세금계산서 수취 항목만
   // amount+vat_amt(부가세 포함 실지급액), 미수취 항목은 amount 그대로가 실제 지급액. 매입처럼
   // 발행/수취 개념이 없으므로 "이미 대사되지 않은 모든 고정비 계획"이 대상.
-  const foutS=parsedTxns.filter(t=>t.cat==='고정비'&&t.outAmt>0);
+  const foutS=parsedTxns.filter(t=>isCat(t.cat,'고정비')&&t.outAmt>0);
   const fixedEligible=()=>planFix.filter(f=>!f.pay_actual_date);
   unmatchedFix=[]; const fMatches=[];
   const usedF=new Set();
@@ -1324,11 +1337,11 @@ function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 �
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
   const mF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean)); // v2.9.41
-  unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
+  unmatchedDep=detailAll.filter(t=>isCat(t.category,'매출입금')&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:num(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+  unmatchedOut=detailAll.filter(t=>isCat(t.category,'매입지급')&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedFix=detailAll.filter(t=>t.category==='고정비'&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+  unmatchedFix=detailAll.filter(t=>isCat(t.category,'고정비')&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
