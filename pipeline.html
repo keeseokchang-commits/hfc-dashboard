@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.67">
+<link rel="stylesheet" href="css/common.css?v=2.9.68">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -241,10 +241,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.67"></script>
-<script src="js/common.js?v=2.9.67"></script>
-<script src="js/calc.js?v=2.9.67"></script>
-<script src="js/nav.js?v=2.9.67"></script>
+<script src="js/schema.js?v=2.9.68"></script>
+<script src="js/common.js?v=2.9.68"></script>
+<script src="js/calc.js?v=2.9.68"></script>
+<script src="js/nav.js?v=2.9.68"></script>
 <script>
 let opps=[];
 let currentFilter='전체';
@@ -454,7 +454,7 @@ function openTransition(idx,targetStatus){
   document.getElementById('formModal').classList.add('open');
 }
 
-function openDrop(idx){
+async function openDrop(idx){
   const o=opps[idx];
   const choice=prompt(`"${o.opportunity}"\n\n포기 또는 실주 중 선택하세요.\n1: 포기 (자체 판단으로 중단)\n2: 실주 (경쟁 실패)\n\n번호 입력:`);
   if(choice!=='1'&&choice!=='2') return;
@@ -462,7 +462,16 @@ function openDrop(idx){
   const reason=prompt(`${status} 사유를 입력하세요:`)||'';
   o.status=status;
   o.memo=(o.memo?o.memo+' | ':'')+`${status}: ${reason}`;
-  saveAll(`${status} 처리 완료`);
+  const ok=await saveAll(`${status} 처리 완료`);
+  // v2.9.68(사용자 지적 — 데이터 무결성): 카드의 "포기/실주" 버튼(가장 많이 쓰이는 실제 경로)은
+  // saveOpp()의 전환 처리 블록을 전혀 거치지 않고 이 함수에서 바로 saveAll()만 호출하고 끝났다.
+  // 그 결과 v2.4부터 있던 계획 스케줄 정리(cleanupSchedules)도, 이번에 추가한 연결 프로젝트
+  // status 동기화(syncProjectStatusOnAbandon)도 실제로는 한 번도 실행되지 않고 있었다 —
+  // PRJ-2026-005가 "수주"에 멈춰 있던 것도 바로 이 경로(버튼 클릭)로 포기 처리됐기 때문일 가능성이 높다.
+  if(ok){
+    await cleanupSchedules(o.pipeline_id,status);
+    await syncProjectStatusOnAbandon(o.pipeline_id,status);
+  }
 }
 
 function closeForm(){
@@ -565,7 +574,13 @@ async function saveOpp(){
     }catch(e){}
   }
   if(ok && ['포기','실주'].includes(status)){ // v2.4: 포기·실주 전환 시 미발행 계획 스케줄 삭제(발행·완료 건 보존)
-    await cleanupSchedules(id||opps[opps.length-1].pipeline_id,status);
+    const plId2=id||opps[opps.length-1].pipeline_id;
+    await cleanupSchedules(plId2,status);
+    // v2.9.68(사용자 지적 — 데이터 무결성): 포기·실주 전환 시 ensureProject()가 호출되지 않아
+    // 이미 연결된 S03_PROJECT 행의 status가 과거 값("수주" 등)에 영구히 멈춰 있던 결함.
+    // 새 프로젝트를 만들지는 않고(포기된 기회에 프로젝트를 새로 만들 이유가 없음), 이미 연결된
+    // 프로젝트 행이 있을 때만 그 status를 파이프라인과 동일하게 맞춘다.
+    await syncProjectStatusOnAbandon(plId2,status);
   }
   if(ok && ['확정','수주','계약','종료'].includes(status)){  // v1.2(#7): 확정 단계부터 프로젝트 생성
     const plId=id||opps[opps.length-1].pipeline_id;
@@ -607,6 +622,26 @@ async function cleanupSchedules(plId,status){
     try{ await logHistory([{pl:plId,target:'청구 스케줄',old:`매출 ${delR.length}·매입 ${delC.length}건`,newv:'삭제',reason:status+' 전환 자동 정리',source:'pipeline'}]); }catch(e){}
   } else toast(`스케줄 삭제 ${ok1?'':'매출 실패 '}${ok2?'':'매입 실패'} — 시트 상태를 확인하세요`,true);
  }catch(e){ toast('스케줄 정리 오류: '+e.message,true); }
+}
+
+// v2.9.68: 포기·실주 전환 시 이미 연결된 S03_PROJECT 행이 있으면 status를 동기화(없으면 아무것도
+// 하지 않음 — ensureProject()처럼 새 프로젝트를 만들지 않음). 사용자 지적: 파이프라인은 포기인데
+// 연결 프로젝트의 status 칼럼은 과거 값("수주" 등)에 멈춰 있어 데이터 정합성이 깨짐.
+async function syncProjectStatusOnAbandon(plId,status){
+  try{
+    const rows=await fetchSheet(...R.S03);
+    const header=rows[0]||['project_id','project_name','client','end_client','contract_amount','start_date','end_date','status','payment_terms','pipeline_id','memo'];
+    const prjs=toObj(rows);
+    const linked=prjs.filter(p=>p.pipeline_id===plId);
+    if(!linked.length) return; // 연결된 프로젝트가 아예 없으면(확정 전 포기 등) 동기화 대상 없음
+    if(linked.every(p=>p.status===status)) return; // 이미 일치하면 불필요한 쓰기 생략
+    linked.forEach(p=>{ p.status=status; });
+    const ok=await clearAndWrite(...W.S03,[header,...rowsFor(header,dedupe(prjs,'project_id'))]);
+    if(ok){
+      toast(`연결 프로젝트 상태를 ${status}로 동기화 ✓`);
+      try{ await logHistory(linked.map(p=>({pl:plId,target:'연결 프로젝트 상태',old:p.status,newv:status,reason:status+' 전환 자동 동기화',source:'pipeline'}))); }catch(e){}
+    } else toast('연결 프로젝트 상태 동기화 실패 — 시트 상태를 확인하세요',true);
+  }catch(e){ toast('프로젝트 상태 동기화 오류: '+e.message,true); }
 }
 
 async function ensureProject(plId,status){

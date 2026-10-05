@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.67">
+<link rel="stylesheet" href="css/common.css?v=2.9.68">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -361,10 +361,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.67"></script>
-<script src="js/common.js?v=2.9.67"></script>
-<script src="js/calc.js?v=2.9.67"></script>
-<script src="js/nav.js?v=2.9.67"></script>
+<script src="js/schema.js?v=2.9.68"></script>
+<script src="js/common.js?v=2.9.68"></script>
+<script src="js/calc.js?v=2.9.68"></script>
+<script src="js/nav.js?v=2.9.68"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1625,7 +1625,11 @@ async function manualMatch(i){
 }
 function renderAging(){
   const today=new Date().toISOString().slice(0,10);
-  const list=s04All.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today)
+  // v2.9.68(사용자 지적): 미지급금(payList)은 okPrjSet(파이프라인이 수주·계약·종료인 "재무반영
+  // 대상" 프로젝트)로 걸러져 있었는데, 바로 아래 미수금(list)에는 같은 필터가 빠져 있었다.
+  // 그 결과 연결 파이프라인이 "포기"로 전환되어 재무반영 대상에서 빠진 프로젝트(S03_PROJECT.status
+  // 칼럼은 과거 값 그대로 "수주"에 머물러 있음)의 미수(S04) 행이 미수금 Aging에 계속 노출됨.
+  const list=s04All.filter(r=>okPrjSet.has(r.project_id)&&r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today)
     .map(r=>({...r,dd:dDiff(r.cash_recv_date,today)})).sort((a,b)=>b.dd-a.dd);
   const card=document.getElementById('agingCard');
   const hasPay=s05All.some(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<today);
