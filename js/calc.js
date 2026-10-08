@@ -2,6 +2,11 @@
 // v2.9.9: pad2·ymList를 input.html에서 이전 — calc.js가 다른 화면 파일의 함수에 의존하던 모듈 독립성 결함 수정
 // (아키텍처 원칙: 도메인 계산 계층은 DOM 무관 순수 함수로, 자기 완결적이어야 함).
 function pad2(n){return String(n).padStart(2,'0');}
+// v2.9.69: 고정비 계획 1건에 실제 통장 거래 여러 건을 연결(분할 지급 지원)하기 위한 SSOT —
+// matched_txn_id 칼럼 값을 "콤마로 구분된 거래ID 목록"으로 다룬다(기존 단일 ID 값도 길이 1인
+// 목록으로 그대로 유효). cashflow.html(통장 대사)·fixed.html(고정비 계획) 양쪽에서 공용으로 사용.
+function splitIds(s){ return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
+function joinIds(arr){ return [...new Set(arr.filter(Boolean))].join(','); }
 function ymList(s,e){const a=new Date(s),b=new Date(e);const r=[];let c=new Date(a.getFullYear(),a.getMonth(),1);
   while(c<=b){const dim=new Date(c.getFullYear(),c.getMonth()+1,0).getDate();
     const f=(c.getFullYear()===a.getFullYear()&&c.getMonth()===a.getMonth())?a.getDate():1;

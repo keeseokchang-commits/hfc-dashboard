@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.64">
+<link rel="stylesheet" href="css/common.css?v=2.9.69">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -170,19 +170,26 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.64"></script>
-<script src="js/common.js?v=2.9.64"></script>
-<script src="js/calc.js?v=2.9.64"></script>
-<script src="js/nav.js?v=2.9.64"></script>
+<script src="js/schema.js?v=2.9.69"></script>
+<script src="js/common.js?v=2.9.69"></script>
+<script src="js/calc.js?v=2.9.69"></script>
+<script src="js/nav.js?v=2.9.69"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
-let fixedAll=[],s10All=[];
+let fixedAll=[],s10All=[],detailAll=[];
+// v2.9.69: 고정비 계획의 "계획상 기대 총 지급액"·"지금까지 연결된 실제 지급 누적액" — cashflow.html의
+// 동일 함수와 같은 개념(SSOT는 js/calc.js의 splitIds/joinIds, 금액 계산은 이 화면이 S08_DETAIL을
+// 직접 들고 있지 않았던 기존 구조상 로컬 정의가 더 간단해 중복 허용 — detailAll 의존이라 calc.js로
+// 옮기면 오히려 결합이 늘어남).
+function fxPlanTotal(f){ return f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0); }
+function fxMatchedTotal(f){ return splitIds(f.matched_txn_id).reduce((s,tid)=>{const t=detailAll.find(x=>x.txn_id===tid); return s+(t?(num(t.outflow_amt)||0):0);},0); }
 async function loadAll(){
  try{
-  const [fxR,stR]=await Promise.all([fetchSheet(...R.S06),fetchSheet(...R.S10).catch(()=>[])]);
+  const [fxR,stR,dtR]=await Promise.all([fetchSheet(...R.S06),fetchSheet(...R.S10).catch(()=>[]),fetchSheet(...R.S08_DETAIL).catch(()=>[])]);
   fixedAll=dedupe(toObj(fxR).filter(x=>x.fixed_id),'fixed_id');
   s10All=toObj(stR);
+  detailAll=dedupe(toObj(dtR).filter(t=>t.txn_id),'txn_id');
   // v2.9.40: 필드명 불일치 결함 수정 — S10은 setting_key/setting_value 헤더인데 r.key를 참조해
   // 코드 관리 화면(③고정비 항목)에서 등록한 항목이 이 자동완성 목록에 절대 반영되지 못하고
   // 항상 하드코딩 기본값만 보이던 결함(전수조사로 발견).
@@ -205,14 +212,23 @@ function renderFx(){
   fxSelected=new Set([...fxSelected].filter(id=>visibleIds.has(id)));
   // v2.9.41: 통장 대사(자금수지 화면)로 확인된 실제 지급 여부를 여기서도 보여준다 — 매입 화면과
   // 동일하게 "지급 완료" 배지 + 실지급일, 그리고 대사를 잘못 확인한 경우 여기서 직접 해제 가능.
-  document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
+  // v2.9.69(사용자 지적 — 계획은 예산 추정치, 실지급은 분할·금액 불일치 가능): 거래가 일부
+  // 연결됐지만(matched_txn_id 있음) 아직 계획 금액에 도달하지 않아 자동 완료되지 않은 "진행중"
+  // 상태를 배지로 보여주고, 이 경우 사용자가 직접 "지급완료 처리"를 눌러 더 이상 기다리지 않고
+  // 바로 닫을 수 있게 한다(예: 계획보다 적게 지출하고 끝난 경우).
+  document.getElementById('fxBody').innerHTML=list.length?list.map(x=>{
+    const linkedN=splitIds(x.matched_txn_id).length;
+    const matchedSum=linkedN?fxMatchedTotal(x):0;
+    const inProgress=linkedN>0&&!x.pay_actual_date;
+    const progressBadge=inProgress?` <span class="badge-tag" style="font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:4px;padding:1px 4px" title="연결된 통장 거래 ${linkedN}건 합계">연결 ${linkedN}건·누적 ${comma(matchedSum)}원</span>`:'';
+    return `
     <tr><td class="nowrap"><input type="checkbox" class="fx-sel" data-id="${x.fixed_id}" onchange="onFxSelChange('${x.fixed_id}',this.checked)" ${fxSelected.has(x.fixed_id)?'checked':''}></td>
     <td class="nowrap">${x.year_month}</td>
-    <td class="cell-cat">${x.category}${x.has_tax_invoice==='Y'?` <span class="badge-tag" style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span class="badge-tag" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}${x.memo?`<div class="cat-memo">${x.memo}</div>`:''}</td>
+    <td class="cell-cat">${x.category}${x.has_tax_invoice==='Y'?` <span class="badge-tag" style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span class="badge-tag" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}${progressBadge}${x.memo?`<div class="cat-memo">${x.memo}</div>`:''}</td>
     <td class="nowrap" style="text-align:right">${comma(x.amount)}원</td>
     <td class="nowrap">${x.payment_date||'─'}</td>
     <td class="wrap cell-memo" style="color:var(--text3)" title="${(x.memo||'').replace(/"/g,'&quot;')}">${x.memo||''}</td>
-    <td class="cell-act"><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;padding:0">수정</button>${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;padding:0">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer;padding:0">삭제</button></td></tr>`).join('')
+    <td class="cell-act"><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;padding:0">수정</button>${inProgress?`<button onclick="completeFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--green);cursor:pointer;padding:0">지급완료 처리</button>`:''}${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;padding:0">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer;padding:0">삭제</button></td></tr>`;}).join('')
     :'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
   const selAll=document.getElementById('fxSelAll'); if(selAll) selAll.checked=list.length>0&&list.every(x=>fxSelected.has(x.fixed_id));
   updateFxBulkBar();
@@ -263,6 +279,20 @@ async function unmatchFxPay(id){
   const next=fixedAll.map(x=>x.fixed_id===id?{...x,pay_actual_date:'',matched_txn_id:''}:x);
   const ok=await writeFx(next);
   toast(ok?'지급 해제 완료':'저장 실패',!ok);
+}
+// v2.9.69(사용자 지적 — 계획은 예산 추정치라 실지급과 금액이 정확히 안 맞을 수 있음): 거래가
+// 하나 이상 연결됐지만 누적액이 계획 금액에 못 미쳐 자동 완료되지 않은 건을, 사용자가 직접
+// "이제 이 계획은 끝났다"고 확정하는 수동 종료. 연결된 거래 목록(matched_txn_id)은 그대로 두고
+// pay_actual_date만 채운다 — 지급 해제(unmatchFxPay)와 달리 연결 이력을 지우지 않는다.
+async function completeFxPay(id){
+  const x=fixedAll.find(v=>v.fixed_id===id); if(!x) return;
+  const linkedN=splitIds(x.matched_txn_id).length;
+  const matchedSum=fxMatchedTotal(x);
+  if(!confirm(`연결된 통장 거래 ${linkedN}건(누적 ${comma(matchedSum)}원)으로 이 고정비 계획을 지급완료 처리할까요?\n(계획 금액 ${comma(fxPlanTotal(x))}원과 차이가 있어도 그대로 종료됩니다)`))return;
+  const lastDate=[...detailAll].filter(t=>splitIds(x.matched_txn_id).includes(t.txn_id)).map(t=>t.txn_date).sort().slice(-1)[0]||new Date().toISOString().slice(0,10);
+  const next=fixedAll.map(v=>v.fixed_id===id?{...v,pay_actual_date:lastDate}:v);
+  const ok=await writeFx(next);
+  toast(ok?'지급완료 처리 ✓':'저장 실패',!ok);
 }
 async function writeFx(next){
   // v2.9.41: 헤더에 matched_txn_id·pay_actual_date 추가(js/schema.js HEADERS.S06와 동일 순서 유지) —

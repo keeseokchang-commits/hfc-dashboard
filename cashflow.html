@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.64">
+<link rel="stylesheet" href="css/common.css?v=2.9.69">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -361,10 +361,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.64"></script>
-<script src="js/common.js?v=2.9.64"></script>
-<script src="js/calc.js?v=2.9.64"></script>
-<script src="js/nav.js?v=2.9.64"></script>
+<script src="js/schema.js?v=2.9.69"></script>
+<script src="js/common.js?v=2.9.69"></script>
+<script src="js/calc.js?v=2.9.69"></script>
+<script src="js/nav.js?v=2.9.69"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1235,7 +1235,34 @@ function renderVatBanner(){
 }
 
 // ═══ 통장 대사 엔진 (v2.3 §5) ═══
+// v2.9.65: 매칭 0건 결함(사용자 신고) — 원인은 코드관리(①거래유형&키워드)에 등록한 유형명(setting_key)이
+// 하드코딩 canonical 문자열과 표기만 다를 때(예: "매출 입금"/"매입 지급" — 공백 포함. 실가입 데이터로 확인:
+// 매출 입금 키워드="이노라인,비플레이스,아시아나아이디티", 매입 지급 키워드="오벳소프트,김기황") classify()가
+// 그 표기 그대로를 t.cat/t.category에 저장하는데, 이 함수들 아래 매칭 로직은 '매출입금'/'매입지급'(공백 없음)
+// 리터럴과 엄격 일치(===)만 검사해 단 1건도 걸리지 않았다 — 9월 CSV에 (주)이노라인 25,591,500원 입금,
+// (주)오벳소프트 24,200,500원 출금이 미수금/미지급 Aging과 사실상 정확히 일치하는데도 대사 후보에
+// 아예 들어가지 못한 것으로 실데이터 확인. 같은 문제를 월별 실적 집계(deriveActFromDetail)는 이미
+// bucketOf()(v2.9.45 — s10의 setting_key→description 매핑으로 사용자 등록 표기를 canonical로 환산)로
+// 올바르게 피해가고 있었는데, 대사 엔진(reconcile/rebuildRecon)만 그 SSOT를 재사용하지 않고 직접
+// 리터럴 비교를 중복 구현한 것이 근본 원인(PRINCIPLES.md #49와 동일한 유형의 SSOT 분기 결함).
+// isCat()으로 두 함수 모두 bucketOf()를 거치도록 통일 — 코드관리에 등록이 없어 하드코딩 폴백이 그대로
+// canonical 문자열을 반환하는 기존 케이스(raw===canon)도 그대로 보존되어 회귀 없음.
+function isCat(raw,canon){ return raw===canon || bucketOf(raw)===canon; }
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
+// v2.9.69(사용자 지적): 고정비 계획은 예산 추정치라 실제 지급과 금액이 정확히 안 맞을 수 있고,
+// 계획 1건에 실제 지급이 여러 건(분할 지급 — 예: 차량구입 500만원 계획을 100만원×5회로 지급)으로
+// 쪼개질 수 있다. 기존 matched_txn_id는 거래 1건만 담을 수 있는 1:1 모델이라 이런 경우 영원히
+// 매칭 불가능(="고정비 계획 선택…" 드롭다운에 고를 게 없음) → 미매칭 목록에 매달 계속 쌓이는
+// 원인이었다. matched_txn_id의 저장 형식을 "콤마로 구분된 거래ID 목록"으로 바꿔(기존 단일 ID
+// 값도 그대로 유효 — 길이 1인 목록과 동일) 고정비 계획 1건에 여러 거래를 연결할 수 있게 한다.
+// 매출(S04)·매입(S05)은 세금계산서 발행·수취 기준이라 금액이 항상 정확히 일치해야 하므로 기존
+// 1:1 모델을 그대로 유지하고, 이 변경은 고정비(S06)에만 적용한다.
+// splitIds/joinIds는 js/calc.js로 이동(cashflow.html·fixed.html 공용 SSOT).
+// 고정비 계획의 "계획상 기대 총 지급액"(세금계산서 수취 시 VAT 포함) — 완료 판정의 기준값.
+function fxPlanTotal(f){ return f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0); }
+// 고정비 계획에 지금까지 연결된 실제 통장 거래의 누적 지급액 — detailAll에서 직접 합산(계획
+// 금액이 아니라 실제 집행액을 봐야 "다 냈는지"를 판단할 수 있음).
+function fxMatchedTotal(f){ return splitIds(f.matched_txn_id).reduce((s,tid)=>{const t=detailAll.find(x=>x.txn_id===tid); return s+(t?(num(t.outflow_amt)||0):0);},0); }
 const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_amt','cash_recv_date','is_received','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','recv_actual_date'];
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
 // v2.9.41: 고정비도 매출·매입과 동일하게 통장 대사 대상(사용자 확정) — S06 헤더에 matched_txn_id·
@@ -1253,7 +1280,7 @@ async function saveS06(next){
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
   // v2.4.2 보수 원칙(매입과 대칭): 발행 완료 건만 · 후보 정확히 1건일 때만 자동 · 사용된 거래ID 재매칭 금지
-  const deps=parsedTxns.filter(t=>t.cat==='매출입금'&&t.inAmt>0);
+  const deps=parsedTxns.filter(t=>isCat(t.cat,'매출입금')&&t.inAmt>0);
   const usedTxnR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const open=s04All.filter(r=>r.is_received!=='Y'&&r.invoice_date);
   const used=new Set(); unmatchedDep=[]; const matches=[];
@@ -1273,7 +1300,7 @@ async function reconcile(){
     else toast('대사 결과 저장 실패',true);
   }
   // ── 매입 지급 대사 (승인 범위: 재무 프로젝트 + 세금계산서 수취완료 건만 · 후보 1건일 때만 자동) ──
-  const outs=parsedTxns.filter(t=>t.cat==='매입지급'&&t.outAmt>0);
+  const outs=parsedTxns.filter(t=>isCat(t.cat,'매입지급')&&t.outAmt>0);
   const eligible=()=>s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
   unmatchedOut=[]; const cMatches=[];
   const usedC=new Set();
@@ -1296,11 +1323,11 @@ async function reconcile(){
   // ── v2.9.41: 고정비 지급 대사(매입 지급 대사와 동일 원칙, 사용자 확정) — 세금계산서 수취 항목만
   // amount+vat_amt(부가세 포함 실지급액), 미수취 항목은 amount 그대로가 실제 지급액. 매입처럼
   // 발행/수취 개념이 없으므로 "이미 대사되지 않은 모든 고정비 계획"이 대상.
-  const foutS=parsedTxns.filter(t=>t.cat==='고정비'&&t.outAmt>0);
+  const foutS=parsedTxns.filter(t=>isCat(t.cat,'고정비')&&t.outAmt>0);
   const fixedEligible=()=>planFix.filter(f=>!f.pay_actual_date);
   unmatchedFix=[]; const fMatches=[];
   const usedF=new Set();
-  const usedTxnF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean));
+  const usedTxnF=new Set(planFix.flatMap(f=>splitIds(f.matched_txn_id)));
   foutS.forEach(t=>{
     if(t.txnId&&usedTxnF.has(t.txnId)){return;}
     const cands=fixedEligible().filter(f=>!usedF.has(f.fixed_id)
@@ -1310,8 +1337,11 @@ async function reconcile(){
     else unmatchedFix.push(t);
   });
   if(fMatches.length){
+    // v2.9.69: 콤마 목록에 추가(덮어쓰지 않음) — CSV 자동 대사 시점에 이미 수동으로 일부 연결된
+    // 계획이 있어도 그 연결을 보존. 금액이 계획 전체와 거의 정확히 일치하는 자동 매칭이므로
+    // 이 1건으로 바로 완료 처리(pay_actual_date 설정)한다.
     const next=planFix.map(f=>{const m=fMatches.find(x=>x[1].fixed_id===f.fixed_id);
-      return m?{...f,pay_actual_date:m[0].date,matched_txn_id:m[0].txnId||''}:f;});
+      return m?{...f,pay_actual_date:m[0].date,matched_txn_id:joinIds([...splitIds(f.matched_txn_id),m[0].txnId])}:f;});
     const ok=await saveS06(next);
     if(ok){planFix=dedupe(next,'fixed_id');toast(`🏢 고정비 대사: ${fMatches.length}건 자동 확인`);}
     else toast('고정비 대사 저장 실패',true);
@@ -1323,12 +1353,12 @@ function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 �
   if(!detailAll.length) return;
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
-  const mF=new Set(planFix.map(f=>f.matched_txn_id).filter(Boolean)); // v2.9.41
-  unmatchedDep=detailAll.filter(t=>t.category==='매출입금'&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
+  const mF=new Set(planFix.flatMap(f=>splitIds(f.matched_txn_id))); // v2.9.41, 콤마 목록 지원(v2.9.69)
+  unmatchedDep=detailAll.filter(t=>isCat(t.category,'매출입금')&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:num(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedOut=detailAll.filter(t=>t.category==='매입지급'&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+  unmatchedOut=detailAll.filter(t=>isCat(t.category,'매입지급')&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedFix=detailAll.filter(t=>t.category==='고정비'&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+  unmatchedFix=detailAll.filter(t=>isCat(t.category,'고정비')&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
@@ -1344,15 +1374,29 @@ function revCands(t,i){const open=s04All.filter(r=>r.is_received!=='Y'&&!r.match
 function costCands(t,i){const open=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&!c.matched_txn_id).map(c=>({id:c.cost_id,a:Math.round((num(c.amount)||0)*1.1),d:c.payment_date,ym:c.year_month}));
   return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mc_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber-lt);color:var(--amber);cursor:pointer">👍 ${c.ym} ${won(c.a)}</button>`).join(' ');}
 // v2.9.41: 고정비 대사 후보(매입 대사와 동일 패턴) — 세금계산서 수취 항목은 amount+vat_amt, 미수취는 amount 그대로.
-function fixCands(t,i){const open=planFix.filter(f=>!f.pay_actual_date&&!f.matched_txn_id).map(f=>({id:f.fixed_id,a:f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0),d:f.payment_date,ym:f.year_month,cat:f.category}));
+// v2.9.69: 이미 일부 거래가 연결된(분할 지급 중인) 계획도 후보에서 제외하지 않고, "남은 금액"
+// (계획 총액 - 이미 연결된 실제 지급 누적)을 기준으로 추천 — 500만원 계획에 300만원이 이미
+// 연결돼 있으면 남은 200만원과 가까운 거래를 추천한다(완전히 닫힌 계획만 제외).
+function fixCands(t,i){const open=planFix.filter(f=>!f.pay_actual_date).map(f=>({id:f.fixed_id,a:Math.max(0,fxPlanTotal(f)-fxMatchedTotal(f)),d:f.payment_date,ym:f.year_month,cat:f.category}));
   return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mf_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--text2);background:var(--bg2,#F3F4F6);color:var(--text2);cursor:pointer">👍 ${c.ym} ${c.cat||''} ${won(c.a)}</button>`).join(' ');}
 function quickPick(sel,val){const el=document.getElementById(sel);if(el)el.value=val;}
 async function saveReclass(){
-  let n=0;
   // v2.9.47: 미분류 재지정 목록(id="rc_...")과 CSV 거래 내역 팝업(id="rct_...") 양쪽의 드롭다운을
   // 모두 훑어 저장 — 두 UI 모두 [id^=rc_]로 매치되는 문제를 피하기 위해 접두사를 명시적으로 분리.
-  document.querySelectorAll('[id^="rc_"], [id^="rct_"]').forEach(el=>{const t=detailAll.find(x=>x.txn_id===el.dataset.tid);
-    if(t&&el.value&&el.value!==t.category){t.category=el.value;n++;}});
+  // v2.9.66: 통장 대사 미매칭 목록(id="rcu_...")도 동일한 이유로 별도 접두사 추가 — 추가하면서
+  // 재현된 결함: 매칭 후보 없는 매출입금/매입지급/고정비 거래는 미매칭 목록과 CSV 팝업 양쪽에
+  // "같은 거래"가 동시에 뜨는 게 정상 상황인데(접두사가 달라 id 자체는 안 겹침), 한쪽에서만
+  // 분류를 바꾸고 다른 쪽(열람만 하고 안 건드린 과거 값 그대로인) 드롭다운이 존재하면, 기존
+  // 1-패스 구현은 el.value를 "그때그때 이미 수정된 t.category"와 비교해 나중에 처리되는 안 건드린
+  // 드롭다운이 방금 저장한 변경을 원래 값으로 도로 덮어써버렸다(tests/e2e_recon_reclass.js로 재현
+  // 확인). 수정: 변경 여부 판정(1패스)과 실제 적용(2패스)을 분리해, 모든 드롭다운을 "아직 아무것도
+  // 바뀌지 않은 원본 t.category"와 비교하도록 — 같은 거래를 가리키는 여러 드롭다운 중 사용자가
+  // 실제로 건드린 것만 정확히 감지되고, 안 건드린 나머지는 원본과 같은 값이라 자동으로 무시된다.
+  const changes={};
+  document.querySelectorAll('[id^="rc_"], [id^="rct_"], [id^="rcu_"]').forEach(el=>{const t=detailAll.find(x=>x.txn_id===el.dataset.tid);
+    if(t&&el.value&&el.value!==t.category) changes[el.dataset.tid]=el.value;});
+  let n=0;
+  Object.entries(changes).forEach(([tid,val])=>{const t=detailAll.find(x=>x.txn_id===tid); if(t){t.category=val;n++;}});
   if(!n){toast('변경된 분류가 없습니다');return;}
   const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
   const ok=await clearAndWrite(...W.S08_DETAIL,[H,...rowsFor(H,detailAll)]);
@@ -1433,11 +1477,24 @@ async function manualMatchCost(i){
   else toast('저장 실패',true);
 }
 // v2.9.41: 고정비 수동 매칭(매입 수동 매칭과 동일 패턴)
+// v2.9.69(사용자 지적 — 계획은 예산 추정치라 실지급과 금액이 안 맞을 수 있고, 계획 1건이 분할
+// 지급 여러 건으로 나뉠 수 있음: "차량구입 500만원 계획했지만 통장 지급은 백만원씩 5번"): 기존엔
+// matched_txn_id를 덮어써 계획 1건에 거래 1건만 연결 가능했다 — 분할 지급은 첫 건만 연결되고
+// 나머지는 "연결할 계획이 없는" 상태로 영원히 미매칭에 쌓였다. 이제 거래를 계획의 연결 목록에
+// 추가(덮어쓰지 않음)하고, 누적 지급액이 계획 총액에 도달하면 자동으로 지급완료 처리, 못 미치면
+// (예산을 다 안 썼거나 아직 분할 지급이 안 끝난 경우) 열어둔 채로 둔다 — 수동 종료는 fixed.html의
+// "지급완료 처리" 버튼으로.
 async function manualMatchFix(i){
   const t=unmatchedFix[i]; const fid=document.getElementById('mf_'+i).value;
   if(!fid){toast('고정비 항목을 선택하세요',true);return;}
-  if(t.txnId&&planFix.some(f=>f.matched_txn_id===t.txnId)){toast('이 출금은 이미 다른 고정비 건에 매칭되어 있습니다. 먼저 [지급 해제]하세요.',true);return;}
-  const next=planFix.map(f=>f.fixed_id===fid?{...f,pay_actual_date:t.date,matched_txn_id:t.txnId||''}:f);
+  if(t.txnId&&planFix.some(f=>splitIds(f.matched_txn_id).includes(t.txnId))){toast('이 출금은 이미 다른 고정비 건에 매칭되어 있습니다. 먼저 [지급 해제]하세요.',true);return;}
+  const next=planFix.map(f=>{
+    if(f.fixed_id!==fid) return f;
+    const ids=joinIds([...splitIds(f.matched_txn_id),t.txnId]);
+    const cumulative=fxMatchedTotal({...f,matched_txn_id:ids});
+    const done=cumulative>=fxPlanTotal(f);
+    return {...f,matched_txn_id:ids,pay_actual_date:done?t.date:(f.pay_actual_date||'')};
+  });
   const ok=await saveS06(next);
   if(ok){planFix=dedupe(next,'fixed_id');unmatchedFix.splice(i,1);toast('고정비 수동 매칭 ✓');renderRecon();renderAging();}
   else toast('저장 실패',true);
@@ -1509,6 +1566,39 @@ async function fixDupMatches(){
     toast('중복 매칭 정리 완료 ✓'); renderDupAudit(); renderRecon(); renderAging(); }
   else toast('정리 저장 실패 — 데이터 변경 없음',true);
 }
+// v2.9.66(사용자 지적): "매칭 대상이 아닌데 매칭 하라고 나오는 부분 — 안 하겠다고 할 방법이 없다."
+// 미매칭 입금/출금 목록에 뜨는 거래 중 일부는 실제로 매출·매입·고정비가 아니라, 코드관리에 등록한
+// 키워드(예: 특정 인물명)가 의도와 달리 무관한 개인 이체까지 함께 묶어버린 "잘못 분류된" 거래다.
+// 이걸 단순히 목록에서 숨기기만 하면(별도의 "제외" 플래그) 월별 매입·고정비 실적 집계는 계속
+// 틀린 채로 남는다 — 분류(집계 버킷)와 대사 대상 여부는 같은 축이 아니라고 숨기는 식으로 처리하면
+// 안 되고, 애초에 분류 자체를 바로잡아야 두 문제(미매칭 노이즈·집계 오류)가 함께 해결된다. 이미
+// 있는 "미분류·기타 재지정" 메커니즘(saveReclass, id="rct_")을 그대로 재사용 — 각 미매칭 행에
+// 분류 재지정 드롭다운을 바로 붙여, 틀린 분류면 그 자리에서 바로 고쳐 저장할 수 있게 한다(재지정
+// 후 해당 유형 기준을 벗어나면 다음 rebuildRecon()에서 자동으로 미매칭 목록에서도 빠진다).
+// id 접두사는 "rcu_"(reclassify-unmatched) — "rc_"(미분류 목록)·"rct_"(CSV 팝업 건별 내역)와 겹치면
+// 안 된다: 같은 거래가 미매칭 목록과 CSV 팝업에 동시에 떠 있을 때(흔한 상황 — 매칭 후보가 없는
+// 매출입금/매입지급/고정비 거래는 둘 다에 나타남) id가 겹치면 document.getElementById가 둘 중
+// 하나만 찾고, saveReclass()의 querySelectorAll은 양쪽을 다 훑어 서로의 값을 되돌려버린다(실제로
+// tests/e2e_csv_reclass_popup.js 회귀로 재현·확인됨 — "rct_"를 그대로 재사용했다가 저장이 꼬였었음).
+// v2.9.67(사용자 지적): "재지정저장을 눌러서 확정하는 건지 알고 눌러 보면 변경내용이 없다고
+// 저장은 안되네" — 드롭다운이 처음부터 "현재 분류값"으로 이미 선택되어 있어(saveReclass()는
+// el.value!==t.category일 때만 변경으로 인식), 사용자가 아무것도 바꾸지 않고 바로 저장을 누르면
+// 당연히 "변경된 분류가 없습니다"만 뜬다 — 화면엔 이미 뭔가 "선택"돼 있는 것처럼 보여 혼동됨.
+// 수정: 기본 선택지를 실제 유형명이 아니라 "현재: <현재분류> (변경 안 함)" 플레이스홀더(value="")로
+// 바꾸고, 목록에서 현재 분류 자체는 제외 — 아무것도 고르지 않으면(플레이스홀더 그대로면) value=""라
+// saveReclass()가 자동으로 무시하고, 사용자가 다른 유형을 실제로 골라야만 저장되는 것이 드롭다운
+// 모양만 봐도 바로 드러나게 했다(매칭 후보 선택 드롭다운의 "청구 건 선택…"과 동일한 관례).
+function reclassRow(t){
+  const cur=t.cat||'미분류';
+  return `<div style="flex-basis:100%;display:flex;gap:6px;align-items:center;margin-top:2px">
+    <span style="font-size:11px;color:var(--text3);white-space:nowrap">분류가 틀렸다면 → 변경:</span>
+    <select id="rcu_${t.txnId}" data-tid="${t.txnId}" style="flex:1;min-width:0;padding:5px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface)">
+      <option value="">현재: ${cur} (변경 안 함)</option>
+      ${txnTypeNames().filter(n=>n!==cur).map(n=>`<option>${n}</option>`).join('')}
+    </select>
+    <button onclick="saveReclass()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap">재지정 저장</button>
+  </div>`;
+}
 function renderRecon(autoCnt,costCnt,fixCnt){
   const card=document.getElementById('reconCard');
   const openRows=s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id).sort((a,b)=>String(a.cash_recv_date||'9999').localeCompare(String(b.cash_recv_date||'9999')));
@@ -1523,6 +1613,7 @@ function renderRecon(autoCnt,costCnt,fixCnt){
         ${openRows.map(r=>`<option value="${r.revenue_id}">${r.year_month} ${r.project_id} ${(num(r.cash_recv_amt)||0).toLocaleString()}원</option>`).join('')}
       </select>
       ${revCands(t,i)} <button onclick="manualMatch(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer">매칭</button>
+      ${reclassRow(t)}
     </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">미매칭 입금이 없습니다.</div>';
   const eligC=s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&!c.matched_txn_id).sort((a,b)=>String(a.payment_date||'9999').localeCompare(String(b.payment_date||'9999')));
   document.getElementById('reconUnmatched').innerHTML+=unmatchedOut.length?('<div style="font-size:12px;font-weight:600;color:var(--amber);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미매칭 출금 (매입지급 분류)</div>'+unmatchedOut.map((t,i)=>`
@@ -1533,17 +1624,23 @@ function renderRecon(autoCnt,costCnt,fixCnt){
         ${eligC.map(c=>`<option value="${c.cost_id}">${c.year_month} ${c.project_id} ${Math.round((num(c.amount)||0)*1.1).toLocaleString()}원</option>`).join('')}
       </select>
       ${costCands(t,i)} <button onclick="manualMatchCost(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--amber);color:#fff;cursor:pointer">매칭</button>
+      ${reclassRow(t)}
     </div>`).join('')):'';
   // v2.9.41: 고정비 미매칭 출금(매입지급과 동일 UI 패턴, 사용자 확정 — 고정비도 통장 대사 대상)
-  const eligF=planFix.filter(f=>!f.pay_actual_date&&!f.matched_txn_id).sort((a,b)=>String(a.payment_date||'9999').localeCompare(String(b.payment_date||'9999')));
+  // v2.9.69: 이미 일부 거래가 연결된 계획도 "완료"가 아니면(pay_actual_date 없으면) 계속 선택
+  // 가능해야 분할 지급 2·3번째 건을 같은 계획에 추가로 연결할 수 있다. 드롭다운 라벨에 연결
+  // 진행 상황(누적/계획)을 표시해 사용자가 "이미 일부 연결된 계획"임을 알 수 있게 함.
+  const eligF=planFix.filter(f=>!f.pay_actual_date).sort((a,b)=>String(a.payment_date||'9999').localeCompare(String(b.payment_date||'9999')));
   document.getElementById('reconUnmatched').innerHTML+=unmatchedFix.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미매칭 출금 (고정비 분류)</div>'+unmatchedFix.map((t,i)=>`
     <div style="display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap">
       <span style="flex:1;min-width:150px">${t.date} <b>${(t.outAmt||0).toLocaleString()}원</b><br><span style="color:var(--text3)">${t.recv||t.desc}</span></span>
-      <select id="mf_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:230px;background:var(--surface)">
+      <select id="mf_${i}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:260px;background:var(--surface)">
         <option value="">고정비 계획 선택…</option>
-        ${eligF.map(f=>`<option value="${f.fixed_id}">${f.year_month} ${f.category} ${(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0)).toLocaleString()}원</option>`).join('')}
+        ${eligF.map(f=>{const matched=fxMatchedTotal(f);const label=matched>0?` (연결 ${splitIds(f.matched_txn_id).length}건·누적 ${matched.toLocaleString()}원)`:'';
+          return `<option value="${f.fixed_id}">${f.year_month} ${f.category} 계획 ${fxPlanTotal(f).toLocaleString()}원${label}</option>`;}).join('')}
       </select>
       ${fixCands(t,i)} <button onclick="manualMatchFix(${i})" style="font-size:11px;padding:6px 12px;border-radius:6px;border:none;background:var(--text2);color:#fff;cursor:pointer">매칭</button>
+      ${reclassRow(t)}
     </div>`).join('')):'';
   // v1.2(#13): 미분류·기타 재지정 (상시)
   const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);
@@ -1565,7 +1662,11 @@ async function manualMatch(i){
 }
 function renderAging(){
   const today=new Date().toISOString().slice(0,10);
-  const list=s04All.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today)
+  // v2.9.68(사용자 지적): 미지급금(payList)은 okPrjSet(파이프라인이 수주·계약·종료인 "재무반영
+  // 대상" 프로젝트)로 걸러져 있었는데, 바로 아래 미수금(list)에는 같은 필터가 빠져 있었다.
+  // 그 결과 연결 파이프라인이 "포기"로 전환되어 재무반영 대상에서 빠진 프로젝트(S03_PROJECT.status
+  // 칼럼은 과거 값 그대로 "수주"에 머물러 있음)의 미수(S04) 행이 미수금 Aging에 계속 노출됨.
+  const list=s04All.filter(r=>okPrjSet.has(r.project_id)&&r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today)
     .map(r=>({...r,dd:dDiff(r.cash_recv_date,today)})).sort((a,b)=>b.dd-a.dd);
   const card=document.getElementById('agingCard');
   const hasPay=s05All.some(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date&&c.payment_date&&c.payment_date<today);
