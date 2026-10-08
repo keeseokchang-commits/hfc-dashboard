@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.69">
+<link rel="stylesheet" href="css/common.css?v=2.9.70">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -102,10 +102,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.69"></script>
-<script src="js/common.js?v=2.9.69"></script>
-<script src="js/calc.js?v=2.9.69"></script>
-<script src="js/nav.js?v=2.9.69"></script>
+<script src="js/schema.js?v=2.9.70"></script>
+<script src="js/common.js?v=2.9.70"></script>
+<script src="js/calc.js?v=2.9.70"></script>
+<script src="js/nav.js?v=2.9.70"></script>
 <script>
 let vats=[],revs=[],costs=[],fixedTax=[],prjMap={},selQ=null;
 const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
@@ -164,7 +164,12 @@ function renderQuarters(){
     // 신고 오류로 오인하거나 실제 오류를 놓칠 위험이 있어 자금수지보다 엄격하게 잠근다.
     const locked=v.status==='납부완료';
     const dSVat=locked?(num(v.sales_vat)||0):c.sVat, dPVat=locked?(num(v.purchase_vat)||0):c.pVat;
+    // v2.9.70: 납부완료 분기는 "실납부액"과 "시스템 예상액(estimated_payment, 신고 시점 스냅샷)"을
+    // 같이 보여준다 — 차이는 시스템에 등록되지 않은 세금계산서분을 가늠하는 지표.
     const dPay=locked?(num(v.actual_payment)||num(v.estimated_payment)||0):c.pay;
+    const dEst=locked?(num(v.estimated_payment)||0):0;
+    const dDiffAmt=locked&&dEst?dPay-dEst:0;
+    const diffLine=locked&&dEst?`<div style="font-size:10px;color:var(--text3);margin-top:2px">시스템 예상 ${wf(dEst)} · 차이 <b style="color:${dDiffAmt===0?'var(--text3)':'#B45309'}">${dDiffAmt>0?'+':''}${wf(dDiffAmt)}</b></div>`:'';
     const changed=locked&&(dSVat!==c.sVat||dPVat!==c.pVat);
     const st=v.status==='납부완료'?'b-done':(c.sVat||c.pVat)?'b-wait':'b-calc';
     const stTxt=v.status==='납부완료'?'납부완료':(c.sVat||c.pVat)?'납부예정':'집계중';
@@ -174,7 +179,7 @@ function renderQuarters(){
       <div class="q-nums">
         <div><div class="lbl">매출 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dSVat)}</div></div>
         <div><div class="lbl">매입 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dPVat)}</div>${!locked&&c.pVatFx?`<div style="font-size:10px;color:var(--text3);margin-top:2px">프로젝트 ${wf(c.pVatPrj)} + 기타경비 ${wf(c.pVatFx)}</div>`:''}</div>
-        <div><div class="lbl">${locked?'납부액':'납부 예정액'}</div><div class="val pay">${wf(dPay)}</div></div>
+        <div><div class="lbl">${locked?'실납부액':'납부 예정액'}</div><div class="val pay">${wf(dPay)}</div>${diffLine}</div>
       </div>
       <div class="q-due" style="margin-top:8px">신고·납부 기한 ${q.due}${v.paid_date?' · 납부일 '+v.paid_date:''}${v.cashflow_reflected==='Y'?' · 자금수지 반영 ✓':''}</div>
       ${changed?`<div style="margin-top:8px;padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:11px;color:#991B1B">⚠ 신고 이후 이 분기의 매출·매입 내역이 변경되었습니다(현재 기준 재계산 시 매출 ${wf(c.sVat)}·매입 ${wf(c.pVat)}). 실제 신고 내용과 다른 경우 수정신고 필요 여부를 확인하세요.</div>`:''}
@@ -185,8 +190,14 @@ function selectQ(code){
   const q=QINFO[code],c=calcQ(code);
   document.getElementById('detailCard').style.display='block';
   document.getElementById('detailTitle').textContent=`${q.name} 상세 (${q.months[0]} ~ ${q.months[2]})`;
+  const vv=vats.find(x=>x.quarter_code===code)||{};
+  const lockedD=vv.status==='납부완료';
+  const estD=lockedD?(num(vv.estimated_payment)||c.pay):c.pay;
+  const actD=lockedD?(num(vv.actual_payment)||0):0;
   document.getElementById('payFormula').innerHTML=
-    `납부 예정액 = 매출 VAT ${wf(c.sVat)} − 매입 VAT ${wf(c.pVat)} = <b>${wf(c.pay)}</b><br>납부 시 ${q.payYm} 자금수지에 현금 유출로 반영됩니다.`;
+    `시스템 예상 납부액 = 매출 VAT ${wf(lockedD?num(vv.sales_vat):c.sVat)} − 매입 VAT ${wf(lockedD?num(vv.purchase_vat):c.pVat)} = <b>${wf(estD)}</b>`
+    +(lockedD&&actD?`<br>실납부액 <b>${wf(actD)}</b> · 차이 <b>${actD-estD>0?'+':''}${wf(actD-estD)}</b> (시스템에 등록되지 않은 세금계산서분 등)`:'')
+    +`<br>자금수지 추정에는 <b>시스템 예상액</b>이 ${q.payYm} 현금 유출로 반영됩니다. 실제 납부액은 통장 CSV의 세금 출금으로 확인합니다.`;
   const sT=document.getElementById('salesTable');
   sT.innerHTML='<tr><th>월 / 프로젝트</th><th>공급가액</th><th>부가세</th></tr>'+
     (c.sRows.length?c.sRows.map(r=>`<tr><td>${r.year_month.slice(5)}월 ${prjMap[r.project_id]||r.project_id}</td><td>${wf(r.tax_invoice_amt)}</td><td>${wf(vatOf(r,'tax_invoice_amt'))}</td></tr>`).join('')
@@ -214,7 +225,10 @@ function upsertVat(code,patch){
   if(!v){v={vat_id:`VAT-2026-${code}`,year:'2026',quarter_code:code,
     period_start:q.months[0]+'-01',period_end:q.months[2]+'-30',due_date:q.due,
     cashflow_reflected:'N',status:'집계중',memo:q.name};vats.push(v);}
-  v.sales_vat=c.sVat;v.purchase_vat=c.pVat;v.estimated_payment=c.pay;
+  // v2.9.70: 이미 납부완료로 확정된 분기는 신고 시점 스냅샷(sales_vat·purchase_vat·estimated_payment)을
+  // 다시 쓰지 않는다 — 이전엔 [자금수지 반영] 등이 호출될 때마다 현재 재계산값/입력한 실납부액으로
+  // 덮어써 "시스템 예상액"이 사라졌다.
+  if(!(v.status==='납부완료'&&num(v.estimated_payment))){v.sales_vat=c.sVat;v.purchase_vat=c.pVat;v.estimated_payment=c.pay;}
   Object.assign(v,patch);return v;
 }
 async function savePayment(){
@@ -231,14 +245,15 @@ async function reflectCashflow(){
   if(!selQ){toast('분기를 선택하세요',true);return;}
   const q=QINFO[selQ],c=calcQ(selQ);
   const v=vats.find(x=>x.quarter_code===selQ);
-  const amt=un(document.getElementById('actualPay').value)||c.pay;
-  if(!amt){toast('납부액이 0원입니다',true);return;}
-  if(!confirm(`${q.payYm}월(신고·납부 기한 월) 자금수지 유출에 ${wf(amt)}을 반영합니다.\n확정 후 자금수지의 [추정 재계산]이 실행되어야 추정 잔액에 반영됩니다.`))return;
+  // v2.9.70: 자금수지 "추정"에는 실납부액이 아니라 시스템 예상액을 반영한다(추정=계획, 실제는 통장 CSV).
+  const amt=(v&&v.status==='납부완료'&&num(v.estimated_payment))?num(v.estimated_payment):c.pay;
+  if(!amt){toast('시스템 예상 납부액이 0원입니다',true);return;}
+  if(!confirm(`${q.payYm}월(신고·납부 기한 월) 자금수지 추정 유출에 시스템 예상액 ${wf(amt)}을 반영합니다.\n(실제 납부액은 통장 CSV의 세금 출금으로 확인됩니다)\n확정 후 자금수지의 [추정 재계산]이 실행되어야 추정 잔액에 반영됩니다.`))return;
   const btn=document.getElementById('btnReflect');btn.disabled=true;
   try{
     // v2.6: 추정 산출자는 자금수지 recalc 하나(SSOT) — 여기서는 S13에 반영 확정만 기록.
     // recalc는 S13의 납부기한 월에 실납부액(없으면 추정세액)을 유출로 집계한다.
-    upsertVat(selQ,{cashflow_reflected:'Y',estimated_payment:amt});
+    upsertVat(selQ,{cashflow_reflected:'Y'});
     const ok=await saveS13();
     btn.disabled=false;
     if(ok){

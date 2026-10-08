@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.69">
+<link rel="stylesheet" href="css/common.css?v=2.9.70">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -361,10 +361,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.69"></script>
-<script src="js/common.js?v=2.9.69"></script>
-<script src="js/calc.js?v=2.9.69"></script>
-<script src="js/nav.js?v=2.9.69"></script>
+<script src="js/schema.js?v=2.9.70"></script>
+<script src="js/common.js?v=2.9.70"></script>
+<script src="js/calc.js?v=2.9.70"></script>
+<script src="js/nav.js?v=2.9.70"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1737,7 +1737,7 @@ async function recalcEstimate(){
         .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0);
       const outFix=planFix.filter(f=>f.year_month===m).reduce((s,f)=>s+(num(f.amount)||0),0);
       const vat=vatRows.filter(v=>(v.due_date||'').slice(0,7)===m)
-        .reduce((s,v)=>s+(num(v.actual_payment)||num(v.estimated_payment)||0),0);
+        .reduce((s,v)=>s+(num(v.estimated_payment)||0),0); // v2.9.70: 추정은 시스템 예상액만(실납부액은 통장 CSV 세금 실적으로 비교)
       const inflow=inf1+inf2, outflow=outCost+outFix+out2+vat;
       bal=bal+inflow-outflow;
       rows.push([m,inflow,outflow,vat,bal,(weighted?'확도가중 ON':'확정분만')+' · 계획 누적',today]);
