@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.71">
+<link rel="stylesheet" href="css/common.css?v=2.9.72">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -170,10 +170,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.71"></script>
-<script src="js/common.js?v=2.9.71"></script>
-<script src="js/calc.js?v=2.9.71"></script>
-<script src="js/nav.js?v=2.9.71"></script>
+<script src="js/schema.js?v=2.9.72"></script>
+<script src="js/common.js?v=2.9.72"></script>
+<script src="js/calc.js?v=2.9.72"></script>
+<script src="js/nav.js?v=2.9.72"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -201,20 +201,20 @@ async function loadAll(){
   renderFx();
  }catch(e){toast('로드 실패: '+e.message,true);}
 }
-// v2.9.71: 월별 조건 필터 — 연도·월 조합을 한 곳(fxList)에서 적용해 목록 렌더와 '첫 건 수정'이 항상 같은 기준을 쓴다.
+// v2.9.71: 월별 조건 필터 — 연도와 별개로 1~12월을 고정 나열(사용자 요청). 연도·월은 AND 조합이며,
+// 목록 필터를 fxList() 한 곳에 두어 목록 렌더와 '첫 건 수정'이 항상 같은 기준을 쓴다.
 function fxList(){
   const y=(document.getElementById('fxYear')||{}).value||'';
   const m=(document.getElementById('fxMonth')||{}).value||'';
-  return fixedAll.filter(x=>(!y||(x.year_month||'').startsWith(y))&&(!m||x.year_month===m))
+  return fixedAll.filter(x=>(!y||(x.year_month||'').startsWith(y))&&(!m||(x.year_month||'').slice(5,7)===m))
     .sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
 }
 function fxBuildMonths(){
-  const y=document.getElementById('fxYear').value, sel=document.getElementById('fxMonth'), cur=sel.value;
-  const yms=[...new Set(fixedAll.map(x=>x.year_month).filter(v=>v&&(!y||v.startsWith(y))))].sort();
-  sel.innerHTML='<option value="">전체 월</option>'+yms.map(v=>`<option value="${v}">${v}</option>`).join('');
-  sel.value=yms.includes(cur)?cur:'';
+  const sel=document.getElementById('fxMonth');
+  if(sel.options.length===13) return;
+  sel.innerHTML='<option value="">전체 월</option>'+Array.from({length:12},(_,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}">${i+1}월</option>`;}).join('');
 }
-function fxYearChanged(){ fxBuildMonths(); renderFx(); }
+function fxYearChanged(){ renderFx(); }
 // v2.9.50: 체크박스 다중 선택 상태(사용자 요청 — 여러 건을 한 번에 삭제·첫 건 수정). 필터를
 // 바꾸거나 다시 그릴 때 화면에 없는 항목의 선택은 자연히 무의미해지므로, renderFx가 항상 현재
 // 화면에 보이는 fixed_id 집합으로 좁혀 정합성을 유지한다.
