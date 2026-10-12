@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.72">
+<link rel="stylesheet" href="css/common.css?v=2.9.73">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -163,8 +163,23 @@
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">④ 기술 태그 <small style="color:var(--text3)">(인력 프로필 검색용 — 동의어는 콤마: React / 리액트,react)</small>
       <button onclick="addCode('skill_tag')" style="font-size:11px;margin-left:8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:3px 9px;cursor:pointer">+ 추가</button></div>
     <div id="ctSkill"></div>
+    <!-- v2.9.73 SCR-12: 인력 모듈 코드표 ⑤~⑧ — 기술 태그와 같은 방식(이름 + 설명·동의어, ▲▼ 순서가 저장 순서) -->
+    <div style="font-size:12px;font-weight:700;margin:16px 0 6px">⑤ 역할 <small style="color:var(--text3)">(인력 의뢰·후보자의 역할 구분 — 설명 칸에 동의어를 콤마로 적을 수 있습니다)</small></div>
+    <div id="ctRole"></div><button class="btn-mini" onclick="addCode('role')">+ 역할 추가</button>
+    <div style="font-size:12px;font-weight:700;margin:16px 0 6px">⑥ 업종 <small style="color:var(--text3)">(고객사·프로젝트의 업종 구분)</small></div>
+    <div id="ctIndustry"></div><button class="btn-mini" onclick="addCode('industry')">+ 업종 추가</button>
+    <div style="font-size:12px;font-weight:700;margin:16px 0 6px">⑦ 프로젝트 유형 <small style="color:var(--text3)">(예: 차세대, 마이그레이션)</small></div>
+    <div id="ctProjType"></div><button class="btn-mini" onclick="addCode('project_type')">+ 유형 추가</button>
+    <div style="font-size:12px;font-weight:700;margin:16px 0 6px">⑧ 실패 사유 <small style="color:var(--text3)">(의뢰·후보가 실패·탈락한 이유)</small></div>
+    <div id="ctFailReason"></div><button class="btn-mini" onclick="addCode('fail_reason')">+ 사유 추가</button>
     <datalist id="typeDL"></datalist>
     <button onclick="saveCodes()" style="width:100%;margin-top:14px;padding:11px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer">🗂 코드 전체 저장</button>
+    <!-- v2.9.73 CMN-03: 시트 준비 — 인력 모듈 신규 탭 18개와 기본 코드를 만든다(이미 있는 탭은 변경하지 않음, 다시 실행해도 안전) -->
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">🧱 시트 준비 <small style="color:var(--text3);font-weight:400">(인력 의뢰·후보자 관리용 탭 18개와 기본 코드 — 처음 한 번 실행, 다시 눌러도 안전합니다)</small></div>
+      <button class="btn btn-secondary btn-sm" id="btnPrep" onclick="runSheetPrep()">시트 준비 실행</button>
+      <div id="prepResult" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
+    </div>
   </div>
   <style>.btn-mini{font-size:11px;padding:5px 10px;border-radius:6px;border:1px dashed var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
   .code-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
@@ -197,6 +212,19 @@
       <span class="param-label">현금 부족 경고 선행 개월</span>
       <span><input class="param-input" type="number" id="param_cash_warn_months" value="3"><span class="param-unit">개월</span></span>
     </div>
+    <!-- v2.9.73 SCR-12: 인력 설정값(S10 category=hr_setting) -->
+    <div class="param-row">
+      <span class="param-label">단기 이력 기준 <small style="color:var(--text3)">(이 개월 수 미만이면 단기)</small></span>
+      <span><input class="param-input" type="number" min="0" step="1" id="param_short_tenure_months" value="3"><span class="param-unit">개월</span></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">철수 알림 <small style="color:var(--text3)">(종료 예정 며칠 전부터)</small></span>
+      <span><input class="param-input" type="number" min="0" step="1" id="param_exit_alert_days" value="30"><span class="param-unit">일</span></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">재확인 <small style="color:var(--text3)">(마지막 확인 후 며칠이 지나면)</small></span>
+      <span><input class="param-input" type="number" min="0" step="1" id="param_reconfirm_days" value="90"><span class="param-unit">일</span></span>
+    </div>
     <div style="margin-top:14px;display:flex;justify-content:flex-end">
       <button class="btn btn-primary" onclick="saveParams()">파라미터 저장</button>
     </div>
@@ -224,10 +252,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.72"></script>
-<script src="js/common.js?v=2.9.72"></script>
-<script src="js/calc.js?v=2.9.72"></script>
-<script src="js/nav.js?v=2.9.72"></script>
+<script src="js/schema.js?v=2.9.73"></script>
+<script src="js/common.js?v=2.9.73"></script>
+<script src="js/cmn-sheet.js?v=2.9.73"></script>
+<script src="js/cmn-init.js?v=2.9.73"></script>
+<script src="js/calc.js?v=2.9.73"></script>
+<script src="js/nav.js?v=2.9.73"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -390,9 +420,12 @@ async function loadSettings(){
     // 그 행들의 category를 keyword/parameter로 잘못 재분류해버려(k.startsWith('kw_')가 아니므로
     // 전부 'parameter'가 됨), 코드 관리 화면에서 저장한 거래유형 데이터가 정체불명의 category로
     // 오염되는 사고로 이어졌다(전수조사로 발견). settingsMap은 키워드·파라미터 카테고리만 담는다.
-    const CODE_CATS=new Set(['txn_type','branch_rule','fixed_item','skill_tag']);
-    toObj(rows).forEach(r=>{ if(r.setting_key&&!CODE_CATS.has(r.category)) settingsMap[r.setting_key]=r.setting_value; });
-    // 키워드 채우기
+    // v2.9.73 SCR-12: 판별 기준을 공유 상수(schema.js S10_KP_CATS)로 통일 — 키워드·파라미터 카테고리만 settingsMap에 담고,
+    // 코드(역할·업종 등)·인력 설정값·알 수 없는 카테고리는 담지 않는다(저장 때 읽은 그대로 보존).
+    toObj(rows).forEach(r=>{ if(r.setting_key&&S10_KP_CATS.includes(r.category||'')) settingsMap[r.setting_key]=r.setting_value; });
+    // 인력 설정값(category=hr_setting) — 값이 없으면 기본값을 보여 주기만 하고, 저장해야 시트에 기록된다
+    const hr={}; toObj(rows).forEach(r=>{ if(r.category===S10_HR_SETTING_CAT&&r.setting_key) hr[r.setting_key]=r.setting_value; });
+    HR_SETTING_FIELDS.forEach(([k,def])=>{ const el=document.getElementById('param_'+k); if(el) el.value=(hr[k]!==undefined&&hr[k]!=='')?hr[k]:def; });    // 키워드 채우기
     ['kw_revenue_inflow','kw_cost_outflow','kw_fixed_outflow','kw_tax_outflow','kw_capital_inflow','kw_card_branch','kw_ai_branch'].forEach(k=>{ const _e=document.getElementById(k); if(!_e) return;
       const el=document.getElementById(k);
       if(el&&settingsMap[k]) el.value=settingsMap[k];
@@ -409,16 +442,22 @@ async function loadSettings(){
   }catch(e){ toast('S10 설정 로드 실패: '+e.message,true); }
 }
 
-async function saveSettingsToSheet(){
-  // v2.9.38: 치명적 결함 수정 — 이 함수는 settingsMap(키워드·파라미터 7~12개 항목)만 갖고 S10 시트
-  // 전체를 clearAndWrite했다. 그런데 S10에는 코드 관리 화면(saveCodes)이 저장한 거래유형·거래점
-  // 규칙·고정비 항목·스킬태그(txn_type/branch_rule/fixed_item/skill_tag) 데이터도 함께 들어있는데,
-  // settingsMap은 이 데이터를 전혀 모르므로 "키워드 저장"·"분류 규칙 저장"·"파라미터 저장" 중 아무
-  // 버튼이나 누르면 그 순간 거래유형 코드 전체가 흔적도 없이 사라졌다(사용자 신고로 발견 — v2.9.37의
-  // "읽기 실패 시 덮어쓰기"와는 별개의, 훨씬 직접적인 원인). 수정: 저장 직전 시트를 읽어와 코드 관리
-  // 카테고리 행은 그대로 보존하고, settingsMap 부분만 교체해 병합한다. 읽기가 실패하면(원칙 27,
-  // 최우선 데이터 보호 원칙) 쓰기 자체를 포기한다.
-  const CODE_CATS=new Set(['txn_type','branch_rule','fixed_item','skill_tag']);
+// v2.9.73 SCR-12: S10을 읽어 오는 단일 관문. 읽기가 실패하거나 읽기 범위(R.S10)를 꽉 채웠으면(=뒤쪽이 잘렸을 수 있음) null —
+// 이 경우 어떤 저장도 하지 않는다(읽은 것만 다시 쓰는 방식이라, 잘린 채 쓰면 뒤쪽 행이 지워진다).
+let s10ReadMsg='';
+async function readS10Fresh(){
+  s10ReadMsg='설정을 읽을 수 없어 저장을 중단했습니다.';
+  try{
+    const v=await fetchSheetSafe(...R.S10); if(v===null) return null;
+    const limit=parseInt(R.S10[1].split(':')[1].replace(/\D/g,''),10);
+    if(v.length>=limit){ s10ReadMsg=`설정 시트가 읽기 범위(${limit}행)를 채워 저장을 중단했습니다. 행이 잘려 지워질 수 있어 관리자 확인이 필요합니다.`; return null; }
+    s10ReadMsg=''; return toObj(v);
+  }catch(e){ return null; }
+}
+async function saveSettingsToSheet(hrUpd){
+  // v2.9.38: 이 함수는 settingsMap(키워드·파라미터)만 알기 때문에, S10의 다른 행(코드 관리 카테고리 등)은 저장 직전 시트를 읽어 그대로 보존한다.
+  // v2.9.73 SCR-12: 보존 대상을 "키워드·파라미터가 아닌 모든 행"으로 넓혔다 — 새 코드 카테고리(role·industry·project_type·fail_reason),
+  // 인력 설정값(hr_setting), 알 수 없는 카테고리까지 지우거나 다른 카테고리로 바꾸지 않는다. 인력 설정값은 hrUpd({키:값})로 받은 것만 갱신한다.
   const header=['setting_key','setting_value','category','description','updated_at'];
   const today=new Date().toISOString().slice(0,10);
   const descMap={
@@ -430,14 +469,17 @@ async function saveSettingsToSheet(){
     param_alert_days:'마감 임박 경고 D-day',param_base_balance:'추정 기초 잔액(자본금)',param_base_ym:'추정 기산월',
     param_cash_warn_months:'현금 부족 경고 선행 개월',
   };
-  // v2.9.9: setting_value는 키워드(텍스트)와 파라미터(숫자)가 같은 컬럼에 혼재 — 컬럼 단위 일괄 정규화(rowsFor) 대신
-  // 숫자 파라미터(param_base_balance 등 금액·개월수)만 개별적으로 num()으로 순수 숫자화, 키워드는 원본 텍스트 유지.
+  const hrDesc=Object.fromEntries(HR_SETTING_FIELDS.map(([k,,l])=>[k,l]));
+  // v2.9.9: setting_value는 키워드(텍스트)와 파라미터(숫자)가 같은 컬럼에 혼재 — 숫자 파라미터만 개별적으로 num()으로 순수 숫자화
   const NUMERIC_PARAMS=new Set(['param_alert_threshold','param_alert_days','param_base_balance','param_cash_warn_months']);
-  const existingRows=await fetchSheetSafe(...R.S10);
-  if(existingRows===null) return false; // 읽기 실패 — 무엇을 보존해야 할지 알 수 없으므로 쓰기 포기
-  const existing=toObj(existingRows);
-  const preserved=existing.filter(r=>CODE_CATS.has(r.category)&&!Object.prototype.hasOwnProperty.call(settingsMap,r.setting_key))
-    .map(r=>[r.setting_key,r.setting_value,r.category,r.description||'',r.updated_at||today]);
+  const existing=await readS10Fresh();
+  if(existing===null) return false; // 읽기 실패 — 무엇을 보존해야 할지 알 수 없으므로 쓰기 포기
+  const upd=hrUpd||{}; const done=new Set();
+  const preserved=existing.filter(r=>r.setting_key&&!S10_KP_CATS.includes(r.category||'')).map(r=>{
+    if(r.category===S10_HR_SETTING_CAT&&Object.prototype.hasOwnProperty.call(upd,r.setting_key)){ done.add(r.setting_key); return [r.setting_key,upd[r.setting_key],r.category,r.description||hrDesc[r.setting_key]||'',today]; }
+    return [r.setting_key,r.setting_value,r.category,r.description||'',r.updated_at||today];
+  });
+  Object.keys(upd).filter(k=>!done.has(k)).forEach(k=>preserved.push([k,upd[k],S10_HR_SETTING_CAT,hrDesc[k]||'',today]));
   const settingRows=Object.entries(settingsMap).map(([k,v])=>[
     k,NUMERIC_PARAMS.has(k)?num(v):v,k.startsWith('kw_')?'keyword':'parameter',descMap[k]||'',today
   ]);
@@ -463,27 +505,33 @@ async function saveBranchRules(){
 }
 
 async function saveParams(){
+  // v2.9.73 SCR-12: 인력 설정값 3개는 숫자(0 이상 정수)만 허용 — 저장 전에 검사
+  const hrUpd={};
+  for(const [k,,label] of HR_SETTING_FIELDS){
+    const v=document.getElementById('param_'+k).value.trim();
+    if(!/^\d+$/.test(v)){ toast('숫자만 입력해 주세요. ('+label+')',true); return; }
+    hrUpd[k]=parseInt(v,10);
+  }
   ['param_alert_threshold','param_alert_days','param_cash_warn_months','param_base_balance','param_base_ym'].forEach(k=>{
     settingsMap[k]=document.getElementById(k).value;
   });
   toast('저장 중…');
-  const ok=await saveSettingsToSheet();
-  toast(ok?'✓ 파라미터 저장 완료':'저장 실패',!ok);
+  const ok=await saveSettingsToSheet(hrUpd);
+  toast(ok?'✓ 파라미터 저장 완료':(s10ReadMsg||'저장 실패'),!ok);
 }
 
 window.addEventListener('load',()=>{ loadRates(); loadSettings(); });
 
 // ═══ v1.2 코드 관리 (#10,#14,#15) ═══
-let codeRows={txn_type:[],branch_rule:[],fixed_item:[],skill_tag:[]}, s10Other=[];
+let codeRows={txn_type:[],branch_rule:[],fixed_item:[],skill_tag:[],role:[],industry:[],project_type:[],fail_reason:[]}; // v2.9.73: 인력 모듈 코드 4종 추가
 const DEF_TYPES=[['매출입금',''],['매입지급',''],['고정비',''],['급여',''],['세금',''],['법인카드',''],['AI사용료',''],['기타비용',''],['기타입금','']];
 async function loadCodes(){
  try{
   const rows=toObj(await fetchSheet(...R.S10));
-  s10Other=rows.filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category));
   // v2.9.45: txn_type만 description 컬럼에 저장된 "집계 버킷"을 세 번째 요소로 함께 복원.
   // description은 그동안 이 카테고리들에서 항상 빈 문자열로만 저장되던 컬럼이라 스키마 변경 없이 재사용.
   codeRows.txn_type=rows.filter(r=>r.category==='txn_type').map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.description||'']);
-  ['branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
+  ['branch_rule','fixed_item','skill_tag',...S10_HR_CODE_CATS].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
   if(!codeRows.txn_type.length){
     // v2.9.42: 이 폴백도 옛 key/value 필드명이라 항상 빈 값만 반환하던 결함 — setting_key/setting_value로 정정.
     const kw=k=>(rows.find(r=>r.setting_key===k)||{}).setting_value||'';
@@ -508,12 +556,12 @@ const TXN_BUCKETS=[
   ['법인카드','법인카드(출금)'],['AI사용료','AI사용료(출금)'],['기타비용','기타비용(출금)'],
 ];
 function renderCodes(){
-  const mk=(c,ph1,ph2,useDL)=>codeRows[c].map((r,i)=>`<div class="code-row">
-    <input value="${r[0]||''}" placeholder="${ph1}" data-c="${c}" data-i="${i}" data-f="0" oninput="codeRows['${c}'][${i}][0]=this.value${c==='txn_type'?';fillDL()':''}">
-    <input value="${r[1]||''}" placeholder="${ph2}" ${useDL?'list="typeDL"':''} oninput="codeRows['${c}'][${i}][1]=this.value">
+  const mk=(c,ph1,ph2,useDL,checkUse)=>codeRows[c].map((r,i)=>`<div class="code-row">
+    <input value="${escAttr(r[0])}" placeholder="${ph1}" data-c="${c}" data-i="${i}" data-f="0" oninput="codeRows['${c}'][${i}][0]=this.value${c==='txn_type'?';fillDL()':''}">
+    <input value="${escAttr(r[1])}" placeholder="${ph2}" ${useDL?'list="typeDL"':''} oninput="codeRows['${c}'][${i}][1]=this.value">
     <button onclick="moveCode('${c}',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
     <button onclick="moveCode('${c}',${i},1)" title="우선순위 내리기" ${i===codeRows[c].length-1?'disabled style="opacity:.25"':''}>▼</button>
-    <button onclick="codeRows['${c}'].splice(${i},1);renderCodes()">✕</button></div>`).join('');
+    <button onclick="${checkUse?`delCode('${c}',${i})`:`codeRows['${c}'].splice(${i},1);renderCodes()`}">✕</button></div>`).join('');
   document.getElementById('ctTxn').innerHTML=codeRows.txn_type.map((r,i)=>`<div class="code-row">
     <input value="${r[0]||''}" placeholder="유형명 (예: 매출 입금)" data-c="txn_type" data-i="${i}" data-f="0" oninput="codeRows['txn_type'][${i}][0]=this.value;fillDL()">
     <input value="${r[1]||''}" placeholder="키워드 콤마구분 (예: 오벳소프트,외주비)" oninput="codeRows['txn_type'][${i}][1]=this.value">
@@ -527,8 +575,14 @@ function renderCodes(){
   document.getElementById('ctBranch').innerHTML=mk('branch_rule','거래점 패턴 (예: 하나은행0026)','적용 유형 (예: 법인카드)',true);
   document.getElementById('ctFixed').innerHTML=mk('fixed_item','항목명 (예: 임차료)','대사 키워드(선택)');
   document.getElementById('ctSkill').innerHTML=mk('skill_tag','태그명 (예: React)','동의어 콤마구분 (예: 리액트,react)');
+  // v2.9.73 SCR-12: 인력 모듈 코드 — ✕는 사용 중인지 확인한 뒤 삭제(설계서 R2)
+  document.getElementById('ctRole').innerHTML=mk('role','역할 (예: DBA)','설명·동의어 콤마구분 (예: 데이터베이스관리자)',false,true);
+  document.getElementById('ctIndustry').innerHTML=mk('industry','업종 (예: 보험)','설명·동의어 콤마구분',false,true);
+  document.getElementById('ctProjType').innerHTML=mk('project_type','유형 (예: 차세대)','설명·동의어 콤마구분',false,true);
+  document.getElementById('ctFailReason').innerHTML=mk('fail_reason','사유 (예: 단가 불일치)','설명',false,true);
   fillDL();
 }
+const escAttr=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 function fillDL(){document.getElementById('typeDL').innerHTML=codeRows.txn_type.map(r=>`<option value="${r[0]}">`).join('');}
 function moveCode(c,i,d){
   const j=i+d; if(j<0||j>=codeRows[c].length) return;
@@ -536,27 +590,61 @@ function moveCode(c,i,d){
   renderCodes();
 }
 function addCode(c){codeRows[c].push(['','']);renderCodes();}
+// v2.9.73 SCR-12 — 코드 삭제 전 사용 건수 확인(설계서 R2: 사용 중이어도 확인 뒤 삭제 허용, 기존 기록에는 값만 남음)
+async function codeUsage(c,name){
+  const spec=S10_CODE_USAGE[c]||[]; const keys=[...new Set(spec.map(x=>x[0]))];
+  const r=await hrReadMany(keys); let total=0;
+  spec.forEach(([k,colName,multi])=>{ const t=r.tabs[k]; if(!t||!t.ok) return;
+    t.rows.forEach(row=>{ const v=String(row[colName]??''); const hit=multi?v.split(',').map(x=>x.trim()).includes(name):v.trim()===name; if(hit) total++; }); });
+  return {total,unread:r.failed.map(k=>R[k][0])};
+}
+async function delCode(c,i){
+  const name=String((codeRows[c][i]||[])[0]||'').trim();
+  if(name){
+    const u=await codeUsage(c,name);
+    if(u.total>0&&!confirm(`이 코드는 ${u.total}건에서 사용 중입니다. 삭제하면 기존 기록에는 값만 남습니다.`+(u.unread.length?`\n(읽지 못한 탭: ${u.unread.join(', ')} — 건수가 더 많을 수 있습니다)`:''))) return;
+  }
+  codeRows[c].splice(i,1); renderCodes();
+}
+// 새 코드 4종은 카테고리 안에서 이름 중복 불가(설계서 §16.4 No.1). 기존 4종의 동작은 바꾸지 않는다.
+function dupCodeName(){
+  for(const c of S10_HR_CODE_CATS){ const seen=new Set();
+    for(const r of codeRows[c]){ const n=String(r[0]||'').trim(); if(!n) continue; if(seen.has(n)) return {c,n}; seen.add(n); } }
+  return null;
+}
 async function saveCodes(){
+  const dup=dupCodeName();
+  if(dup){ toast(`같은 이름의 코드가 있습니다. (${S10_CODE_LABEL[dup.c]}: ${dup.n})`,true); return; }
   const today=new Date().toISOString().slice(0,10);
-  // v2.9.38: 헤더 컬럼 순서를 saveSettingsToSheet()와 완전히 통일 — 두 함수가 같은 S10 시트를
-  // ['setting_key','setting_value','description','category',...]와
-  // ['setting_key','setting_value','category','description',...]로 서로 다르게 써왔던 것이
-  // 전수조사(사용자 요청)로 드러남. toObj()는 시트에 실제로 저장된 헤더 행을 그대로 따라가므로
-  // 컬럼이 뒤바뀌어도 즉시 깨지지는 않지만, 두 함수가 번갈아 저장할 때마다 헤더 자체가 계속
-  // 바뀌는 것 자체가 데이터 정합성 위험이었다 — 이제 항상 category가 C열, description이 D열.
+  // v2.9.38: 헤더 컬럼 순서를 saveSettingsToSheet()와 통일 — 항상 category가 C열, description이 D열.
   const H=['setting_key','setting_value','category','description','updated_at'];
-  // 저장 직전 시트를 다시 읽어 s10Other(로드 시점 캡처값)가 그 사이 최신 상태와 어긋나지 않는지
-  // 확인 — 읽기가 실패하면(원칙 27) 메모리의 s10Other로 계속 진행하되, 성공하면 최신 값으로 교체.
-  const freshRows=await fetchSheetSafe(...R.S10);
-  const freshOther=freshRows!==null
-    ? toObj(freshRows).filter(r=>!['txn_type','branch_rule','fixed_item','skill_tag'].includes(r.category))
-    : s10Other;
-  const rows=[...freshOther.map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.category,r.description,r.updated_at])];
-  // v2.9.45: txn_type은 description 컬럼에 사용자가 지정한 집계 버킷(r[2])을 저장 — 다른
-  // 카테고리(branch_rule 등)는 description을 쓰지 않으므로 그대로 빈 문자열 유지.
-  ['txn_type','branch_rule','fixed_item','skill_tag'].forEach(c=>codeRows[c].filter(r=>r[0]).forEach(r=>rows.push([r[0],r[1]||'',c,c==='txn_type'?(r[2]||''):'',today])));
+  // v2.9.73 SCR-12: 저장 직전 S10을 다시 읽고, 이 화면이 관리하는 카테고리(S10_CODE_CATS)가 아닌 행은 읽은 그대로 보존한다
+  // (키워드·파라미터·인력 설정값·알 수 없는 카테고리). 읽기가 실패하면 쓰지 않는다 — 예전에는 메모리 값으로 계속 진행했다.
+  const fresh=await readS10Fresh();
+  if(fresh===null){ toast(s10ReadMsg||'설정을 읽을 수 없어 저장을 중단했습니다.',true); return; }
+  const rows=fresh.filter(r=>!S10_CODE_CATS.includes(r.category)).map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.category,r.description,r.updated_at]);
+  // v2.9.45: txn_type은 description 컬럼에 사용자가 지정한 집계 버킷(r[2])을 저장 — 다른 카테고리는 description을 쓰지 않으므로 빈 문자열.
+  S10_CODE_CATS.forEach(c=>codeRows[c].filter(r=>r[0]&&String(r[0]).trim()).forEach(r=>rows.push([S10_HR_CODE_CATS.includes(c)?String(r[0]).trim():r[0],r[1]||'',c,c==='txn_type'?(r[2]||''):'',today])));
   const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
+}
+// v2.9.73 CMN-03 시트 준비 — 확인 창 → 신규 탭 18개·기본 행·기본 코드. 이미 있는 것은 건드리지 않는다.
+async function runSheetPrep(){
+  if(!confirm('신규 탭 18개를 준비합니다. 이미 있는 탭은 변경하지 않습니다.')) return;
+  const btn=document.getElementById('btnPrep'), box=document.getElementById('prepResult');
+  btn.disabled=true; box.textContent='준비 중…';
+  let r;
+  try{ r=await hrInitSheets(m=>{ box.textContent='준비 중… '+m; }); }
+  catch(e){ r={ok:false,tabs:[],seeds:[],message:'시트 준비 중 오류가 발생했습니다: '+e.message}; }
+  btn.disabled=false;
+  const icon={created:'✅',exists:'➖',header:'⚠️',fail:'❌',skipped:'⏸'};
+  const li=x=>`<div>${icon[x.status]||''} ${x.target} — ${x.message}</div>`;
+  const cnt=st=>r.tabs.filter(x=>x.status===st).length;
+  box.innerHTML=`<div style="margin-bottom:4px;font-weight:600">${r.ok?'완료':'일부 실패'} — 새로 만듦 ${cnt('created')} · 이미 있음 ${cnt('exists')} · 헤더 불일치 ${cnt('header')} · 실패 ${cnt('fail')} · 미실행 ${cnt('skipped')}</div>`
+    +(r.message?`<div style="color:var(--red)">${r.message}</div>`:'')
+    +r.tabs.filter(x=>x.status!=='exists').map(li).join('')+r.seeds.map(li).join('');
+  toast(r.ok?'✓ 시트 준비 완료':(r.message||'일부 항목이 실패했습니다. 결과를 확인하세요'),!r.ok);
+  await loadCodes(); await loadSettings();
 }
 window.addEventListener('load',loadCodes);
 </script>

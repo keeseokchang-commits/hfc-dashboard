@@ -72,7 +72,7 @@ function rowsFor(H,list){
     let v=r[h];
     if(NUMERIC_COLS.has(h)){
       if(v===undefined||v===null||v===''){ return ZERO_DEFAULT_COLS.has(h)?0:''; }
-      return num(v);
+      return (typeof DECIMAL_COLS!=='undefined'&&DECIMAL_COLS.has(h))?numF(v):num(v); // v2.9.73: 소수 한 자리 컬럼(경력 연수)은 정수로 자르지 않는다
     }
     return v??'';
   }));
