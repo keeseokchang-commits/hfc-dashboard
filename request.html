@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 인력 의뢰 대장</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.76">
+<link rel="stylesheet" href="css/hr.css?v=2.9.76">
+</head>
+<body data-page="stf_req">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>인력 의뢰 대장</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+
+  <div id="screen" style="display:none">
+    <div class="hr-row" style="margin-bottom:12px;justify-content:flex-end">
+      <button class="btn btn-secondary" id="btnPool" disabled title="후보자 관리는 다음 개발 단계에서 열립니다">후보자 풀</button>
+      <button class="btn btn-primary" id="btnNewReq" onclick="location.href='request-detail.html?new=1'">+ 새 의뢰</button>
+    </div>
+
+    <!-- 상단 요약 -->
+    <div class="hr-kpis" id="kpis"></div>
+
+    <!-- 필터 바 -->
+    <div class="card">
+      <div class="hr-row">
+        <div class="hr-field fixed" style="min-width:110px"><label for="fYear">연도</label><select class="hr-select" id="fYear" onchange="onFilter()"></select></div>
+        <div class="hr-field fixed" style="min-width:100px"><label for="fMonth">월</label><select class="hr-select" id="fMonth" onchange="onFilter()"></select></div>
+        <div class="hr-field fixed" style="min-width:120px"><label for="fStatus">상태</label><select class="hr-select" id="fStatus" onchange="onFilter()"></select></div>
+        <div class="hr-field"><label for="fClient">고객사</label><select class="hr-select" id="fClient" onchange="onFilter()"></select></div>
+        <div class="hr-field"><label for="fSearch">검색어</label><input class="hr-input" id="fSearch" placeholder="번호·프로젝트명·고객사·역할·서치업체" oninput="onFilter()"></div>
+      </div>
+    </div>
+
+    <!-- 의뢰 목록 -->
+    <div class="card">
+      <div class="card-title"><span>의뢰 목록 <span class="hr-sub" id="listCount"></span></span><span class="hr-sub">열 머리글을 누르면 정렬됩니다 · 금액은 만원/월</span></div>
+      <div id="listBox"></div>
+    </div>
+
+    <!-- 알림 영역 -->
+    <div class="card">
+      <div class="card-title">알림</div>
+      <div id="alertBox"></div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.76"></script>
+<script src="js/common.js?v=2.9.76"></script>
+<script src="js/cmn-sheet.js?v=2.9.76"></script>
+<script src="js/cmn-derive.js?v=2.9.76"></script>
+<script src="js/cmn-alert.js?v=2.9.76"></script>
+<script src="js/hr-ui.js?v=2.9.76"></script>
+<script src="js/scr-request.js?v=2.9.76"></script>
+<script src="js/nav.js?v=2.9.76"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

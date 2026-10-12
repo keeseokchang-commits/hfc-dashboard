@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 거래처 관리</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.76">
+<link rel="stylesheet" href="css/hr.css?v=2.9.76">
+</head>
+<body data-page="party">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>거래처 관리</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+
+  <div id="screen" style="display:none">
+    <div class="hr-split">
+      <div>
+        <!-- ① 검색·필터 -->
+        <div class="card">
+          <div class="card-title">① 검색·필터</div>
+          <div class="hr-row">
+            <div class="hr-field"><label for="fSearch">이름·별칭 검색</label><input class="hr-input" id="fSearch" placeholder="이름 또는 별칭" oninput="renderList()"></div>
+            <div class="hr-field"><label for="fRole">역할</label><select class="hr-select" id="fRole" onchange="renderList()"></select></div>
+            <label class="hr-switch fixed" style="padding-bottom:9px"><input type="checkbox" id="fHidden" onchange="renderList()"> 숨김 포함</label>
+          </div>
+        </div>
+        <!-- ② 거래처 목록 -->
+        <div class="card">
+          <div class="card-title">② 거래처 목록 <button class="btn btn-primary btn-sm" id="btnNewParty" onclick="newParty()">+ 새 거래처</button></div>
+          <div class="hr-help" style="margin-bottom:8px">건수(담당자·의뢰·발송·이력서)는 읽기 전용 집계입니다.</div>
+          <div id="partyList"></div>
+        </div>
+      </div>
+
+      <div>
+        <!-- ③ 거래처 입력·수정 -->
+        <div class="card" id="partyForm">
+          <div class="card-title"><span id="pfTitle">③ 거래처 입력</span><span id="pfBadges"></span></div>
+          <div class="hr-field"><label class="hr-req" for="pfName">거래처명</label><input class="hr-input" id="pfName" maxlength="100"><div class="hr-err" id="pfNameErr"></div></div>
+          <div style="margin-top:10px"><div class="hr-lbl hr-req" style="margin-bottom:6px">역할 (복수 선택)</div><div class="hr-chips" id="pfRoles"></div><div class="hr-err" id="pfRolesErr"></div></div>
+          <div class="hr-field" style="margin-top:10px"><label for="pfAliases">별칭 (쉼표로 구분)</label><input class="hr-input" id="pfAliases" placeholder="표기가 다른 같은 회사 이름"><div class="hr-help">경력의 고객사·현행 프로젝트 고객사를 연결할 때 이 별칭으로 자동 매칭합니다.</div></div>
+          <div class="hr-row" style="margin-top:10px">
+            <div class="hr-field"><label for="pfPhone">대표 전화</label><input class="hr-input" id="pfPhone" inputmode="tel"></div>
+          </div>
+          <div class="hr-field" style="margin-top:10px"><label for="pfMemo">메모</label><textarea class="hr-textarea" id="pfMemo"></textarea></div>
+          <div class="hr-err" id="pfMsg" style="margin-top:8px"></div>
+          <div class="hr-row" style="margin-top:12px">
+            <button class="btn btn-primary" id="btnSaveParty" onclick="saveParty()">저장</button>
+            <button class="btn btn-secondary" id="btnHideParty" onclick="toggleHideParty()" style="display:none">숨김</button>
+          </div>
+        </div>
+
+        <!-- ④ 담당자 -->
+        <div class="card" id="contactCard" style="display:none">
+          <div class="card-title"><span id="ctTitle">④ 담당자</span><button class="btn btn-secondary btn-sm" onclick="newContact()">+ 담당자 추가</button></div>
+          <div id="contactList"></div>
+          <div id="contactForm" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <div class="hr-lbl" id="cfTitle" style="margin-bottom:8px">담당자 입력</div>
+            <div class="hr-row">
+              <div class="hr-field"><label class="hr-req" for="cfName">이름</label><input class="hr-input" id="cfName"><div class="hr-err" id="cfNameErr"></div></div>
+              <div class="hr-field"><label for="cfTitleIn">직함</label><input class="hr-input" id="cfTitleIn"></div>
+            </div>
+            <div class="hr-row" style="margin-top:8px">
+              <div class="hr-field"><label for="cfPhone">전화</label><input class="hr-input" id="cfPhone" inputmode="tel"></div>
+              <div class="hr-field"><label for="cfEmail">이메일</label><input class="hr-input" id="cfEmail" inputmode="email"></div>
+            </div>
+            <div class="hr-row" style="margin-top:8px">
+              <div class="hr-field"><label for="cfLast">마지막 연락일</label><input class="hr-input" id="cfLast" type="date"></div>
+              <div class="hr-field"><label for="cfMemo">담당자 메모</label><input class="hr-input" id="cfMemo"></div>
+            </div>
+            <div class="hr-row" style="margin-top:10px">
+              <label class="hr-switch"><input type="checkbox" id="cfPrimary"> 주 담당자</label>
+              <label class="hr-switch"><input type="checkbox" id="cfHidden"> 담당자 숨김</label>
+            </div>
+            <div class="hr-err" id="cfMsg" style="margin-top:8px"></div>
+            <div class="hr-row" style="margin-top:10px"><button class="btn btn-primary" id="btnSaveContact" onclick="saveContact()">담당자 저장</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.76"></script>
+<script src="js/common.js?v=2.9.76"></script>
+<script src="js/cmn-sheet.js?v=2.9.76"></script>
+<script src="js/cmn-derive.js?v=2.9.76"></script>
+<script src="js/hr-ui.js?v=2.9.76"></script>
+<script src="js/scr-party.js?v=2.9.76"></script>
+<script src="js/nav.js?v=2.9.76"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

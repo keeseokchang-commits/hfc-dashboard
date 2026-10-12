@@ -1,0 +1,76 @@
+/* HFC hr.css v2.9.76 — 인력 의뢰·거래처 화면(request/request-detail/party) 공통 스타일.
+   common.css 위에 얹는다. 입력창·버튼·배지·목록은 이 파일 한 곳에서만 정의한다(화면마다 따로 만들지 않는다). */
+@media(min-width:768px){ .main{max-width:1180px} }
+.hr-page-title{font-size:16px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hr-sub{font-size:12px;color:var(--text3);font-weight:400}
+.hr-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.hr-field{display:flex;flex-direction:column;gap:4px;min-width:120px;flex:1}
+.hr-field.fixed{flex:0 0 auto}
+.hr-field>label,.hr-lbl{font-size:12px;font-weight:600;color:var(--text2)}
+.hr-req::after{content:' *';color:var(--red)}
+.hr-input,.hr-select,.hr-textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text);outline:none;font-family:inherit}
+.hr-input:focus,.hr-select:focus,.hr-textarea:focus{border-color:var(--blue)}
+.hr-input:disabled,.hr-select:disabled,.hr-textarea:disabled{background:var(--surface2);color:var(--text3)}
+.hr-textarea{min-height:64px;resize:vertical}
+.hr-input.num{text-align:right}
+.hr-err{font-size:11px;color:var(--red);min-height:0}
+.hr-err:empty{display:none}
+.hr-help{font-size:11px;color:var(--text3)}
+.btn{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:disabled,.btn:disabled{background:var(--surface2);color:var(--text3);cursor:not-allowed;border:1px solid var(--border)}
+.btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.btn-danger{background:var(--red-lt);color:var(--red);border:1px solid #FECACA}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-emph{box-shadow:0 0 0 3px rgba(37,99,235,.25)}
+.hr-chips{display:flex;gap:6px;flex-wrap:wrap}
+.hr-chip{padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);font-size:12px;color:var(--text2);cursor:pointer;user-select:none}
+.hr-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.hr-chip.disabled{opacity:.5;cursor:not-allowed}
+.hr-switch{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer}
+.hr-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+@media(min-width:768px){ .hr-kpis{grid-template-columns:repeat(4,1fr)} }
+.hr-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);cursor:pointer;text-align:left;font-family:inherit}
+.hr-kpi.on{border-color:var(--blue);background:var(--blue-lt)}
+.hr-kpi .l{font-size:11px;color:var(--text3);margin-bottom:4px}
+.hr-kpi .v{font-size:20px;font-weight:700}
+.hr-kpi .s{font-size:11px;color:var(--text3);margin-top:3px}
+.hr-kpi.red .v{color:var(--red)} .hr-kpi.amber .v{color:var(--amber)} .hr-kpi.blue .v{color:var(--blue)}
+.hr-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.hr-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:980px}
+.hr-table th{font-size:11px;font-weight:600;color:var(--text3);text-align:left;padding:8px 6px;border-bottom:2px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.hr-table th.r,.hr-table td.r{text-align:right}
+.hr-table th.nosort{cursor:default}
+.hr-table td{font-size:12px;padding:9px 6px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hr-table tbody tr{cursor:pointer}
+.hr-table tbody tr:hover td{background:var(--surface2)}
+.hr-table .wrap{white-space:normal;word-break:keep-all}
+.hr-sort{color:var(--blue);margin-left:2px}
+.hr-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;display:inline-block;white-space:nowrap}
+.hr-badge.gray{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.hr-badge.blue{background:var(--blue-lt);color:var(--blue)} .hr-badge.green{background:var(--green-lt);color:var(--green)}
+.hr-badge.amber{background:var(--amber-lt);color:var(--amber)} .hr-badge.red{background:var(--red-lt);color:var(--red)}
+.hr-alert{font-size:12px;padding:8px 10px;border-radius:8px;margin-bottom:6px;background:var(--amber-lt);color:#92400E;display:flex;gap:6px;align-items:center;cursor:pointer}
+.hr-alert.red{background:var(--red-lt);color:var(--red)}
+.hr-alert.plain{background:var(--surface2);color:var(--text2);cursor:default}
+.hr-empty{text-align:center;padding:28px 12px;color:var(--text3);font-size:13px}
+.hr-notice{font-size:12px;padding:10px 12px;border-radius:8px;background:var(--blue-lt);color:var(--blue);margin-bottom:10px;line-height:1.5}
+.hr-notice.warn{background:var(--amber-lt);color:#92400E}
+.hr-notice.err{background:var(--red-lt);color:var(--red)}
+.hr-steps{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.hr-step{flex:1;min-width:92px;text-align:center;font-size:11px;padding:7px 4px;border-radius:8px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);text-decoration:none;cursor:pointer}
+.hr-step b{color:var(--blue)}
+.hr-block-no{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;margin-right:6px}
+.hr-grid2{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:768px){ .hr-grid2{grid-template-columns:1fr 1fr} }
+.hr-split{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:900px){ .hr-split{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)} }
+.hr-line-card{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)}
+.hr-line-card.cancelled{opacity:.6;background:var(--surface2)}
+.hr-rate-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hr-list-item{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;background:var(--surface)}
+.hr-list-item.on{border-color:var(--blue);background:var(--blue-lt)}
+.hr-list-item.off{opacity:.55}
+.hr-pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:320px;overflow:auto;font-family:inherit}
+.hr-muted{color:var(--text3)}
+.hr-login{margin-left:auto}

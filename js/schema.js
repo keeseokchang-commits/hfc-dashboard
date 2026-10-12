@@ -179,7 +179,7 @@ const HR_ORDER=Object.keys(HR_TABS); // 신규 탭 18개(정의 순서)
   });
 })();
 // 행 단위 삭제를 허용하는 탭(물리 설계 §9 — 접촉 이력만)
-const HR_DELETABLE=new Set(['S26']);
+const HR_DELETABLE=new Set(['S26','S33']);   // S33: 프로그램 설계서 §5.6 "후보 없는 라인만 삭제" — 후보 유무는 화면(SCR-02)이 확인한다
 // 숫자 컬럼 추가(물리 설계 §5). 단가·인원·연령·개월 수는 빈칸 유지(미정과 0을 구분), cnt_* 만 0 기본값.
 ['career_years_reported','career_years_manual','desired_rate','birth_year','headcount','line_no','rate_sell','rate_buy_target',
  'offered_rate_buy','rate_buy','age_min','age_max','duration_months','load_pct','version_no','cnt_new','cnt_updated','cnt_review','cnt_fail'

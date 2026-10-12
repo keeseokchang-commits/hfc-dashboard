@@ -1,7 +1,7 @@
 // HFC nav.js v2.0 — 사이드바·탭바 단일 렌더(메뉴 변경은 이 파일만 수정)
 // v2.9.28: 배포 버전 표시 — 실제 실행 중인 배포가 어느 버전인지 화면에서 바로 구분할 수 있게(사용자 요청).
 // 새 버전 배포 시 이 상수 하나만 갱신하면 전 화면(사이드바+모바일 탭바)에 자동 반영된다.
-const HFC_VERSION='v2.9.75';
+const HFC_VERSION='v2.9.76';
 const NAV_ITEMS=[
   ['dash','🏠','대시보드','index.html',true],
   ['pipeline','📋','사업기회','pipeline.html',true],
@@ -12,18 +12,29 @@ const NAV_ITEMS=[
   ['fixed','🏢','고정비','fixed.html',false],
   ['cashflow','💰','자금수지','cashflow.html',true],
   ['vat','🧾','부가세','vat.html',false],
+  // v2.9.76 인력 관리 그룹(통합 설계서 v0.9 §6.1·6.2: 부가세 다음에 구분선 + 그룹, 기존 메뉴 순서는 그대로). 후보자 관리 메뉴는 단계 ②에서 추가한다.
+  ['sep'],
+  ['stf_req','🧑‍💼','인력 의뢰','request.html',false,'인력 관리'],
+  ['party','🤝','거래처 관리','party.html',false],
+  ['sep'],
   ['settings','⚙️','설정','settings.html',false],
 ];
+// 구분선은 사이드바에서만 그리고, 모바일 탭바·더보기에서는 건너뛴다. 의뢰 상세는 인력 의뢰 메뉴를 활성으로 둔다(page 이름 별칭).
+const NAV_ALIAS={stf_req_detail:'stf_req'};
+const navItemsOnly=()=>NAV_ITEMS.filter(x=>x[0]!=='sep');
 function renderNav(active){
+  active=NAV_ALIAS[active]||active;
   const sn=document.querySelector('nav.side-nav');
-  if(sn) sn.innerHTML=NAV_ITEMS.map(([k,ic,label,href])=>
-    `<button class="side-nav-item${k===active?' active':''}" ${k===active?'':`onclick="location.href='${href}'"`}><span class="sn-icon">${ic}</span>${label}</button>`).join('\n')
+  if(sn) sn.innerHTML=NAV_ITEMS.map(([k,ic,label,href,,group])=> k==='sep'
+    ?'<div style="height:1px;background:var(--border,#E2E8F0);margin:6px 8px"></div>'
+    :(group?`<div style="padding:4px 14px 2px;font-size:11px;color:var(--text3,#94A3B8)">${group}</div>`:'')
+      +`<button class="side-nav-item${k===active?' active':''}" ${k===active?'':`onclick="location.href='${href}'"`}><span class="sn-icon">${ic}</span>${label}</button>`).join('\n')
     +`<div style="margin-top:auto;padding:10px 14px;font-size:11px;color:var(--text3,#94A3B8);border-top:1px solid var(--border,#E2E8F0)">HFC 경영관리 ${HFC_VERSION}</div>`;
   const tb=document.querySelector('nav.tab-bar');
   if(tb){
-    const moreKeys=NAV_ITEMS.filter(x=>!x[4]).map(x=>x[0]);
+    const moreKeys=navItemsOnly().filter(x=>!x[4]).map(x=>x[0]);
     const moreActive=moreKeys.includes(active);
-    tb.innerHTML=NAV_ITEMS.filter(x=>x[4]).map(([k,ic,label,href])=>
+    tb.innerHTML=navItemsOnly().filter(x=>x[4]).map(([k,ic,label,href])=>
       `<button class="tab-item${k===active?' active':''}" ${k===active?'':`onclick="location.href='${href}'"`}><span class="tab-icon">${ic}</span>${label==='대시보드'?'홈':label}</button>`).join('\n')
       +`<button class="tab-item${moreActive?' active':''}" onclick="toggleMoreNav()"><span class="tab-icon">⋯</span>더보기</button>`;
   }
@@ -49,10 +60,10 @@ if(document.readyState!=='loading'){ const p=document.body&&document.body.datase
 function toggleMoreNav(){
   let m=document.getElementById('moreNav');
   if(m){ m.remove(); return; }
-  const active=document.body.dataset.page;
+  const active=NAV_ALIAS[document.body.dataset.page]||document.body.dataset.page;
   m=document.createElement('div'); m.id='moreNav';
   m.style.cssText='position:fixed;right:10px;bottom:64px;z-index:250;background:var(--surface,#fff);border:1px solid var(--border,#E2E8F0);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:8px;min-width:150px';
-  m.innerHTML=NAV_ITEMS.filter(x=>!x[4]).map(([k,ic,label,href])=>
+  m.innerHTML=navItemsOnly().filter(x=>!x[4]).map(([k,ic,label,href])=>
     `<button style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:none;background:${k===active?'var(--blue-lt,#EFF6FF)':'none'};border-radius:9px;font-size:13px;cursor:pointer;color:${k===active?'var(--blue,#2563EB)':'inherit'};font-weight:${k===active?'700':'500'}" onclick="location.href='${href}'">${ic} ${label}</button>`).join('');
   document.body.appendChild(m);
   setTimeout(()=>document.addEventListener('click',function h(e){ if(!m.contains(e.target)&&!e.target.closest('.tab-item')){m.remove();document.removeEventListener('click',h);} }),50);

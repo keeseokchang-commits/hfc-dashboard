@@ -1,6 +1,6 @@
 const {chromium}=require('playwright'); const path=require('path');
 (async()=>{ const b=await chromium.launch(); let bad=0;
-  for(const f of ['index','input','pipeline','project','estimate','cashflow','vat','fixed','profile','settings']){
+  for(const f of ['index','input','pipeline','project','estimate','cashflow','vat','fixed','profile','settings','party','request','request-detail']){
     const p=await (await b.newContext()).newPage(); const errs=[];
     p.on('pageerror',e=>errs.push(e.message));
     await p.route('**/*',r=>{ const u=r.request().url(); if(u.startsWith('file://')) return r.continue();

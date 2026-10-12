@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 인력 의뢰 상세</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.76">
+<link rel="stylesheet" href="css/hr.css?v=2.9.76">
+</head>
+<body data-page="stf_req_detail">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>인력 의뢰 상세</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+
+  <div id="screen" style="display:none">
+    <!-- 상단: 상태·처리 -->
+    <div class="card">
+      <div class="hr-page-title">
+        <a href="request.html" class="btn btn-secondary btn-sm" style="text-decoration:none">← 의뢰 대장</a>
+        <span id="topTitle"></span><span id="topStatus"></span><span class="hr-sub" id="topId"></span>
+      </div>
+      <div class="hr-help" style="margin-bottom:8px">의뢰 상태는 후보 단계·발송 기록으로 자동 계산되는 값이라 직접 고칠 수 없습니다. (실패·취소만 아래 버튼으로 처리)</div>
+      <div class="hr-row">
+        <button class="btn btn-danger btn-sm" id="btnFail" onclick="openClosePanel('실패')">실패 처리</button>
+        <button class="btn btn-secondary btn-sm" id="btnCancel" onclick="openClosePanel('취소')">취소 처리</button>
+        <button class="btn btn-secondary btn-sm" id="btnReopen" onclick="reopenReq()" style="display:none">진행으로 되돌리기</button>
+        <button class="btn btn-secondary btn-sm" id="btnPromote" disabled title="사업기회 승격 후 사용할 수 있습니다.">사업기회 승격</button>
+        <button class="btn btn-secondary btn-sm" id="btnEstimate" disabled title="사업기회 승격 후 사용할 수 있습니다.">견적에 반영</button>
+      </div>
+      <div class="hr-help" style="margin-top:6px" id="promoteHelp">사업기회 승격과 견적 반영은 후보 단계가 열리는 다음 개발 단계에서 사용할 수 있습니다.</div>
+      <div id="closePanel" style="display:none;margin-top:10px" class="hr-line-card">
+        <div class="hr-lbl" id="closeTitle"></div>
+        <div class="hr-field" id="closeReasonWrap" style="margin-top:6px"><label class="hr-req" for="closeReason">실패 사유</label><select class="hr-select" id="closeReason"></select><div class="hr-err" id="closeReasonErr"></div></div>
+        <div class="hr-err" id="closeMsg"></div>
+        <div class="hr-row" style="margin-top:8px"><button class="btn btn-primary btn-sm" id="btnCloseDo" onclick="doClose()">확인</button><button class="btn btn-secondary btn-sm" onclick="hrQ('closePanel').style.display='none'">닫기</button></div>
+      </div>
+    </div>
+
+    <!-- 진행 순서 띠 -->
+    <div class="hr-steps" id="steps">
+      <a class="hr-step" href="#secInfo"><b>①</b> 의뢰 정보</a><a class="hr-step" href="#secLines"><b>②</b> 요청 라인</a><a class="hr-step" href="#secSend"><b>③</b> 서치업체 발송</a>
+      <a class="hr-step" href="#secOrders"><b>④</b> 발송 내역</a><a class="hr-step" href="#secCands"><b>⑤</b> 후보 단계</a><a class="hr-step" href="#secClaude"><b>⑥</b> Claude 질문</a><a class="hr-step" href="#secMemo"><b>⑦</b> 메모</a>
+    </div>
+
+    <!-- ① 의뢰 정보 -->
+    <div class="card" id="secInfo">
+      <div class="card-title"><span><span class="hr-block-no">1</span>의뢰 정보</span></div>
+      <div class="hr-row">
+        <div class="hr-field"><label class="hr-req" for="fAlias">별칭 (프로젝트명)</label><input class="hr-input" id="fAlias" maxlength="100" placeholder="고객명이 비공개여도 알아볼 수 있는 이름"><div class="hr-err" id="fAliasErr"></div></div>
+        <div class="hr-field"><label class="hr-req" for="fRequester">요청자</label><select class="hr-select" id="fRequester"></select><div class="hr-help" id="fRequesterHelp">목록에 없으면 <a href="party.html">거래처 관리</a>에서 먼저 등록하세요.</div><div class="hr-err" id="fRequesterErr"></div></div>
+      </div>
+      <div class="hr-row" style="margin-top:10px">
+        <div class="hr-field"><label for="fClientName">고객사 (알고 있는 이름 그대로)</label><input class="hr-input" id="fClientName" maxlength="100"></div>
+        <div class="hr-field"><label for="fClientParty">고객사 연결 (확인된 경우)</label><select class="hr-select" id="fClientParty"></select></div>
+        <div class="hr-field fixed" style="min-width:170px"><label class="hr-req" for="fDisclose">고객사 공개</label><select class="hr-select" id="fDisclose"><option value="N">비공개 (기본)</option><option value="Y">공개</option></select><div class="hr-help">서치업체 문구에 고객사 줄을 넣을지</div></div>
+      </div>
+      <div class="hr-row" style="margin-top:10px">
+        <div class="hr-field"><label for="fPlace">근무지</label><input class="hr-input" id="fPlace" maxlength="100"></div>
+        <div class="hr-field fixed" style="min-width:150px"><label for="fStartYm">투입 시기</label><input class="hr-input" type="month" id="fStartYm"></div>
+        <div class="hr-field fixed" style="min-width:150px"><label for="fStartNote">투입 시기 메모</label><input class="hr-input" id="fStartNote" maxlength="30" placeholder="초/중/말/ASAP"></div>
+        <div class="hr-field fixed" style="min-width:110px"><label for="fDuration">기간 (개월)</label><input class="hr-input num" id="fDuration" inputmode="numeric"><div class="hr-err" id="fDurationErr"></div></div>
+      </div>
+      <div class="hr-row" style="margin-top:10px">
+        <div class="hr-field fixed" style="min-width:170px"><label class="hr-req" for="fReceived">접수일</label><input class="hr-input" type="date" id="fReceived"><div class="hr-err" id="fReceivedErr"></div></div>
+        <div class="hr-field fixed" style="min-width:170px"><label for="fDue">요청자 회신 기한</label><input class="hr-input" type="date" id="fDue"></div>
+      </div>
+      <div class="hr-err" id="infoMsg" style="margin-top:8px"></div>
+      <div class="hr-row" style="margin-top:10px"><button class="btn btn-primary" id="btnSaveInfo" onclick="saveInfo()">저장</button></div>
+    </div>
+
+    <!-- ② 요청 라인 -->
+    <div class="card" id="secLines">
+      <div class="card-title"><span><span class="hr-block-no">2</span>요청 라인 <span class="hr-sub" id="fillText"></span></span><button class="btn btn-secondary btn-sm" id="btnAddLine" onclick="addLine()">+ 요청 라인 추가</button></div>
+      <div class="hr-help" style="margin-bottom:8px">금액은 만원/월. 판매 단가(요청자 제시)와 매입 목표 단가(서치업체 제시)는 나란히 둡니다. 마진은 저장하지 않고 화면에서 계산합니다.</div>
+      <div id="lineBox"></div>
+    </div>
+
+    <!-- ③ 서치업체 발송 -->
+    <div class="card" id="secSend">
+      <div class="card-title"><span><span class="hr-block-no">3</span>서치업체 발송</span></div>
+      <div id="sendBox"></div>
+    </div>
+
+    <!-- ④ 발송 내역·회신 관리 -->
+    <div class="card" id="secOrders">
+      <div class="card-title"><span><span class="hr-block-no">4</span>발송 내역·회신 관리</span></div>
+      <div id="orderBox"></div>
+    </div>
+
+    <!-- ⑤ 후보 단계 -->
+    <div class="card" id="secCands">
+      <div class="card-title"><span><span class="hr-block-no">5</span>후보 단계</span></div>
+      <div class="hr-empty">후보 등록과 단계 관리는 다음 개발 단계에서 열립니다.</div>
+    </div>
+
+    <!-- ⑥ Claude 질문 -->
+    <div class="card" id="secClaude">
+      <div class="card-title"><span><span class="hr-block-no">6</span>Claude 질문</span></div>
+      <div class="hr-empty">후보를 등록한 뒤 사용할 수 있습니다. (개발 4단계)</div>
+    </div>
+
+    <!-- ⑦ 메모 -->
+    <div class="card" id="secMemo">
+      <div class="card-title"><span><span class="hr-block-no">7</span>메모</span></div>
+      <textarea class="hr-textarea" id="fMemo" style="min-height:90px"></textarea>
+      <div class="hr-err" id="memoMsg"></div>
+      <div class="hr-row" style="margin-top:8px"><button class="btn btn-primary" id="btnSaveMemo" onclick="saveMemo()">메모 저장</button></div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.76"></script>
+<script src="js/common.js?v=2.9.76"></script>
+<script src="js/cmn-sheet.js?v=2.9.76"></script>
+<script src="js/cmn-derive.js?v=2.9.76"></script>
+<script src="js/cmn-msg.js?v=2.9.76"></script>
+<script src="js/hr-ui.js?v=2.9.76"></script>
+<script src="js/scr-request-detail.js?v=2.9.76"></script>
+<script src="js/nav.js?v=2.9.76"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

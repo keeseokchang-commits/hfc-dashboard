@@ -78,7 +78,7 @@ async function hrReadMany(keys){
     out.calls++;
     const r=await hrGet(`${HR_API}/values/${encodeURIComponent(R[k][0]+'!'+R[k][1])}?key=${API_KEY}`);
     if(r.ok) out.tabs[k]={ok:true,...hrParse(r.json.values)};
-    else { out.tabs[k]={ok:false,headers:[],rows:[],message:HR_MSG.read(R[k][0])}; out.failed.push(k); }
+    else { out.tabs[k]={ok:false,headers:[],rows:[],message:HR_MSG.read(R[k][0]),status:r.status}; out.failed.push(k); }
   }
   return out;
 }
