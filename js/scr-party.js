@@ -87,6 +87,7 @@ function fillForm(){
   const hid=p&&String(p.is_active).trim()==='N';
   hrQ('pfBadges').innerHTML=p?`${base?'<span class="hr-badge blue">기본 거래처</span> ':''}${hid?'<span class="hr-badge gray">숨김</span>':''}`:'';
   const b=hrQ('btnHideParty'); b.style.display=p?'':'none'; b.textContent=hid?'숨김 해제':'숨김';
+  hrQ('btnDeleteParty').style.display=p&&!base?'':'none';
   hrQ('contactCard').style.display=p?'':'none';
 }
 function newParty(){ selParty=null; selContact=null; fillForm(); renderList(); renderContacts(); hrQ('pfName').focus(); }
@@ -133,6 +134,35 @@ async function toggleHideParty(){
   });
 }
 
+// 거래처 삭제 — 어디에도 쓰이지 않은 거래처만(변경 004). 사용 여부는 지금 시트를 다시 읽어 확인하고, 확인이 안 되면 삭제하지 않는다. 담당자는 함께 삭제한다.
+async function partyUsage(pid){
+  const r=await hrReadMany(['S32','S34','S31','S28','S25','S23']); if(r.failed.length) return null;
+  const t=r.tabs; const n=(k,f)=>t[k].rows.filter(f).length;
+  return [['의뢰',n('S32',x=>x.requester_party_id===pid||x.end_client_party_id===pid)],['발송',n('S34',x=>x.party_id===pid)],['후보 경로',n('S31',x=>x.via_party_id===pid)],['이력서',n('S28',x=>x.source_party_id===pid)],
+    ['투입',n('S25',x=>x.via_party_id===pid||x.client_party_id===pid)],['경력',n('S23',x=>x.client_party_id===pid)]].filter(x=>x[1]>0);
+}
+async function deleteParty(){
+  await hrBusy(hrQ('btnDeleteParty'),async()=>{
+    clearErrors(); const p=curParty(); if(!p) return;
+    if(BASE_IDS.has(p.party_id)){ hrQ('pfMsg').textContent=MSG_BASE; return; }
+    const use=await partyUsage(p.party_id);
+    if(use===null){ hrQ('pfMsg').textContent='사용 여부를 확인하지 못해 삭제하지 않았습니다. 다시 시도해 주세요.'; return; }
+    if(use.length){ hrQ('pfMsg').textContent=`사용 중이라 삭제할 수 없습니다 (${use.map(x=>x[0]+' '+x[1]+'건').join(' · ')}). 숨김을 사용해 주세요.`; return; }
+    const cs=D.S36.filter(c=>c.party_id===p.party_id);
+    if(!confirm(`‘${p.name}’ 거래처${cs.length?`와 담당자 ${cs.length}명`:''}을(를) 삭제합니다. 되돌릴 수 없습니다. 삭제할까요?`)) return;
+    for(const c of cs){ const d=await hrDelete('S36',c.pcontact_id,{readUpdatedAt:c.updated_at}); if(!d.ok){ hrQ('pfMsg').textContent=hrSaveFailText(d); await loadAll(); return; } }
+    const d=await hrDelete('S27',p.party_id,{readUpdatedAt:p.updated_at}); if(!d.ok){ hrQ('pfMsg').textContent=hrSaveFailText(d); await loadAll(); return; }
+    toast('✓ 거래처를 삭제했습니다'); selParty=null; selContact=null; await loadAll();
+  });
+}
+async function deleteContact(){
+  await hrBusy(hrQ('btnDeleteContact'),async()=>{
+    hrQ('cfMsg').textContent=''; const c=D.S36.find(x=>x.pcontact_id===selContact); if(!c) return;
+    if(!confirm(`담당자 ‘${c.name}’을(를) 삭제합니다. 되돌릴 수 없습니다. 삭제할까요?`)) return;
+    const d=await hrDelete('S36',c.pcontact_id,{readUpdatedAt:c.updated_at}); if(!d.ok){ hrQ('cfMsg').textContent=hrSaveFailText(d); return; }
+    toast('✓ 담당자를 삭제했습니다'); selContact=null; await loadAll();
+  });
+}
 // ── ④ 담당자 ────────────────────────────────────────────────────────────────
 function contactsOf(pid){
   return D.S36.filter(c=>c.party_id===pid).sort((a,b)=>(hrYes(b.is_primary)-hrYes(a.is_primary))||((String(a.is_active)==='N')-(String(b.is_active)==='N'))||String(a.name).localeCompare(String(b.name),'ko'));
@@ -156,6 +186,7 @@ function fillContact(){
   hrQ('cfTitle').textContent=c?'담당자 수정':'담당자 입력';
   hrQ('cfName').value=c?c.name:''; hrQ('cfTitleIn').value=c?c.title:''; hrQ('cfPhone').value=c?c.phone:''; hrQ('cfEmail').value=c?c.email:'';
   hrQ('cfLast').value=c?c.last_contacted_at:''; hrQ('cfMemo').value=c?c.contact_memo:'';
+  hrQ('btnDeleteContact').style.display=c?'':'none';
   hrQ('cfPrimary').checked=!!c&&hrYes(c.is_primary); hrQ('cfHidden').checked=!!c&&String(c.is_active).trim()==='N';
 }
 function newContact(){ selContact=null; renderContacts(); hrQ('cfName').focus(); }

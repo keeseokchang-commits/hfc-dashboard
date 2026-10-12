@@ -131,4 +131,14 @@ t('UI-align','한 줄의 입력칸은 설명 문구 유무와 관계없이 아�
   }
 });
 
+t('TC-SCR02-16','의뢰 삭제(변경 004) — 기록 없는 의뢰는 라인과 함께 삭제 / 발송·후보·사업기회 연결이 있으면 거부 / 취소하면 안 지움',async()=>{
+  const m=mock({S32:[R('REQ-2026-001','지울것'),R('REQ-2026-002','발송있음'),R('REQ-2026-003','후보있음'),R('REQ-2026-004','사업기회',{pipeline_id:'PL-001'}),R('REQ-2026-005','남길것')],
+    S33:[L('LN-0001','REQ-2026-001',1),L('LN-0002','REQ-2026-001',1,{line_no:'2'}),L('LN-0003','REQ-2026-002',1),L('LN-0004','REQ-2026-003',1),L('LN-0005','REQ-2026-005',1)],
+    S34:[O('ORD-00001','REQ-2026-002','LN-0003','PTY-004')],S31:[{cand_id:'CND-00001',line_id:'LN-0004',person_id:'PSN-0001',stage:'추천수령',updated_at:'2026-10-02 09:00:00'}]});
+  for(const [id,why] of [['REQ-2026-002','발송 기록 1건'],['REQ-2026-003','후보 1명'],['REQ-2026-004','사업기회 연결']]){
+    const h=await open(m,'?id='+id); await h.page.click('#btnDeleteReq'); await h.page.waitForTimeout(500); ok((await U.toastText(h.page)).includes('기록이 있어 삭제할 수 없습니다 ('+why+')'),why); eq(U.rowsOf(m,'S32').length,5); await h.close(); }
+  const {page,setAnswer,dialogs,close}=await open(m,'?id=REQ-2026-001'); setAnswer(false); await page.click('#btnDeleteReq'); await page.waitForTimeout(400); ok(dialogs.at(-1).includes('요청 라인 2건')); eq(U.rowsOf(m,'S32').length,5);
+  setAnswer(true); await page.click('#btnDeleteReq'); await page.waitForTimeout(1500); eq(U.rowsOf(m,'S32').map(r=>r.request_id),['REQ-2026-002','REQ-2026-003','REQ-2026-004','REQ-2026-005']); eq(U.rowsOf(m,'S33').map(r=>r.line_id),['LN-0003','LN-0004','LN-0005'],'다른 의뢰의 라인은 그대로'); ok(page.url().endsWith('request.html')); await close();
+});
+
 (async()=>{ browser=await U.launch(); const f=await runTests(T,'SCR-02 의뢰 상세'); await browser.close(); process.exit(f?1:0); })();

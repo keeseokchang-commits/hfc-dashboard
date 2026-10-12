@@ -119,4 +119,22 @@ t('CMN-url','주소의 id 로 거래처를 미리 선택해 열 수 있다 / 새
   eq(await page.inputValue('#pfName'),'가나다'); ok(await page.isVisible('#contactCard')); await page.click('#btnNewParty'); eq(await page.inputValue('#pfName',''),''); ok(!(await page.isVisible('#contactCard'))); await close();
 });
 
+t('TC-SCR11-11','거래처 삭제(변경 004) — 쓰이지 않은 거래처는 담당자와 함께 삭제 / 쓰이는 거래처·기본 거래처는 거부 / 사용 확인 실패면 삭제 안 함',async()=>{
+  const C=(id,pid)=>({pcontact_id:id,party_id:pid,name:'담'+id,is_active:'Y',created_at:'2026-09-01',updated_at:'2026-09-01 09:00:00'});
+  const x={S31:[],S25:[],S23:[]};
+  const m=mock({...x,S27:[...BASE,P('PTY-003','미사용','고객'),P('PTY-004','사용중','서치업체')],S36:[C('PCT-0001','PTY-003'),C('PCT-0002','PTY-003'),C('PCT-0003','PTY-004')],S34:[{order_id:'ORD-00001',request_id:'REQ-2026-001',party_id:'PTY-004',reply_state:'대기'}]});
+  const {page,dialogs,setAnswer,close}=await U.open(browser,'party.html',m);
+  await page.click('#partyList .hr-list-item:has-text("사용중")'); await page.click('#btnDeleteParty'); await page.waitForTimeout(400); eq(await page.textContent('#pfMsg'),'사용 중이라 삭제할 수 없습니다 (발송 1건). 숨김을 사용해 주세요.'); eq(U.rowsOf(m,'S27').length,4);
+  await page.click('#partyList .hr-list-item:has-text("직접")'); eq(await page.isVisible('#btnDeleteParty'),false,'기본 거래처는 삭제 버튼 없음');
+  await page.click('#partyList .hr-list-item:has-text("미사용")'); setAnswer(false); await page.click('#btnDeleteParty'); await page.waitForTimeout(400); ok(dialogs.at(-1).includes('담당자 2명')); eq(U.rowsOf(m,'S27').length,4,'확인 취소 → 삭제 안 함');
+  setAnswer(true); await page.click('#btnDeleteParty'); await page.waitForTimeout(900); eq(U.rowsOf(m,'S27').map(r=>r.party_id),['PTY-001','PTY-002','PTY-004']); eq(U.rowsOf(m,'S36').map(r=>r.pcontact_id),['PCT-0003'],'다른 거래처 담당자는 그대로');
+  m.failNext(/GET .*values:batchGet/,403,1); m.failNext(/GET .*S23_PERSON_CAREER/,403,2); await page.click('#partyList .hr-list-item:has-text("사용중")'); await page.click('#btnDeleteParty'); await page.waitForTimeout(2500); eq(await page.textContent('#pfMsg'),'사용 여부를 확인하지 못해 삭제하지 않았습니다. 다시 시도해 주세요.'); eq(U.rowsOf(m,'S27').length,3); await close();
+});
+t('TC-SCR11-12','담당자 삭제 — 선택한 담당자 한 명만 삭제',async()=>{
+  const C=(id)=>({pcontact_id:id,party_id:'PTY-003',name:'담'+id,is_active:'Y',created_at:'2026-09-01',updated_at:'2026-09-01 09:00:00'});
+  const m=mock({S27:[...BASE,P('PTY-003','가나다','고객')],S36:[C('PCT-0001'),C('PCT-0002')]}); const {page,close}=await U.open(browser,'party.html',m);
+  await page.click('#partyList .hr-list-item:has-text("가나다")'); eq(await page.isVisible('#btnDeleteContact'),false); await page.click('#contactList .hr-list-item:has-text("PCT-0002")'); await page.click('#btnDeleteContact'); await page.waitForTimeout(800);
+  eq(U.rowsOf(m,'S36').map(r=>r.pcontact_id),['PCT-0001']); await close();
+});
+
 (async()=>{ browser=await U.launch(); const f=await runTests(T,'SCR-11 거래처 관리'); await browser.close(); process.exit(f?1:0); })();

@@ -58,7 +58,7 @@ function renderTop(){
   hrQ('topStatus').innerHTML=DER?`<span class="hr-badge ${STATUS_COLOR[DER.status]||'gray'}" id="statusBadge">${hrEsc(DER.status)}</span>`:'<span class="hr-badge gray" id="statusBadge">접수 전</span>';
   const closed=DER&&DER.closed;
   hrQ('btnFail').style.display=hrQ('btnCancel').style.display=REQ&&!closed?'':'none';
-  hrQ('btnReopen').style.display=closed?'':'none';
+  hrQ('btnReopen').style.display=closed?'':'none'; hrQ('btnDeleteReq').style.display=REQ?'':'none';
   hrQ('closePanel').style.display='none'; closeKind='';
 }
 function openClosePanel(kind){
@@ -76,6 +76,21 @@ async function doClose(){
     const r=await hrUpdate('S32',REQ.request_id,ch,{readUpdatedAt:REQ.updated_at});
     if(!r.ok){ hrQ('closeMsg').textContent=hrSaveFailText(r); return; }
     toast(`✓ 의뢰를 ${closeKind}로 처리했습니다`); await loadAll();
+  });
+}
+// 의뢰 삭제 — 발송 기록·후보가 없고 사업기회에 연결되지 않은 의뢰만(변경 004). 지금 시트를 다시 읽어 확인하고, 확인이 안 되면 삭제하지 않는다. 요청 라인은 함께 삭제한다.
+async function deleteReq(){
+  await hrBusy(hrQ('btnDeleteReq'),async()=>{
+    if(!REQ) return; const msg=t=>{ toast(t,true); };
+    const r=await hrReadMany(['S32','S33','S34','S31']); if(r.failed.length){ msg('사용 여부를 확인하지 못해 삭제하지 않았습니다. 다시 시도해 주세요.'); return; }
+    const cur=r.tabs.S32.rows.find(x=>x.request_id===REQ.request_id); if(!cur){ msg('이미 삭제된 의뢰입니다.'); return; }
+    const lines=r.tabs.S33.rows.filter(l=>l.request_id===REQ.request_id), lids=new Set(lines.map(l=>l.line_id));
+    const orders=r.tabs.S34.rows.filter(o=>o.request_id===REQ.request_id).length, cands=r.tabs.S31.rows.filter(c=>lids.has(c.line_id)).length;
+    if(orders||cands||!cmnBlank(cur.pipeline_id)){ const why=[orders&&`발송 기록 ${orders}건`,cands&&`후보 ${cands}명`,!cmnBlank(cur.pipeline_id)&&'사업기회 연결'].filter(Boolean).join(' · '); msg(`기록이 있어 삭제할 수 없습니다 (${why}). 실패·취소로 처리해 주세요.`); return; }
+    if(!confirm(`의뢰 ‘${REQ.alias}’(${REQ.request_id})${lines.length?`와 요청 라인 ${lines.length}건`:''}을(를) 삭제합니다. 되돌릴 수 없습니다. 삭제할까요?`)) return;
+    for(const l of lines){ const d=await hrDelete('S33',l.line_id,{readUpdatedAt:l.updated_at}); if(!d.ok){ msg(hrSaveFailText(d)); await loadAll(); return; } }
+    const d=await hrDelete('S32',REQ.request_id,{readUpdatedAt:cur.updated_at}); if(!d.ok){ msg(hrSaveFailText(d)); await loadAll(); return; }
+    toast('✓ 의뢰를 삭제했습니다'); setTimeout(()=>{ location.href='request.html'; },700);
   });
 }
 async function reopenReq(){

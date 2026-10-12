@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 거래처 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.77">
-<link rel="stylesheet" href="css/hr.css?v=2.9.77">
+<link rel="stylesheet" href="css/common.css?v=2.9.78">
+<link rel="stylesheet" href="css/hr.css?v=2.9.78">
 </head>
 <body data-page="party">
 
@@ -55,6 +55,7 @@
           <div class="hr-row" style="margin-top:12px">
             <button class="btn btn-primary" id="btnSaveParty" onclick="saveParty()">저장</button>
             <button class="btn btn-secondary" id="btnHideParty" onclick="toggleHideParty()" style="display:none">숨김</button>
+            <button class="btn btn-danger" id="btnDeleteParty" onclick="deleteParty()" style="display:none" title="어디에도 쓰이지 않은 거래처만 삭제할 수 있습니다">삭제</button>
           </div>
         </div>
 
@@ -81,7 +82,7 @@
               <label class="hr-switch"><input type="checkbox" id="cfHidden"> 담당자 숨김</label>
             </div>
             <div class="hr-err" id="cfMsg" style="margin-top:8px"></div>
-            <div class="hr-row" style="margin-top:10px"><button class="btn btn-primary" id="btnSaveContact" onclick="saveContact()">담당자 저장</button></div>
+            <div class="hr-row" style="margin-top:10px"><button class="btn btn-primary" id="btnSaveContact" onclick="saveContact()">담당자 저장</button> <button class="btn btn-danger" id="btnDeleteContact" onclick="deleteContact()" style="display:none">담당자 삭제</button></div>
           </div>
         </div>
       </div>
@@ -92,13 +93,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.77"></script>
-<script src="js/common.js?v=2.9.77"></script>
-<script src="js/cmn-sheet.js?v=2.9.77"></script>
-<script src="js/cmn-derive.js?v=2.9.77"></script>
-<script src="js/hr-ui.js?v=2.9.77"></script>
-<script src="js/scr-party.js?v=2.9.77"></script>
-<script src="js/nav.js?v=2.9.77"></script>
+<script src="js/schema.js?v=2.9.78"></script>
+<script src="js/common.js?v=2.9.78"></script>
+<script src="js/cmn-sheet.js?v=2.9.78"></script>
+<script src="js/cmn-derive.js?v=2.9.78"></script>
+<script src="js/hr-ui.js?v=2.9.78"></script>
+<script src="js/scr-party.js?v=2.9.78"></script>
+<script src="js/nav.js?v=2.9.78"></script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>
 </html>
