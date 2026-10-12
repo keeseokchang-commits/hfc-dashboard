@@ -36,7 +36,8 @@ t('TC-SCR02-02b','라인 필수 항목 — 역할·등급·인원 안내 / 인�
   const m=mock(); const {page,close}=await open(m); await page.click('#btnAddLine'); const c='[data-new="1"]'; await page.click(`${c} [data-act="saveLine"]`);
   eq([await page.textContent(`${c} .lc-err-roles`),await page.textContent(`${c} .lc-err-grade`)],['역할을(를) 선택해 주세요.','등급을(를) 선택해 주세요.']); ok((await page.textContent(`${c} .lc-err-hc`)).includes('인원'));
   await page.fill(`${c} .lc-hc`,'0'); await page.click(`${c} [data-act="saveLine"]`); ok((await page.textContent(`${c} .lc-err-hc`)).includes('1 이상'));
-  await page.fill(`${c} .lc-sell`,'abc'); await page.click(`${c} [data-act="saveLine"]`); ok((await page.textContent(`${c} .lc-err-rate`)).includes('단가')); eq(U.writes(m).length,0); await close();
+  await page.fill(`${c} .lc-sell`,'abc'); eq(await page.inputValue(`${c} .lc-sell`),'','문자는 입력되지 않는다');
+  await page.fill(`${c} .lc-sell`,'1200000'); await page.click(`${c} [data-act="saveLine"]`); eq(await page.textContent(`${c} .lc-err-rate`),'단가는 만원 단위입니다. 월 5,000만원 이하로 입력해 주세요.'); eq(U.writes(m).length,0); await close();
 });
 t('TC-SCR02-03','마진 계산 — 판매 800, 매입 700: 마진 100 표시, 시트에는 마진이 저장되지 않는다',async()=>{
   const m=mock(); const {page,close}=await open(m); const c='[data-line="LN-0001"]'; eq((await page.textContent(`${c} .lc-margin`)).trim(),'100');
@@ -109,6 +110,25 @@ t('CMN-load','없는 의뢰 번호 / 탭 없음 / 읽기 실패 / 코드(S10) �
   h=await open(mock({},null)); ok((await h.page.textContent('#loadBox')).includes('코드 목록')); ok(await h.page.isVisible('#screen'),'나머지 화면은 열린다'); await h.close();
   const m3=mock({S32:[R('REQ-2026-001','<img src=x onerror="window.__x=1">',{end_client_name:'"><b id=zz>'})],S27:[...PARTIES,P('PTY-008','<i id=yy>서치</i>','서치업체')]}); h=await open(m3);
   eq(await h.page.evaluate(()=>window.__x),undefined); eq(await h.page.evaluate(()=>!!document.getElementById('zz')||!!document.getElementById('yy')),false); eq(h.page.__errors,[]); await h.close();
+});
+
+t('UI-amount','금액 칸 표준 — 입력하는 즉시 천 단위 쉼표(소수 한 자리까지), 기존 값도 쉼표로 표시, 저장은 쉼표 없이 원 단위',async()=>{
+  const m=mock({S33:[L('LN-0001','REQ-2026-001',2,{rate_sell:'12000000',rate_buy_target:'7005000'})],S34:[O('ORD-00001','REQ-2026-001','LN-0001','PTY-004',{offered_rate_buy:'12000000'})]}); const {page,close}=await open(m); const c='[data-line="LN-0001"]';
+  eq([await page.inputValue(`${c} .lc-sell`),await page.inputValue(`${c} .lc-buy`),await page.inputValue('[data-order] .oc-rate')],['1,200','700.5','1,200']);
+  await page.fill(`${c} .lc-sell`,'1234.56'); eq(await page.inputValue(`${c} .lc-sell`),'1,234.5'); await page.fill(`${c} .lc-sell`,''); await page.type(`${c} .lc-sell`,'1000'); eq(await page.inputValue(`${c} .lc-sell`),'1,000');
+  eq((await page.textContent(`${c} .lc-margin`)).trim(),'299.5'); await page.click(`${c} [data-act="saveLine"]`); await page.waitForTimeout(500); eq(String(U.rowsOf(m,'S33')[0].rate_sell),'10000000');
+  await page.fill('[data-order] .oc-rate','1,300'); await page.click('[data-order] [data-oact="save"]'); await page.waitForTimeout(500); eq(String(U.rowsOf(m,'S34')[0].offered_rate_buy),'13000000'); await close();
+});
+t('UI-align','한 줄의 입력칸은 설명 문구 유무와 관계없이 아래 기준선이 같다 / 설명·오류가 다음 줄과 겹치지 않는다(PC·모바일)',async()=>{
+  for(const vp of [{width:1280,height:900},{width:390,height:800}]){
+    const m=mock({S32:[],S33:[]}); const {page,close}=await U.open(browser,'request-detail.html',m,{query:'?new=1',viewport:vp});
+    const bottoms=await page.evaluate(()=>['fAlias','fRequester'].map(i=>Math.round(document.getElementById(i).getBoundingClientRect().bottom)));
+    if(vp.width>=768) eq(bottoms[0],bottoms[1],'별칭·요청자 입력칸 하단 일치'); 
+    const b2=await page.evaluate(()=>['fClientName','fClientParty','fDisclose'].map(i=>Math.round(document.getElementById(i).getBoundingClientRect().bottom))); if(vp.width>=768) eq(new Set(b2).size,1,'고객사 줄 하단 일치 '+b2);
+    await page.fill('#fDuration','x'); await page.click('#btnSaveInfo'); await page.waitForTimeout(200);
+    const r=await page.evaluate(()=>{ const e=document.getElementById('fDurationErr').getBoundingClientRect(), n=document.getElementById('fReceived').getBoundingClientRect(); const d=document.getElementById('fDuration').getBoundingClientRect(); return {errTop:e.top,errBottom:e.bottom,inputBottom:d.bottom,nextTop:n.top}; });
+    ok(r.errTop>=r.inputBottom,'오류 문구는 입력칸 아래'); ok(r.errBottom<=r.nextTop,'오류 문구가 다음 줄 입력칸과 겹치지 않음 '+JSON.stringify(r)); eq(page.__errors,[]); await close();
+  }
 });
 
 (async()=>{ browser=await U.launch(); const f=await runTests(T,'SCR-02 의뢰 상세'); await browser.close(); process.exit(f?1:0); })();

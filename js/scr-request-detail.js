@@ -12,6 +12,9 @@ let selLines=new Set();     // ③ 에서 고른 라인
 let closeKind='';           // 열려 있는 실패·취소 패널 종류
 let MSGS=[];                // 만든 전달 문구 [{party,text,warnings}]
 
+const RATE_MAX_MAN=5000;   // 월 단가 상한(만원) — 원 단위로 잘못 넣는 실수를 막는 확인선(정한 것, 개발 기록 참고)
+const rateTooBig=w=>typeof w==='number'&&w>RATE_MAX_MAN*10000;
+const RATE_BIG_MSG=`단가는 만원 단위입니다. 월 ${RATE_MAX_MAN.toLocaleString('ko-KR')}만원 이하로 입력해 주세요.`;
 const num1=v=>{ const t=String(v??'').replace(/,/g,'').trim(); if(t==='') return ''; const n=parseFloat(t); return isNaN(n)?NaN:n; };
 const partyActive=p=>String(p.is_active??'Y').trim()!=='N';
 const lineLabel=l=>`${hrSplit(l.role_codes).join('·')||'(역할 없음)'} ${l.grade||''} ${l.headcount||''}명`.replace(/\s+/g,' ').trim();
@@ -148,21 +151,21 @@ function lineCard(l){
     <div class="hr-row" style="justify-content:space-between;margin-bottom:8px"><b>${isNew?'새 요청 라인':hrEsc('라인 '+(L.line_no||''))}</b>
       <span>${cancelled?'<span class="hr-badge gray">취소됨</span>':(f?`<span class="hr-badge ${f.filled>=f.need?'green':'blue'}" data-fill>충원 ${f.filled}/${f.need}</span>`:'')}${candCount?` <span class="hr-sub">후보 ${candCount}명</span>`:''}</span></div>
     <div class="hr-lbl hr-req">역할 (겸임이면 복수 선택)</div><div class="hr-chips lc-roles" style="margin:4px 0">${roleChips||'<span class="hr-help">역할 코드가 없습니다. 설정 화면에서 코드를 먼저 등록하세요.</span>'}</div><div class="hr-err lc-err-roles"></div>
-    <div class="hr-row" style="margin-top:8px">
+    <div class="hr-row">
       <div class="hr-field fixed" style="min-width:110px"><label class="hr-req">등급</label><select class="hr-select lc-grade"${dis}>${optList(GRADE4.map(g=>({v:g,t:g})),L.grade||'','선택')}</select><div class="hr-err lc-err-grade"></div></div>
       <div class="hr-field fixed" style="min-width:90px"><label class="hr-req">인원 (명)</label><input class="hr-input num lc-hc" inputmode="numeric" value="${hrEsc(L.headcount||'')}"${dis}><div class="hr-err lc-err-hc"></div></div>
       <div class="hr-field"><label>필수 기술 (쉼표)</label><input class="hr-input lc-must" value="${hrEsc(L.must_skills||'')}"${dis}></div>
       <div class="hr-field"><label>우대 기술 (쉼표)</label><input class="hr-input lc-nice" value="${hrEsc(L.nice_skills||'')}"${dis}></div>
     </div>
-    <div class="hr-row" style="margin-top:8px">
+    <div class="hr-row">
       <div class="hr-field"><label>업종</label><select class="hr-select lc-ind"${dis}>${optList(inds.map(x=>({v:x,t:x})),L.industry||'','선택 안 함')}</select></div>
       <div class="hr-field"><label>프로젝트 유형</label><select class="hr-select lc-pt"${dis}>${optList(pts.map(x=>({v:x,t:x})),L.project_type||'','선택 안 함')}</select></div>
       <div class="hr-field fixed" style="min-width:90px"><label>연령 하한</label><input class="hr-input num lc-amin" inputmode="numeric" value="${hrEsc(L.age_min||'')}"${dis}></div>
       <div class="hr-field fixed" style="min-width:90px"><label>연령 상한</label><input class="hr-input num lc-amax" inputmode="numeric" value="${hrEsc(L.age_max||'')}"${dis}><div class="hr-err lc-err-age"></div></div>
     </div>
     <div class="hr-rate-pair" style="margin-top:8px">
-      <div class="hr-field"><label>판매 단가 (만원/월) · 요청자 제시</label><input class="hr-input num lc-sell" inputmode="decimal" value="${hrEsc(man(L.rate_sell))}"${dis}></div>
-      <div class="hr-field"><label>매입 목표 단가 (만원/월) · 서치업체 제시</label><input class="hr-input num lc-buy" inputmode="decimal" value="${hrEsc(man(L.rate_buy_target))}"${dis}></div>
+      <div class="hr-field"><label>판매 단가 (만원/월) · 요청자 제시</label><input class="hr-input num hr-amt lc-sell" inputmode="decimal" value="${hrEsc(hrFmtMan(L.rate_sell))}"${dis}></div>
+      <div class="hr-field"><label>매입 목표 단가 (만원/월) · 서치업체 제시</label><input class="hr-input num hr-amt lc-buy" inputmode="decimal" value="${hrEsc(hrFmtMan(L.rate_buy_target))}"${dis}></div>
     </div>
     <div class="hr-err lc-err-rate"></div>
     <div style="margin-top:6px" class="hr-sub">마진 <b class="lc-margin">${hrEsc(marginText(L.rate_sell,L.rate_buy_target))}</b> 만원/월 (판매 − 매입 목표, 저장하지 않음)</div>
@@ -195,6 +198,7 @@ function validateLine(card,x){
   const a=x.v.age_min, b=x.v.age_max;
   if((a!==''&&!/^\d+$/.test(a))||(b!==''&&!/^\d+$/.test(b))||(a!==''&&b!==''&&+a>+b)){ e('.lc-err-age').textContent='연령은 숫자로, 하한이 상한보다 크지 않게 입력해 주세요.'; bad=true; }
   if(Number.isNaN(x.sell)||Number.isNaN(x.buy)){ e('.lc-err-rate').textContent='단가는 0 이상의 숫자(만원)로 입력해 주세요.'; bad=true; }
+  else if(rateTooBig(x.sell)||rateTooBig(x.buy)){ e('.lc-err-rate').textContent=RATE_BIG_MSG; bad=true; }
   return !bad;
 }
 async function saveLine(card){
@@ -260,7 +264,7 @@ function renderSend(){
   const blank=(DER&&DER.orderCount)?'':'';
   box.innerHTML=`<div class="hr-lbl hr-req">발송할 업체 (여러 곳 선택)</div><div class="hr-chips" id="spChips" style="margin:4px 0">${partyChips}</div><div class="hr-err" id="spErr"></div>
     <div class="hr-lbl" style="margin-top:8px">보낼 요청 라인</div><div class="hr-chips" id="slChips" style="margin:4px 0">${lineChips}</div><div class="hr-err" id="slErr"></div>
-    <div class="hr-row" style="margin-top:8px"><div class="hr-field fixed" style="min-width:180px"><label class="hr-req" for="sDue">회신 기한</label><input class="hr-input" type="date" id="sDue"><div class="hr-err" id="sDueErr"></div></div>
+    <div class="hr-row"><div class="hr-field fixed" style="min-width:180px"><label class="hr-req" for="sDue">회신 기한</label><input class="hr-input" type="date" id="sDue"><div class="hr-err" id="sDueErr"></div></div>
       <div class="hr-field fixed" style="min-width:180px"><label for="sSent">발송일</label><input class="hr-input" type="date" id="sSent" value="${hrToday()}"></div></div>
     <div class="hr-row" style="margin-top:10px"><button class="btn btn-secondary" id="btnMsg">문구 만들기</button><button class="btn btn-primary" id="btnSend">발송 기록 저장</button></div>
     <div class="hr-help" style="margin-top:4px">문구는 만들어 복사한 뒤 직접 전달합니다. 시스템이 업체에 보내지 않습니다. 매입 목표 단가만 들어가고 판매 단가·마진은 들어가지 않습니다.</div>
@@ -332,9 +336,9 @@ function renderOrders(){
         <div class="hr-field fixed" style="min-width:150px"><label>회신 상태</label><select class="hr-select oc-state">${optList(ORDER_STATES.map(s=>({v:s,t:s})),o.reply_state||'대기')}</select></div>
         <div class="hr-field fixed" style="min-width:160px"><label>회신 기한</label><input class="hr-input oc-due" type="date" value="${hrEsc(o.reply_due||'')}"></div>
         <div class="hr-field fixed" style="min-width:160px"><label>회신일</label><input class="hr-input oc-repl" type="date" value="${hrEsc(o.replied_at||'')}"></div>
-        <div class="hr-field fixed" style="min-width:120px"><label>제시 매입 단가 (만원/월)</label><input class="hr-input num oc-rate" inputmode="decimal" value="${hrEsc(hrWonToMan(o.offered_rate_buy))}"></div>
+        <div class="hr-field fixed" style="min-width:120px"><label>제시 매입 단가 (만원/월)</label><input class="hr-input num hr-amt oc-rate" inputmode="decimal" value="${hrEsc(hrFmtMan(o.offered_rate_buy))}"></div>
       </div>
-      <div class="hr-row" style="margin-top:8px"><div class="hr-field"><label>조건 요약</label><input class="hr-input oc-cond" value="${hrEsc(o.conditions||'')}"></div><div class="hr-field"><label>메모</label><input class="hr-input oc-memo" value="${hrEsc(o.memo||'')}"></div></div>
+      <div class="hr-row"><div class="hr-field"><label>조건 요약</label><input class="hr-input oc-cond" value="${hrEsc(o.conditions||'')}"></div><div class="hr-field"><label>메모</label><input class="hr-input oc-memo" value="${hrEsc(o.memo||'')}"></div></div>
       <div class="hr-err oc-msg" style="margin-top:6px"></div>
       <div class="hr-row" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-oact="save">저장</button></div></div>`;
   }).join('');
@@ -349,6 +353,7 @@ async function saveOrder(card){
   const state=e('.oc-state').value, due=e('.oc-due').value; let repl=e('.oc-repl').value; const rate=hrManToWon(e('.oc-rate').value);
   if(!due){ msg.textContent='회신 기한을(를) 입력해 주세요.'; return; }
   if(Number.isNaN(rate)){ msg.textContent='단가는 0 이상의 숫자(만원)로 입력해 주세요.'; return; }
+  if(rateTooBig(rate)){ msg.textContent=RATE_BIG_MSG; return; }
   if(state!==(cur.reply_state||'대기')&&repl===(cur.replied_at||'')) repl=state==='대기'?'':hrToday();   // 상태를 바꾸면 회신일은 오늘(직접 고친 값이 있으면 그대로)
   const rec={reply_state:state,reply_due:due,replied_at:repl,offered_rate_buy:rate,conditions:e('.oc-cond').value.trim(),memo:e('.oc-memo').value.trim()};
   const ch={}; Object.keys(rec).forEach(k=>{ if(String(cur[k]??'')!==String(rec[k]??'')) ch[k]=rec[k]; });

@@ -45,3 +45,18 @@ const hrYes=v=>String(v??'').trim().toUpperCase()==='Y';
 const hrSplit=s=>String(s??'').split(',').map(x=>x.trim()).filter(Boolean);
 // 저장 실패 문구(설계서 §5.7 "저장하지 못했습니다. 다시 시도해 주세요.") — 충돌·읽기 실패는 그 이유를 그대로 보여 준다
 function hrSaveFailText(r){ return (r&&(r.code==='CONFLICT'||r.code==='READ_FAIL'||r.code==='NOT_FOUND')&&r.message)?r.message:'저장하지 못했습니다. 다시 시도해 주세요.'; }
+
+// 금액 입력칸 표준(2026-10-12 사용자 지정): 금액을 넣는 칸(class="hr-amt")은 입력하는 즉시 천 단위 쉼표를 찍어 자릿수 실수를 막는다.
+// 만원 단위 칸은 소수 한 자리까지(예: 700.5). 쉼표는 저장 전에 hrManToWon 이 지운다.
+function hrFmtAmt(raw,decimals){
+  let t=String(raw??'').replace(/[^\d.]/g,''); const i=t.indexOf('.');
+  let ip=i<0?t:t.slice(0,i), dp=i<0?null:t.slice(i+1).replace(/\./g,'').slice(0,decimals);
+  ip=ip.replace(/^0+(?=\d)/,''); ip=ip.replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  return dp===null?ip:(decimals>0?ip+'.'+dp:ip);
+}
+document.addEventListener('input',ev=>{
+  const el=ev.target; if(!el.classList||!el.classList.contains('hr-amt')) return;
+  const dec=parseInt(el.dataset.dec||'1',10); const pos=el.selectionStart; const before=el.value.slice(0,pos).replace(/,/g,'').length;
+  const f=hrFmtAmt(el.value,dec); if(f===el.value) return; el.value=f;
+  let n=0,c=0; for(;c<f.length&&n<before;c++){ if(f[c]!==',') n++; } try{ el.setSelectionRange(c,c); }catch(e){}
+});

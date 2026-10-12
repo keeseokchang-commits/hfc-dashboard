@@ -3,7 +3,23 @@
 @media(min-width:768px){ .main{max-width:1180px} }
 .hr-page-title{font-size:16px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .hr-sub{font-size:12px;color:var(--text3);font-weight:400}
-.hr-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.hr-row{display:flex;gap:8px 8px;flex-wrap:wrap;align-items:flex-end}
+.hr-row:has(>.hr-field){padding-bottom:24px}
+/* UI 표준(2026-10-12 사용자 지정): 한 줄의 입력칸은 모두 아래 기준선에 맞추고, 설명·오류 문구는 입력칸 아래의 비워 둔 여백(16px)에 띄운다.
+   → 설명 문구가 있는 칸과 없는 칸이 섞여도 입력칸 높이가 어긋나지 않고, 줄 간격은 항상 입력칸 아래 기준이다. */
+.hr-row>.hr-field{position:relative}
+.hr-row>.hr-field>.hr-help,.hr-row>.hr-field>.hr-err{position:absolute;top:100%;left:0;margin-top:2px;line-height:14px;white-space:nowrap}
+.hr-row>.hr-field>.hr-help{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.hr-row>.hr-field:last-child>.hr-err{left:auto;right:0}
+.hr-row>.hr-field>.hr-err:empty{display:none}
+.hr-row>.hr-field:has(>.hr-err:not(:empty))>.hr-help{visibility:hidden}   /* 오류가 있으면 같은 자리의 설명은 숨김 */
+/* 모바일: 설명·오류가 있는 줄은 칸을 한 줄에 하나씩 쌓고 문구를 칸 아래에 그대로(줄바꿈 허용) 둔다 */
+@media(max-width:767px){
+  .hr-row:has(>.hr-field>.hr-help,>.hr-field>.hr-err){padding-bottom:0;gap:10px}
+  .hr-row:has(>.hr-field>.hr-help,>.hr-field>.hr-err)>.hr-field{flex:1 1 100%;min-width:0!important}
+  .hr-row:has(>.hr-field>.hr-help,>.hr-field>.hr-err)>.hr-field>.hr-help,.hr-row:has(>.hr-field>.hr-help,>.hr-field>.hr-err)>.hr-field>.hr-err{position:static;white-space:normal;max-width:none;overflow:visible;text-overflow:clip}
+  .hr-row>.hr-field:has(>.hr-err:not(:empty))>.hr-help{display:none}
+}
 .hr-field{display:flex;flex-direction:column;gap:4px;min-width:120px;flex:1}
 .hr-field.fixed{flex:0 0 auto}
 .hr-field>label,.hr-lbl{font-size:12px;font-weight:600;color:var(--text2)}
