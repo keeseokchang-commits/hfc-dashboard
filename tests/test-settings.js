@@ -94,11 +94,18 @@ t('TC-SCR12-07','사용 중 코드 삭제 — 사용 건수를 안내하고, 확
   addHrTab(m,'S21',[{prole_id:'PRL-00001',person_id:'PSN-0001',role_code:'DBA'},{prole_id:'PRL-00002',person_id:'PSN-0002',role_code:'PM'}]);
   addHrTab(m,'S23',[{career_id:'CAR-000001',person_id:'PSN-0001',kind:'프로젝트',industry:'보험',project_type:'차세대',role_codes:'DA, DBA'},{career_id:'CAR-000002',person_id:'PSN-0001',kind:'프로젝트',role_codes:'PM'}]);
   addHrTab(m,'S33',[{line_id:'LN-0001',request_id:'REQ-2026-001',role_codes:'DBA'}]);
+  addHrTab(m,'S25',[{assign_id:'ASG-00001',person_id:'PSN-0001',assign_kind:'외부 투입',role_code:'DBA'}]); // 변경 003: S25 포함 → 총 4건
   const {page,dialogs,close}=await open(browser,m);
   await page.click('#ctRole .code-row:nth-child(2) button:has-text("✕")'); await page.waitForTimeout(400);
-  eq(dialogs.length,1); ok(dialogs[0].includes('이 코드는 3건에서 사용 중입니다. 삭제하면 기존 기록에는 값만 남습니다.'),dialogs[0]);
+  eq(dialogs.length,1); ok(dialogs[0].includes('이 코드는 4건에서 사용 중입니다. 삭제하면 기존 기록에는 값만 남습니다.'),dialogs[0]);
   eq(await names(page,'ctRole'),['PM','TA']); await page.click('button:has-text("코드 전체 저장")'); await toast(page);
   eq(cat(m,'role'),['PM','TA']); eq(m.tab('S23_PERSON_CAREER').cells[1][HDR.S23.indexOf('role_codes')],'DA, DBA','기존 기록의 값은 그대로'); await close();
+});
+t('SCR12-사용건수-실패사유','실패 사유는 의뢰(S32)·후보(S31) 사용 건수를 합산해 안내',async()=>{
+  const m=newMock(); addHrTab(m,'S31',[{cand_id:'CND-00001',stage:'탈락',fail_reason_code:'후보 부족'}]); addHrTab(m,'S32',[{request_id:'REQ-2026-001',closed_state:'실패',fail_reason_code:'후보 부족'},{request_id:'REQ-2026-002',closed_state:'실패',fail_reason_code:'기타'}]);
+  const {page,dialogs,close}=await open(browser,m);
+  await page.click('#ctFailReason .code-row:nth-child(1) button:has-text("✕")'); await page.waitForTimeout(400);
+  ok(dialogs[0].includes('2건에서 사용 중'),dialogs[0]); await close();
 });
 t('TC-SCR12-07b','사용 중이 아닌 코드는 확인 창 없이 삭제, 취소하면 삭제되지 않는다',async()=>{
   const m=newMock(); const o=await open(browser,m);

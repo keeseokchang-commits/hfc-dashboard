@@ -223,12 +223,12 @@ const HR_SEED_SETTINGS=[
      '초급':{cert:{'기사':0},edu:{'전문학사':0}}}})},
 ];
 
-// ── 코드 관리(SCR-12): 코드 삭제 때 "사용 건수"를 세는 위치 [탭, 열, 쉼표로 여러 개 들어가는 열인가] — 설계서 §16.6: S21~S23, S33, S31 조회만
+// ── 코드 관리(SCR-12): 코드 삭제 때 "사용 건수"를 세는 위치 [탭, 열, 쉼표로 여러 개 들어가는 열인가] — 설계서 §16.6: S21~S23, S33, S31 조회 + 변경 003(2026-10-12): S25·S32 추가, 모두 읽기만
 const S10_CODE_USAGE={
-  role:[['S21','role_code',false],['S23','role_codes',true],['S33','role_codes',true]],
+  role:[['S21','role_code',false],['S23','role_codes',true],['S33','role_codes',true],['S25','role_code',false]], // S25 추가: 변경 003(사용자 승인 2026-10-12)
   industry:[['S23','industry',false],['S33','industry',false]],
   project_type:[['S23','project_type',true],['S33','project_type',false]],
-  fail_reason:[['S31','fail_reason_code',false]],
+  fail_reason:[['S31','fail_reason_code',false],['S32','fail_reason_code',false]], // S32 추가: 변경 003
 };
 const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유'};
 // 인력 설정값(S10 category=hr_setting) 중 파라미터 카드에서 편집하는 항목 [키, 기본값, 화면 라벨]
