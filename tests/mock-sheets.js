@@ -52,7 +52,7 @@ class Mock{
     if(method!=='GET'&&!/^Bearer \S+/.test(auth)) return {status:401,body:{error:{message:'unauthorized'}}};
     const rest=rawPath.slice(base.length); const body=bodyText?JSON.parse(bodyText):null;
     const dec=s=>decodeURIComponent(s);
-    if(rest===''&&method==='GET') return {status:200,body:{sheets:this.sheets.map(s=>({properties:{sheetId:s.id,title:s.title,gridProperties:{rowCount:s.rowCount,columnCount:s.colCount,frozenRowCount:s.frozen}}}))}};
+    if(rest===''&&method==='GET') return {status:200,body:{sheets:this.sheets.map(s=>({properties:{sheetId:s.id,index:this.sheets.indexOf(s),title:s.title,gridProperties:{rowCount:s.rowCount,columnCount:s.colCount,frozenRowCount:s.frozen}}}))}};
     if(rest===':batchUpdate') return this.batchUpdate(body);
     if(rest==='/values:batchGet'){ const ranges=u.searchParams.getAll('ranges'); const vr=[]; for(const r of ranges){ const x=this.read(r); if(x.err) return {status:400,body:{error:{message:x.err}}}; vr.push({range:x.range,values:x.values}); } return {status:200,body:{valueRanges:vr}}; }
     if(rest==='/values:batchUpdate'){ for(const d of body.data){ const x=this.parse(d.range); const g=this.grid(x); if(g.err) return {status:400,body:{error:{message:g.err}}}; }
@@ -78,7 +78,7 @@ class Mock{
     for(const rq of body.requests){
       if(rq.addSheet){ const p=rq.addSheet.properties; if(this.tab(p.title)) return fail(`A sheet with the name "${p.title}" already exists.`);
         const id=p.sheetId!==undefined?p.sheetId:this.nextId; if(byId(id)) return fail('sheetId exists'); this.nextId=Math.max(this.nextId,id+1);
-        const gp=p.gridProperties||{}; this.sheets.push({id,title:p.title,rowCount:gp.rowCount||1000,colCount:gp.columnCount||26,frozen:gp.frozenRowCount||0,cells:[],fmt:{},valid:{},prot:[]});
+        const gp=p.gridProperties||{}; const ns={id,title:p.title,rowCount:gp.rowCount||1000,colCount:gp.columnCount||26,frozen:gp.frozenRowCount||0,cells:[],fmt:{},valid:{},prot:[]}; if(p.index===undefined||p.index>=this.sheets.length) this.sheets.push(ns); else this.sheets.splice(p.index,0,ns);
         replies.push({addSheet:{properties:{sheetId:id,title:p.title}}}); }
       else if(rq.updateCells){ const s=byId(rq.updateCells.start.sheetId); if(!s) return fail('no sheet');
         rq.updateCells.rows.forEach((row,i)=>row.values.forEach((c,j)=>{ const v=c.userEnteredValue; if(v) this.set(s.title,rq.updateCells.start.rowIndex+1+i,rq.updateCells.start.columnIndex+1+j,v.stringValue!==undefined?v.stringValue:v.numberValue); })); replies.push({}); }
@@ -86,6 +86,7 @@ class Mock{
       else if(rq.setDataValidation){ const s=byId(rq.setDataValidation.range.sheetId); if(!s) return fail('no sheet'); const r=rq.setDataValidation.rule; if(r.condition.type!=='ONE_OF_LIST') return fail('bad rule');
         for(let c=rq.setDataValidation.range.startColumnIndex;c<rq.setDataValidation.range.endColumnIndex;c++) s.valid[c]={values:r.condition.values.map(v=>v.userEnteredValue),strict:!!r.strict}; replies.push({}); }
       else if(rq.addProtectedRange){ const s=byId(rq.addProtectedRange.protectedRange.range.sheetId); if(!s) return fail('no sheet'); s.prot.push(rq.addProtectedRange.protectedRange); replies.push({}); }
+      else if(rq.updateSheetProperties){ const sp=rq.updateSheetProperties; const s=byId(sp.properties.sheetId); if(!s) return fail('no sheet'); if(sp.fields==='index'){ const c=this.sheets.indexOf(s); let idx=sp.properties.index; if(c<idx) idx--; /* 구글: 이동 전 기준 위치 */ this.sheets.splice(c,1); this.sheets.splice(idx,0,s); } replies.push({}); }
       else if(rq.deleteDimension){ const r=rq.deleteDimension.range; const s=byId(r.sheetId); if(!s) return fail('no sheet'); if(r.dimension!=='ROWS') return fail('rows only'); s.cells.splice(r.startIndex,r.endIndex-r.startIndex); replies.push({}); }
       else return fail('unsupported request '+Object.keys(rq)[0]);
     }

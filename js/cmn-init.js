@@ -9,10 +9,12 @@ const HR_INIT_MSG={
   meta:'시트 정보를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.',
 };
 // 탭 하나를 만드는 요청 묶음 — 한 번의 batchUpdate(전부 성공 또는 전부 취소)이므로 중간에 끊겨도 "헤더 없는 탭"이 남지 않는다.
-function hrCreateRequests(k,sid){
+// 탭 번호 순서(S20, S21 … S39) — 시트 아래쪽 탭 줄에서 찾기 쉽도록 이 순서로 만들고 정렬한다(변경 002, 사용자 승인 2026-10-12)
+const HR_NUM_ORDER=[...HR_ORDER].sort((a,b)=>parseInt(a.slice(1),10)-parseInt(b.slice(1),10));
+function hrCreateRequests(k,sid,index){
   const t=HR_TABS[k], cols=HR_COLS[k];
   const req=[
-    {addSheet:{properties:{sheetId:sid,title:t.tab,gridProperties:{rowCount:t.rows,columnCount:cols.length,frozenRowCount:1}}}},
+    {addSheet:{properties:{sheetId:sid,title:t.tab,index,gridProperties:{rowCount:t.rows,columnCount:cols.length,frozenRowCount:1}}}},
     {updateCells:{start:{sheetId:sid,rowIndex:0,columnIndex:0},fields:'userEnteredValue',
       rows:[{values:cols.map(c=>({userEnteredValue:{stringValue:c.name}}))}]}},
   ];
@@ -50,6 +52,22 @@ async function hrSeedS10(){
   const w=await hrSend('POST',`${HR_API}/values/${encodeURIComponent(R.S10[0]+'!A:'+colLetter(header.length))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{values:add});
   return w.ok?{ok:true,added:add.length,existed}:{ok:false,message:HR_MSG.write};
 }
+// 인력 모듈 탭 18개를 번호순으로 나란히 둔다. 다른 탭(S01~S17 등)의 상대 순서는 그대로, 인력 모듈 탭만 그 뒤로 모은다. 탭 위치만 바뀌고 데이터는 건드리지 않는다.
+// 구글의 순서 이동은 "이동 전 기준 위치"를 쓰므로, 앞에서부터 차례로 제 위치로 옮긴다(앞 칸은 이미 확정이므로 항상 앞쪽으로 이동).
+async function hrOrderTabs(){
+  const meta=await hrGet(`${HR_API}?fields=sheets.properties(sheetId,title,index)&key=${API_KEY}`);
+  if(!meta.ok) return {ok:false,message:HR_INIT_MSG.meta};
+  const list=(meta.json.sheets||[]).map(x=>x.properties).sort((a,b)=>a.index-b.index);
+  const mineTitles=new Set(HR_NUM_ORDER.map(k=>HR_TABS[k].tab));
+  const others=list.filter(p=>!mineTitles.has(p.title));
+  const mine=HR_NUM_ORDER.map(k=>list.find(p=>p.title===HR_TABS[k].tab)).filter(Boolean);
+  const desired=[...others,...mine];
+  const first=desired.findIndex((p,i)=>list[i].sheetId!==p.sheetId);
+  if(first<0) return {ok:true,changed:false};
+  const requests=desired.slice(first).map((p,j)=>({updateSheetProperties:{properties:{sheetId:p.sheetId,index:first+j},fields:'index'}}));
+  const w=await hrSend('POST',`${HR_API}:batchUpdate`,{requests});
+  return w.ok?{ok:true,changed:true}:{ok:false,message:'탭 순서를 바꾸지 못했습니다. 로그인 상태와 시트 권한을 확인해 주세요.'};
+}
 // 시트 준비 실행. onProgress(문구)는 선택. 반환 {ok, tabs:[{target,status,message}], seeds:[{target,status,message}], message?}
 //   status: created(새로 만들어짐) / exists(이미 있음) / header(헤더 불일치) / fail(실패) / skipped(미실행)
 async function hrInitSheets(onProgress){
@@ -59,9 +77,9 @@ async function hrInitSheets(onProgress){
   const meta=await hrGet(`${HR_API}?fields=sheets.properties(sheetId,title)&key=${API_KEY}`);
   if(!meta.ok){ out.ok=false; out.message=HR_INIT_MSG.meta; return out; }
   const sheets=meta.json.sheets||[]; const byTitle=Object.fromEntries(sheets.map(s=>[s.properties.title,s.properties.sheetId]));
-  let nextId=sheets.reduce((m,s)=>Math.max(m,s.properties.sheetId),0)+1;
+  let nextIndex=sheets.length; let nextId=sheets.reduce((m,s)=>Math.max(m,s.properties.sheetId),0)+1;
   let stopped=false;
-  for(const k of HR_ORDER){
+  for(const k of HR_NUM_ORDER){
     const t=HR_TABS[k];
     if(stopped){ out.tabs.push({target:t.tab,status:'skipped',message:'미실행'}); continue; }
     say(t.tab);
@@ -74,11 +92,16 @@ async function hrInitSheets(onProgress){
       continue;
     }
     const sid=nextId++;
-    const r=await hrSend('POST',`${HR_API}:batchUpdate`,{requests:hrCreateRequests(k,sid)});
-    if(r.ok){ out.tabs.push({target:t.tab,status:'created',message:'새로 만들어짐'}); byTitle[t.tab]=sid; }
+    const r=await hrSend('POST',`${HR_API}:batchUpdate`,{requests:hrCreateRequests(k,sid,nextIndex)});
+    if(r.ok){ out.tabs.push({target:t.tab,status:'created',message:'새로 만들어짐'}); byTitle[t.tab]=sid; nextIndex++; }
     else { out.tabs.push({target:t.tab,status:'fail',message:HR_INIT_MSG.create}); out.ok=false; out.message=HR_INIT_MSG.create; stopped=true; }
   }
   if(stopped) return out; // 만들기에 실패하면 기본 행·코드는 넣지 않는다(다시 실행하면 이어서 진행)
+  // 탭 순서 정리(번호순)
+  say('탭 순서');
+  const o=await hrOrderTabs();
+  out.seeds.push(o.ok?{target:'탭 순서(번호순)',status:o.changed?'created':'exists',message:o.changed?'번호순으로 정렬함':'이미 번호순'}:{target:'탭 순서(번호순)',status:'fail',message:o.message});
+  if(!o.ok) out.ok=false;
   // 기본 거래처(S27)
   if(out.tabs.find(x=>x.target===HR_TABS.S27.tab).status==='header'){
     out.seeds.push({target:'S27 기본 거래처',status:'skipped',message:'S27 헤더가 정의와 다르므로 넣지 않았습니다.'});

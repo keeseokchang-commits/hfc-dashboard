@@ -7,6 +7,7 @@ function seed(env,k,objs=[]){
   const T=env.run('HR_TABS')[k], H=env.run('HEADERS')[k];
   env.mock.addTab(T.tab,H,objs.map(o=>H.map(h=>o[h]??'')),{rowCount:T.rows,colCount:H.length,frozen:1});
 }
+const NOWRE=/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/;
 const S26=(n,extra={})=>({contact_id:'CT-'+String(n).padStart(6,'0'),person_id:'PSN-0001',contact_date:'2026-09-01',type:'통화',direction:'발신',summary:'요약'+n,created_at:'2026-09-01',updated_at:'2026-09-01',...extra});
 const col=(env,k,name)=>env.run('HEADERS')[k].indexOf(name)+1;
 const cell=(env,k,row,name)=>{ const s=env.mock.tab(env.run('HR_TABS')[k].tab); return (s.cells[row-1]||[])[col(env,k,name)-1]; };
@@ -54,35 +55,34 @@ T('TC-CMN01-03','행 추가 — 마지막 행 다음에 한 줄 추가, 다른 �
   const a=await env.run("hrAppend('S26',{person_id:'PSN-0007',contact_date:'2026-10-12',type:'미팅',direction:'수신',summary:'신규'})");
   ok(a.ok,a.message); eq(a.id,'CT-000003'); eq(a.row,4);
   const cells=env.mock.tab('S26_CONTACT_LOG').cells; eq(JSON.stringify(cells.slice(0,3)),JSON.stringify(JSON.parse(before).slice(0,3)),'기존 행 불변');
-  eq(cell(env,'S26',4,'contact_id'),'CT-000003'); eq(cell(env,'S26',4,'created_at'),TODAY); eq(cell(env,'S26',4,'updated_at'),TODAY,'수정일시=등록일');
+  eq(cell(env,'S26',4,'contact_id'),'CT-000003'); eq(cell(env,'S26',4,'created_at'),TODAY); ok(NOWRE.test(cell(env,'S26',4,'updated_at'))&&cell(env,'S26',4,'updated_at').startsWith(TODAY),'수정일시=등록 일시(초 단위)');
 });
 T('TC-CMN01-04','행 수정 — 그 행만 바뀌고 수정일시가 갱신된다',async()=>{
   const env=makeEnv(); env.login(); seed(env,'S26',[S26(1),S26(2),S26(3)]);
   const snap=JSON.stringify(env.mock.tab('S26_CONTACT_LOG').cells);
   const u=await env.run("hrUpdate('S26','CT-000002',{summary:'고친 내용',feedback:'피드백'},{readUpdatedAt:'2026-09-01'})");
-  ok(u.ok,u.message); eq(u.row,3); eq(cell(env,'S26',3,'summary'),'고친 내용'); eq(cell(env,'S26',3,'feedback'),'피드백'); eq(cell(env,'S26',3,'updated_at'),TODAY);
+  ok(u.ok,u.message); eq(u.row,3); eq(cell(env,'S26',3,'summary'),'고친 내용'); eq(cell(env,'S26',3,'feedback'),'피드백'); ok(NOWRE.test(cell(env,'S26',3,'updated_at'))&&cell(env,'S26',3,'updated_at').startsWith(TODAY),'수정일시 갱신(초 단위)');
   const after=env.mock.tab('S26_CONTACT_LOG').cells, was=JSON.parse(snap);
   eq(JSON.stringify(after[0]),JSON.stringify(was[0])); eq(JSON.stringify(after[1]),JSON.stringify(was[1])); eq(JSON.stringify(after[3]),JSON.stringify(was[3]),'다른 행 불변');
   eq(cell(env,'S26',3,'person_id'),'PSN-0001','수정하지 않은 열 불변');
 });
-T('TC-CMN01-05','수정 충돌 — 화면 A가 읽은 뒤 B가 같은 행을 고치면 A의 저장은 거부된다',async()=>{
-  const env=makeEnv(); env.login(); seed(env,'S26',[S26(1)]);
-  const read=await env.run("hrReadMany(['S26'])"); const rowA=read.tabs.S26.rows[0];                       // A: 읽음
-  const b=await env.run("hrUpdate('S26','CT-000001',{summary:'B가 고침'},{readUpdatedAt:'2026-09-01'})"); ok(b.ok,'B 저장');   // B: 수정(수정일시가 오늘로 바뀜)
-  const a=await env.run(`hrUpdate('S26','CT-000001',{summary:'A가 고침'},{readUpdatedAt:${JSON.stringify(rowA.updated_at)},readRow:${JSON.stringify(rowA)}})`);
+T('TC-CMN01-05','수정 충돌 — 화면 A가 읽은 뒤 B가 같은 행을 고치면 A의 저장은 거부된다 (같은 날이어도)',async()=>{
+  const env=makeEnv(); env.login(); seed(env,'S26',[S26(1,{updated_at:TODAY+' 09:00:00'})]);
+  const rowA=(await env.run("hrReadMany(['S26'])")).tabs.S26.rows[0];                                  // A: 읽음
+  const b=await env.run(`hrUpdate('S26','CT-000001',{summary:'B가 고침'},{readUpdatedAt:${JSON.stringify(rowA.updated_at)}})`); ok(b.ok,'B 저장');   // B: 같은 날 수정
+  const a=await env.run(`hrUpdate('S26','CT-000001',{summary:'A가 고침'},{readUpdatedAt:${JSON.stringify(rowA.updated_at)}})`);
   ok(!a.ok&&a.code==='CONFLICT','충돌 거부'); eq(a.message,'다른 곳에서 수정되었습니다. 다시 불러온 뒤 수정해 주세요.'); eq(cell(env,'S26',2,'summary'),'B가 고침','B의 수정이 유지됨');
 });
-T('TC-CMN01-05b','같은 날 두 번 수정 — 수정일시(날짜)만으로는 못 잡고, 읽은 행 내용을 함께 비교해야 잡는다',async()=>{
-  const env=makeEnv(); env.login(); seed(env,'S26',[S26(1,{created_at:TODAY,updated_at:TODAY})]);
-  const rowA=(await env.run("hrReadMany(['S26'])")).tabs.S26.rows[0];
-  env.mock.set('S26_CONTACT_LOG',2,col(env,'S26','summary'),'B가 같은 날 고침');                       // 수정일시는 그대로(오늘)
-  const only=await env.run(`hrUpdate('S26','CT-000001',{feedback:'수정일시만 비교'},{readUpdatedAt:${JSON.stringify(rowA.updated_at)}})`);
-  ok(only.ok,'수정일시만 비교하면 통과해 버림(설계서 방식의 한계)');
-  const env2=makeEnv(); env2.login(); seed(env2,'S26',[S26(1,{created_at:TODAY,updated_at:TODAY})]);
-  const rowA2=(await env2.run("hrReadMany(['S26'])")).tabs.S26.rows[0];
-  env2.mock.set('S26_CONTACT_LOG',2,col(env2,'S26','summary'),'B가 같은 날 고침');
-  const both=await env2.run(`hrUpdate('S26','CT-000001',{feedback:'행 내용도 비교'},{readUpdatedAt:${JSON.stringify(rowA2.updated_at)},readRow:${JSON.stringify(rowA2)}})`);
-  ok(!both.ok&&both.code==='CONFLICT','행 내용까지 비교하면 거부');
+T('TC-CMN01-05b','수정일시 없이는 수정할 수 없고, 읽은 수정일시가 지금과 같으면 통과한다',async()=>{
+  const env=makeEnv(); env.login(); seed(env,'S26',[S26(1,{updated_at:TODAY+' 09:00:00'})]);
+  const n=await env.run("hrUpdate('S26','CT-000001',{summary:'x'},{})"); ok(!n.ok&&n.code==='NO_BASIS');
+  const r=await env.run(`hrUpdate('S26','CT-000001',{summary:'정상'},{readUpdatedAt:'${TODAY} 09:00:00'})`); ok(r.ok,r.message);
+  const rowB=(await env.run("hrReadMany(['S26'])")).tabs.S26.rows[0]; ok(NOWRE.test(rowB.updated_at));
+});
+T('CMN01-삭제충돌','삭제도 읽은 수정일시가 다르면 거부한다',async()=>{
+  const env=makeEnv(); env.login(); seed(env,'S26',[S26(1,{updated_at:TODAY+' 09:00:00'})]);
+  const d=await env.run(`hrDelete('S26','CT-000001',{readUpdatedAt:'${TODAY} 08:00:00'})`); ok(!d.ok&&d.code==='CONFLICT'); eq(env.mock.tab('S26_CONTACT_LOG').cells.length,2);
+  const d2=await env.run(`hrDelete('S26','CT-000001',{readUpdatedAt:'${TODAY} 09:00:00'})`); ok(d2.ok);
 });
 T('TC-CMN01-06','행 삭제 — 해당 행만 삭제되고 아래 행이 당겨진다',async()=>{
   const env=makeEnv(); env.login(); seed(env,'S26',[S26(1),S26(2),S26(3)]);
@@ -186,10 +186,32 @@ T('TC-CMN03-03','중간 실패 후 재실행 — 나머지 탭만 생성',async(
   eq(r.seeds.length,0,'실패하면 기본 행·코드는 넣지 않음'); eq(env.mock.sheets.filter(s=>/^S\d\d_/.test(s.title)&&!/S10|S11/.test(s.title)).length,9,'10번째 탭은 반쪽으로 남지 않음');
   const r2=await env.run('hrInitSheets()'); ok(r2.ok,JSON.stringify(r2)); eq(r2.tabs.filter(x=>x.status==='exists').length,9); eq(r2.tabs.filter(x=>x.status==='created').length,9);
 });
+const titles=env=>env.mock.sheets.map(s=>s.title);
+const NUM=['S20_PERSON','S21_PERSON_ROLE','S22_PERSON_SKILL','S23_PERSON_CAREER','S24_PERSON_CERT','S25_ASSIGNMENT','S26_CONTACT_LOG','S27_PARTY','S28_PERSON_FILE','S29_RATING','S31_CANDIDACY','S32_REQUEST','S33_REQUEST_LINE','S34_SEARCH_ORDER','S36_PARTY_CONTACT','S37_AGENT_RUN','S38_CAND_STAGE_LOG','S39_PERSON_PRIVATE'];
+T('TAB-정렬-01','처음 실행하면 기존 탭 뒤에 번호순(S20→S39)으로 만들어진다',async()=>{
+  const env=freshFile(); await env.run('hrInitSheets()'); eq(titles(env),['S10_SETTINGS','S11_GRADE_RATE',...NUM]);
+});
+T('TAB-정렬-02','이미 업무 순서로 만들어진 탭 18개는 다시 실행하면 번호순으로 재배열 — 데이터와 다른 탭 순서는 그대로',async()=>{
+  const env=freshFile(); const T_=env.run('HR_TABS'),H=env.run('HEADERS');
+  // 이전 버전(v2.9.73)이 만든 순서: 거래처·담당자·의뢰·라인·발송·후보·단계로그·후보자…
+  ['S27','S36','S32','S33','S34','S31','S38','S20','S39','S21','S22','S24','S23','S25','S26','S28','S29','S37'].forEach(k=>env.mock.addTab(T_[k].tab,H[k],[],{rowCount:T_[k].rows,colCount:H[k].length,frozen:1}));
+  env.mock.addTab('ZZ_사용자탭',['a'],[['1']]);   // 사용자가 뒤에 추가한 다른 탭
+  env.mock.set('S26_CONTACT_LOG',2,1,'CT-000001');
+  const r=await env.run('hrInitSheets()'); ok(r.ok,JSON.stringify(r));
+  eq(titles(env),['S10_SETTINGS','S11_GRADE_RATE','ZZ_사용자탭',...NUM],'다른 탭 순서 유지, 인력 모듈 탭은 번호순');
+  eq(env.mock.tab('S26_CONTACT_LOG').cells[1][0],'CT-000001','데이터 불변'); ok(r.seeds.find(x=>x.target.startsWith('탭 순서')).status==='created');
+  const snap=JSON.stringify(env.mock.sheets.map(s=>s.title)); const r2=await env.run('hrInitSheets()'); eq(JSON.stringify(env.mock.sheets.map(s=>s.title)),snap); ok(r2.seeds.find(x=>x.target.startsWith('탭 순서')).status==='exists','두 번째는 변화 없음');
+});
+T('TAB-정렬-03','다른 탭이 사이사이 끼어 있어도 인력 모듈 탭만 뒤로 모이고 다른 탭끼리 순서는 유지',async()=>{
+  const env=freshFile(); const T_=env.run('HR_TABS'),H=env.run('HEADERS');
+  ['S39','S20'].forEach(k=>env.mock.addTab(T_[k].tab,H[k],[],{rowCount:T_[k].rows,colCount:H[k].length}));
+  env.mock.addTab('MID',['a']); env.mock.addTab('S21_PERSON_ROLE',H.S21,[],{rowCount:3000,colCount:7}); env.mock.addTab('END',['a']);
+  await env.run('hrInitSheets()'); eq(titles(env),['S10_SETTINGS','S11_GRADE_RATE','MID','END',...NUM]);
+});
 T('TC-CMN03-04','서식 확인 — ID·연-월·전화 열이 일반 텍스트 서식',async()=>{
   const env=freshFile(); await env.run('hrInitSheets()'); const T_=env.run('HR_TABS'),H=env.run('HEADERS');
   const fmt=(k,n)=>env.mock.tab(T_[k].tab).fmt[H[k].indexOf(n)];
-  ['S20.person_id','S20.birth_date','S23.start_ym','S23.end_ym','S39.rid_head7','S39.mobile','S36.phone','S27.main_phone','S37.requested_at','S31.stage_x'.replace('stage_x','cand_id')].forEach(x=>{ const [k,n]=x.split('.'); eq(fmt(k,n),'TEXT',x); });
+  ['S20.person_id','S20.updated_at','S26.updated_at','S20.birth_date','S23.start_ym','S23.end_ym','S39.rid_head7','S39.mobile','S36.phone','S27.main_phone','S37.requested_at','S31.stage_x'.replace('stage_x','cand_id')].forEach(x=>{ const [k,n]=x.split('.'); eq(fmt(k,n),'TEXT',x); });
   ['S20.name','S23.tasks','S33.headcount'].forEach(x=>{ const [k,n]=x.split('.'); eq(fmt(k,n),undefined,x+'은 일반 서식'); });
 });
 T('TC-CMN03-05','드롭다운 — 허용값 이외 입력은 거부',async()=>{

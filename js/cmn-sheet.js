@@ -17,6 +17,8 @@ const HR_MSG={
 const hrSleep=ms=>new Promise(r=>setTimeout(r,ms));
 // 한국 시간 기준 오늘(YYYY-MM-DD) — 기기 시간대와 무관하게 같은 날짜
 function hrToday(){ return new Date(Date.now()+9*3600*1000).toISOString().slice(0,10); }
+// 한국 시간 기준 현재 일시(YYYY-MM-DD HH:mm:ss) — updated_at 에 쓴다(변경 001: 같은 날 수정도 충돌 검사로 구분)
+function hrNow(){ return new Date(Date.now()+9*3600*1000).toISOString().slice(0,19).replace('T',' '); }
 const HR_RETRY_MS=800;
 const hrHeaderCache={};   // {S20:[헤더…]} — 쓰기 전에 한 번 확인한 실제 시트 헤더
 let hrSheetIdCache=null;  // {탭이름:sheetId}
@@ -146,8 +148,8 @@ async function hrAppend(k,obj,opts={}){
     if(!n.ok) return n;
     rec[idName]=n.ids[0];
   }
-  ['created_at','updated_at'].forEach(c=>{ if(HEADERS[k].includes(c)&&(rec[c]===undefined||rec[c]==='')) rec[c]=today; });
-  if(HEADERS[k].includes('updated_at')&&HEADERS[k].includes('created_at')&&obj.updated_at===undefined) rec.updated_at=rec.created_at; // 신규 입력은 수정일시=등록일 (S26 L열 규칙)
+  if(HEADERS[k].includes('created_at')&&(rec.created_at===undefined||rec.created_at==='')) rec.created_at=today;
+  if(HEADERS[k].includes('updated_at')&&(rec.updated_at===undefined||rec.updated_at==='')) rec.updated_at=hrNow(); // 신규 입력의 수정일시 = 등록 일시
   const row=rowsFor(h.header,[rec])[0];
   const url=hrRangeUrl(k,'A:'+t.last)+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
   let r=await hrSend('POST',url,{values:[row]});
@@ -163,24 +165,16 @@ async function hrAppend(k,obj,opts={}){
   const m=/!A(\d+)/.exec((r.json&&r.json.updates&&r.json.updates.updatedRange)||'');
   return {ok:true,id:rec[idName],row:m?parseInt(m[1],10):undefined};
 }
-// 충돌 판단: 읽은 시점의 수정일시가 지금 시트와 다르거나, 화면이 읽어 둔 행 내용(readRow)이 지금 시트 행과 다르면 충돌.
-// ※ 수정일시(updated_at)는 날짜(YYYY-MM-DD)까지만 저장되므로 같은 날 두 번 고친 경우는 일시만으로는 구분되지 않는다 —
-//   그래서 호출하는 화면은 hrReadMany가 돌려준 행 객체(readRow)도 함께 넘기는 것을 원칙으로 한다.
+// 충돌 판단: 읽은 시점의 수정일시(초 단위)가 지금 시트의 수정일시와 다르면 충돌. (변경 001 — 수정일시를 일시로 저장해 같은 날 수정도 구분)
 function hrConflict(k,cur,opts){
-  const has=HEADERS[k].includes('updated_at');
-  if(has&&opts.readUpdatedAt!==undefined&&String(cur.updated_at??'')!==String(opts.readUpdatedAt??'')) return true;
-  if(opts.readRow){
-    for(const c of HEADERS[k]){ if(c==='updated_at'&&has&&opts.readUpdatedAt!==undefined) continue;
-      if(String(cur[c]??'')!==String(opts.readRow[c]??'')) return true; }
-  }
-  return false;
+  return HEADERS[k].includes('updated_at')&&String(cur.updated_at??'')!==String(opts.readUpdatedAt??'');
 }
 // 행 수정(TC-CMN01-04/05): 쓰기 직전 대상 행을 다시 읽어 충돌을 확인한 뒤, 바뀐 셀만 쓰고 수정일시를 갱신한다.
-// opts.readUpdatedAt — 읽은 시점의 수정일시(수정일시 열이 있는 탭 필수), opts.readRow — 읽은 시점의 행 객체(권장)
+// opts.readUpdatedAt — 읽은 시점의 수정일시(수정일시 열이 있는 탭은 필수). 수정일시 열이 없는 탭은 충돌 검사 없이 수정한다.
 async function hrUpdate(k,id,changes,opts={}){
   const t=HR_TABS[k]; if(!t) return {ok:false,code:'BAD_TAB',message:'알 수 없는 탭입니다: '+k};
   const hasUpd=HEADERS[k].includes('updated_at');
-  if(opts.readUpdatedAt===undefined&&!opts.readRow) return {ok:false,code:'NO_BASIS',message:'읽은 시점의 수정일시 또는 행 내용이 필요합니다.'};
+  if(hasUpd&&opts.readUpdatedAt===undefined) return {ok:false,code:'NO_BASIS',message:'읽은 시점의 수정일시가 필요합니다.'};
   const bad=Object.keys(changes).filter(c=>!HEADERS[k].includes(c)); if(bad.length) return {ok:false,code:'BAD_COL',message:'정의에 없는 열입니다: '+bad.join(', ')};
   const h=await hrHeader(k); if(!h.ok) return h;
   const row=await hrFindRow(k,id);
@@ -189,7 +183,7 @@ async function hrUpdate(k,id,changes,opts={}){
   const cur=await hrReadRow(k,row,h.header);
   if(cur===null) return {ok:false,code:'READ_FAIL',message:HR_MSG.read(t.tab)};
   if(hrConflict(k,cur,opts)) return {ok:false,code:'CONFLICT',message:HR_MSG.conflict};
-  const upd={...changes}; if(hasUpd&&upd.updated_at===undefined) upd.updated_at=hrToday();
+  const upd={...changes}; if(hasUpd&&upd.updated_at===undefined) upd.updated_at=hrNow();
   const data=Object.keys(upd).map(c=>{
     const col=colLetter(h.header.indexOf(c)+1);
     return {range:`${t.tab}!${col}${row}`,values:[rowsFor([c],[upd])[0]]};
@@ -220,7 +214,7 @@ async function hrDelete(k,id,opts={}){
   const row=await hrFindRow(k,id);
   if(row===null) return {ok:false,code:'READ_FAIL',message:HR_MSG.read(HR_TABS[k].tab)};
   if(row<0) return {ok:false,code:'NOT_FOUND',message:HR_MSG.notFound};
-  if(opts.readUpdatedAt!==undefined||opts.readRow){
+  if(opts.readUpdatedAt!==undefined){
     const cur=await hrReadRow(k,row,h.header);
     if(cur===null) return {ok:false,code:'READ_FAIL',message:HR_MSG.read(HR_TABS[k].tab)};
     if(hrConflict(k,cur,opts)) return {ok:false,code:'CONFLICT',message:HR_MSG.conflict};
