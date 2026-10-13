@@ -141,4 +141,17 @@ t('TC-SCR02-16','의뢰 삭제(변경 004) — 기록 없는 의뢰는 라인과
   setAnswer(true); await page.click('#btnDeleteReq'); await page.waitForTimeout(1500); eq(U.rowsOf(m,'S32').map(r=>r.request_id),['REQ-2026-002','REQ-2026-003','REQ-2026-004','REQ-2026-005']); eq(U.rowsOf(m,'S33').map(r=>r.line_id),['LN-0003','LN-0004','LN-0005'],'다른 의뢰의 라인은 그대로'); ok(page.url().endsWith('request.html')); await close();
 });
 
+t('TC-SCR02-10b','발송 기록이 있는 라인도 삭제 거부 — 취소 안내(의뢰 삭제와 같은 규칙)',async()=>{
+  const m=mock({S34:[O('ORD-00001','REQ-2026-001','LN-0001','PTY-004')]}); const {page,close}=await open(m); await page.click('[data-line="LN-0001"] [data-act="deleteLine"]');
+  eq(await page.textContent('[data-line="LN-0001"] .lc-msg'),'발송 기록 1건이 있어 삭제할 수 없습니다. 취소로 처리해 주세요.'); eq(U.rowsOf(m,'S33').length,1); await close();
+});
+
+t('TC-SCR02-17','발송 기록 삭제(변경 005) — 후보 연결이 없으면 삭제 / 있으면 거부 / 취소하면 안 지움 / 지운 뒤 상태·충원 다시 계산',async()=>{
+  const m=mock({S34:[O('ORD-00001','REQ-2026-001','LN-0001','PTY-004'),O('ORD-00002','REQ-2026-001','LN-0001','PTY-005')],S31:[{cand_id:'CND-00001',line_id:'LN-0001',person_id:'PSN-0001',order_id:'ORD-00002',stage:'추천수령',updated_at:'2026-10-02 09:00:00'}]});
+  const {page,setAnswer,dialogs,close}=await open(m); await page.click('[data-order="ORD-00002"] [data-oact="delete"]'); await page.waitForTimeout(500); eq(await page.textContent('[data-order="ORD-00002"] .oc-msg'),'이 발송으로 들어온 후보 1명이 연결되어 있어 삭제할 수 없습니다.'); eq(U.rowsOf(m,'S34').length,2);
+  setAnswer(false); await page.click('[data-order="ORD-00001"] [data-oact="delete"]'); await page.waitForTimeout(500); ok(dialogs.at(-1).includes('서치에이')); eq(U.rowsOf(m,'S34').length,2);
+  setAnswer(true); await page.click('[data-order="ORD-00001"] [data-oact="delete"]'); await page.waitForTimeout(900); eq(U.rowsOf(m,'S34').map(o=>o.order_id),['ORD-00002']); eq((await page.$$('#orderBox [data-order]')).length,1); await close();
+  const m2=mock({S34:[O('ORD-00001','REQ-2026-001','LN-0001','PTY-004')]}); const h=await open(m2); eq(await h.page.textContent('#statusBadge'),'탐색'); await h.page.click('[data-order="ORD-00001"] [data-oact="delete"]'); await h.page.waitForTimeout(900); eq(await h.page.textContent('#statusBadge'),'접수','발송이 없어지면 상태가 접수로'); await h.close();
+});
+
 (async()=>{ browser=await U.launch(); const f=await runTests(T,'SCR-02 의뢰 상세'); await browser.close(); process.exit(f?1:0); })();

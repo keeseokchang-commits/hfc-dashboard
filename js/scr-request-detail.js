@@ -246,7 +246,8 @@ async function deleteLine(card){
   const cur=LINES.find(l=>l.line_id===card.dataset.line); const msg=card.querySelector('.lc-msg'); msg.textContent='';
   if(D.S31.some(c=>c.line_id===cur.line_id)){ msg.textContent='후보가 있어 삭제할 수 없습니다. 취소로 처리해 주세요.'; return; }
   const sent=D.S34.filter(o=>o.line_id===cur.line_id).length;
-  if(!confirm(sent?`이 라인으로 보낸 발송 기록 ${sent}건이 있습니다. 라인을 삭제하면 발송 기록의 라인 정보가 사라집니다. 그래도 삭제할까요?\n(발송 기록은 남겨 두려면 “라인 취소”를 쓰세요.)`:'이 요청 라인을 삭제할까요?')) return;
+  if(sent){ msg.textContent=`발송 기록 ${sent}건이 있어 삭제할 수 없습니다. 취소로 처리해 주세요.`; return; }   // 의뢰 삭제와 같은 규칙 — 기록이 있는 것은 지우지 않는다(사용자 지적 2026-10-12)
+  if(!confirm('이 요청 라인을 삭제할까요? 되돌릴 수 없습니다.')) return;
   const r=await hrDelete('S33',cur.line_id,{readUpdatedAt:cur.updated_at});
   if(!r.ok){ msg.textContent=hrSaveFailText(r); return; }
   toast('✓ 라인을 삭제했습니다'); await loadAll();
@@ -355,14 +356,26 @@ function renderOrders(){
       </div>
       <div class="hr-row"><div class="hr-field"><label>조건 요약</label><input class="hr-input oc-cond" value="${hrEsc(o.conditions||'')}"></div><div class="hr-field"><label>메모</label><input class="hr-input oc-memo" value="${hrEsc(o.memo||'')}"></div></div>
       <div class="hr-err oc-msg" style="margin-top:6px"></div>
-      <div class="hr-row" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-oact="save">저장</button></div></div>`;
+      <div class="hr-row" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-oact="save">저장</button><button class="btn btn-danger btn-sm" data-oact="delete">삭제</button></div></div>`;
   }).join('');
 }
 const ORDER_STATES=HR_TABS.S34.enums?HR_TABS.S34.enums.reply_state:['대기','조건 협의 중','후보 추천','후보 없음','종결'];
 document.addEventListener('click',ev=>{
   const b=ev.target.closest('[data-oact]'); if(!b) return; const card=b.closest('[data-order]');
-  hrBusy(b,()=>saveOrder(card));
+  hrBusy(b,()=>b.dataset.oact==='delete'?deleteOrder(card):saveOrder(card));
 });
+// 발송 기록 삭제 — 잘못 기록한 것을 지운다(변경 005). 이 발송으로 들어온 후보(S31.order_id)가 있으면 삭제하지 않는다. 직전에 시트를 다시 읽어 확인하고, 확인하지 못하면 삭제하지 않는다.
+async function deleteOrder(card){
+  const cur=ORDERS.find(o=>o.order_id===card.dataset.order); const msg=card.querySelector('.oc-msg'); msg.textContent='';
+  const r=await hrReadMany(['S34','S31']); if(r.failed.length){ msg.textContent='사용 여부를 확인하지 못해 삭제하지 않았습니다. 다시 시도해 주세요.'; return; }
+  const fresh=r.tabs.S34.rows.find(o=>o.order_id===cur.order_id); if(!fresh){ msg.textContent='이미 삭제된 발송 기록입니다.'; return; }
+  const n=r.tabs.S31.rows.filter(c=>c.order_id===cur.order_id).length;
+  if(n){ msg.textContent=`이 발송으로 들어온 후보 ${n}명이 연결되어 있어 삭제할 수 없습니다.`; return; }
+  const pm=hrMap(D.S27,'party_id');
+  if(!confirm(`${hrPartyName(pm,cur.party_id)} 발송 기록(${cur.order_id})을 삭제합니다. 되돌릴 수 없습니다. 삭제할까요?`)) return;
+  const d=await hrDelete('S34',cur.order_id,{readUpdatedAt:fresh.updated_at}); if(!d.ok){ msg.textContent=hrSaveFailText(d); return; }
+  toast('✓ 발송 기록을 삭제했습니다'); await loadAll();
+}
 async function saveOrder(card){
   const cur=ORDERS.find(o=>o.order_id===card.dataset.order); const e=s=>q$(card,s); const msg=e('.oc-msg'); msg.textContent='';
   const state=e('.oc-state').value, due=e('.oc-due').value; let repl=e('.oc-repl').value; const rate=hrManToWon(e('.oc-rate').value);
