@@ -18,7 +18,7 @@ function buildRows(d,asOf){
     const x=der[r.request_id]; const lines=d.S33.filter(l=>l.request_id===r.request_id&&!cmnYes(l.is_cancelled));
     const roles=[...new Set(lines.flatMap(l=>hrSplit(l.role_codes)))];
     const customer=r.end_client_party_id?hrPartyName(pm,r.end_client_party_id):(r.end_client_name||'');
-    const parties=x.partyIds.map(id=>hrPartyName(pm,id));
+    const parties=x.partyIds.map(id=>hrPartyLabel(pm,id));
     const dueIn=cmnDiffDays(asOf,r.requester_due);
     return {id:r.request_id,customer,alias:r.alias,roles:roles.join(', '),need:x.need,filled:x.filled,short:x.short&&!x.closed,closed:x.closed,
       sellText:hrRangeMan(lines.map(l=>l.rate_sell)),buyText:hrRangeMan(lines.map(l=>l.rate_buy_target)),
@@ -71,7 +71,7 @@ function clearFilters(){ ['fYear','fMonth','fStatus','fClient'].forEach(i=>hrQ(i
 function showMore(){ shown+=PAGE_SIZE; renderList(); }
 
 const COLS=[['id','의뢰 번호',110,''],['customer','고객사',110,''],['alias','프로젝트명',150,''],['roles','역할',110,''],['need','필요 인원',64,'r'],['filled','충원 인원',64,'r'],['short','부족 여부',84,''],
-  ['sell','판매 단가(만원/월)',96,'r'],['buy','매입 목표 단가(만원/월)',104,'r'],['received','의뢰일',92,''],['status','상태',84,''],['party','서치업체',130,'']];
+  ['sell','판매 단가(만원/월)',96,'r'],['buy','매입 목표 단가(만원/월)',104,'r'],['received','의뢰일',92,''],['status','상태',84,''],['party','서치업체',200,'']];
 function cellOf(r,k){
   switch(k){
     case 'id': return hrEsc(r.id);

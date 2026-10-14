@@ -32,6 +32,7 @@ async function hrLoadScreen(keys){
 const hrMap=(rows,idCol)=>new Map(rows.map(r=>[r[idCol],r]));
 // 거래처 이름 — 대표 이름만 보여 준다(별칭이 아니라)
 const hrPartyName=(pm,id)=>{ const p=pm.get(id); return p?p.name:(id||''); };
+const hrPartyLabel=(pm,id)=>{ const p=pm.get(id); return p?`${p.name} (${id})`:(id||''); };  // 이름 + 거래처 ID. 이력서 JSON의 source_party_id를 화면에서 확인하기 위함
 // 화면 상태 안내(탭 없음/읽기 실패)를 한 곳에서 그린다
 function hrShowLoadProblem(el,state,message){
   const link=state==='noTab'?' <a href="settings.html" style="color:inherit;font-weight:600">설정 화면으로 이동</a>':' <button class="btn btn-secondary btn-sm" onclick="hrRelogin()">다시 로그인</button>';

@@ -66,12 +66,12 @@ function badges(v){
 }
 function row(v){
   const cur=v.current; const curText=cur?`${hrEsc([cur.client,cur.project].filter(Boolean).join(' · ')||'-')}${cur.end_ym?` <span class="hr-sub">(${hrEsc(cur.end_ym)} 종료)</span>`:''}${cur.kind==='resume'?' <span class="hr-sub">(이력서 기준)</span>':''}`:'-';
-  const route=v.route.latestPartyId?`최근 경로 ${hrEsc(hrPartyName(PM,v.route.latestPartyId))}`:'';
+  const route=v.route.latestPartyId?`최근 경로 ${hrEsc(hrPartyLabel(PM,v.route.latestPartyId))}`:'';
   const via=v.route.count>=2?` <span class="hr-badge amber" data-via="1">경유 ${v.route.count}곳</span>`:'';
   const g=v.grade||(v.gradeReported?`${v.gradeReported}(기재)`:'-');
   const yrs=v.years.applied; const dim=v.rating.flag==='블랙'?' style="opacity:.55"':'';
   return `<tr data-id="${hrEsc(v.id)}"${dim}>
-    <td><a href="candidate-detail.html?id=${encodeURIComponent(v.id)}" data-name="1" style="font-weight:600;color:inherit">${hrEsc(v.name)}</a><div class="hr-sub">${hrEsc(v.age.label||'')}${route?` · ${route}`:''}${via}</div></td>
+    <td><a href="candidate-detail.html?id=${encodeURIComponent(v.id)}" data-name="1" style="font-weight:600;color:inherit">${hrEsc(v.name)}</a><div class="hr-sub">${hrEsc(v.id)} · ${hrEsc(v.age.label||'')}${route?` · ${route}`:''}${via}</div></td>
     <td>${hrEsc(v.roleLabel||'-')}<div class="hr-sub">${hrEsc(g)}</div></td>
     <td>${hrEsc(v.skills.slice(0,4).join(', ')||'-')}<div class="hr-sub">${hrEsc(v.industries.join(', '))}</div></td>
     <td class="r">${hrEsc(yrs.years)}년${yrs.basis==='manual'?' <span class="hr-badge gray">수기</span>':''}</td>

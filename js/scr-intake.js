@@ -28,7 +28,7 @@ async function loadAll(){
 }
 function fillParties(){
   const cur=hrQ('fParty').value; const ps=D.S27.filter(p=>hrYes(p.is_active)&&hrSplit(p.roles).some(x=>['서치업체','경로'].includes(x)));
-  hrQ('fParty').innerHTML='<option value="">선택 안 함</option>'+ps.map(p=>`<option value="${hrEsc(p.party_id)}">${hrEsc(p.name)}</option>`).join(''); hrQ('fParty').value=cur;
+  hrQ('fParty').innerHTML='<option value="">선택 안 함</option>'+ps.map(p=>`<option value="${hrEsc(p.party_id)}">${hrEsc(p.name)} (${hrEsc(p.party_id)})</option>`).join(''); hrQ('fParty').value=cur;
 }
 function render(){ renderStatus(); renderNeed(); renderRuns(); }
 
@@ -86,7 +86,7 @@ function renderNeed(){
     if(st==='읽기실패'){ info=hrEsc(f.parse_error||'읽지 못했습니다.'); btn=`<button class="btn btn-secondary btn-sm" data-act="reread" data-file="${hrEsc(f.file_id)}">다시 읽기</button>`; }
     else if(st==='검토필요'){ const n=(pend.get(f.file_id)||[]).length; info=`변경 검토 ${n}건`; btn=`<button class="btn btn-primary btn-sm" data-act="openReview" data-file="${hrEsc(f.file_id)}">변경 검토</button>`; }
     else { info=`이름이 같은 기존 후보: ${hrEsc(pname(f.match_person_id))} (${hrEsc(f.match_person_id||'-')})`; btn=`<button class="btn btn-primary btn-sm" data-act="openMerge" data-file="${hrEsc(f.file_id)}">같은 사람</button> <button class="btn btn-secondary btn-sm" data-act="notSame" data-file="${hrEsc(f.file_id)}">다른 사람</button>`; }
-    return `<tr data-file="${hrEsc(f.file_id)}"><td><span class="hr-badge ${cls}">${NEED_LABEL[st]}</span></td><td>${hrEsc(f.file_name||f.file_id)}<div class="hr-sub">${hrEsc(f.received_at||'')}${f.source_party_id?' · '+hrEsc(hrPartyName(PM,f.source_party_id)):''}</div></td><td>${f.person_id?`<a href="candidate-detail.html?id=${encodeURIComponent(f.person_id)}">${hrEsc(pname(f.person_id))}</a>`:'-'}</td><td>${info}</td><td style="white-space:nowrap">${btn}</td></tr>`; }).join('')}</tbody></table></div>`;
+    return `<tr data-file="${hrEsc(f.file_id)}"><td><span class="hr-badge ${cls}">${NEED_LABEL[st]}</span></td><td>${hrEsc(f.file_name||f.file_id)}<div class="hr-sub">${hrEsc(f.received_at||'')}${f.source_party_id?' · '+hrEsc(hrPartyLabel(PM,f.source_party_id)):''}</div></td><td>${f.person_id?`<a href="candidate-detail.html?id=${encodeURIComponent(f.person_id)}">${hrEsc(pname(f.person_id))}</a>`:'-'}</td><td>${info}</td><td style="white-space:nowrap">${btn}</td></tr>`; }).join('')}</tbody></table></div>`;
   renderPanel();
 }
 async function reread(btn){

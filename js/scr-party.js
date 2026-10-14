@@ -65,6 +65,7 @@ function renderList(){
     return `<div class="hr-list-item${p.party_id===selParty?' on':''}${hidden?' off':''}" data-id="${hrEsc(p.party_id)}" onclick="pickParty('${hrEsc(p.party_id)}')">
       <div style="min-width:0;flex:1">
         <div style="font-weight:600;font-size:13px">${hrEsc(p.name)}${hidden?' <span class="hr-badge gray">숨김</span>':''}${BASE_IDS.has(p.party_id)?' <span class="hr-badge blue">기본</span>':''}</div>
+        <div class="hr-help" data-pid="1" style="margin-top:2px">${hrEsc(p.party_id)}</div>
         <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${hrSplit(p.roles).map(x=>`<span class="hr-badge gray">${hrEsc(x)}</span>`).join('')}</div>
         <div class="hr-help" style="margin-top:4px">${p.main_phone?'☎ '+hrEsc(p.main_phone)+' · ':''}담당자 ${c.contacts} · 의뢰 ${c.requests} · 발송 ${c.orders} · 이력서 ${c.files}</div>
       </div></div>`;
@@ -85,7 +86,7 @@ function fillForm(){
   pfRoles=new Set(p?hrSplit(p.roles):[]); renderRoleChips(base);
   hrQ('pfName').disabled=!!base;
   const hid=p&&String(p.is_active).trim()==='N';
-  hrQ('pfBadges').innerHTML=p?`${base?'<span class="hr-badge blue">기본 거래처</span> ':''}${hid?'<span class="hr-badge gray">숨김</span>':''}`:'';
+  hrQ('pfBadges').innerHTML=p?`<span class="hr-sub" data-pid-form="1">${hrEsc(p.party_id)}</span> <button type="button" class="btn btn-secondary btn-sm" data-act="copyPid" data-pid="${hrEsc(p.party_id)}">ID 복사</button> ${base?'<span class="hr-badge blue">기본 거래처</span> ':''}${hid?'<span class="hr-badge gray">숨김</span>':''}`:'';
   const b=hrQ('btnHideParty'); b.style.display=p?'':'none'; b.textContent=hid?'숨김 해제':'숨김';
   hrQ('btnDeleteParty').style.display=p&&!base?'':'none';
   hrQ('contactCard').style.display=p?'':'none';
@@ -224,3 +225,8 @@ async function saveContact(){
   });
 }
 window.addEventListener('load',loadAll);
+
+// 거래처 ID 복사 (이력서 JSON의 source_party_id에 붙여 넣기 위함)
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-act="copyPid"]'); if(!b) return; const id=b.dataset.pid;
+  const done=()=>{ b.textContent='복사됨'; setTimeout(()=>{ b.textContent='ID 복사'; },1200); };
+  try{ navigator.clipboard.writeText(id).then(done,()=>{ b.textContent=id; }); }catch(_){ b.textContent=id; } });

@@ -275,7 +275,7 @@ function renderSend(){
   const live=LINES.filter(l=>!cmnYes(l.is_cancelled)); const sps=searchParties();
   if(!live.length){ box.innerHTML='<div class="hr-empty">요청 라인을 먼저 추가해 주세요.</div>'; return; }
   if(DER&&DER.closed){ box.innerHTML=`<div class="hr-notice warn">${hrEsc(DER.status)}로 처리된 의뢰입니다. 새로 발송하려면 먼저 “진행으로 되돌리기”를 누르세요.</div>`; return; }
-  const partyChips=sps.length?sps.map(p=>`<span class="hr-chip${selParties.has(p.party_id)?' on':''}" data-sp="${hrEsc(p.party_id)}">${hrEsc(p.name)}</span>`).join(''):'<span class="hr-help">서치업체 역할의 거래처가 없습니다. <a href="party.html">거래처 관리</a>에서 먼저 등록하세요.</span>';
+  const partyChips=sps.length?sps.map(p=>`<span class="hr-chip${selParties.has(p.party_id)?' on':''}" data-sp="${hrEsc(p.party_id)}">${hrEsc(p.name)} <span class="hr-sub">${hrEsc(p.party_id)}</span></span>`).join(''):'<span class="hr-help">서치업체 역할의 거래처가 없습니다. <a href="party.html">거래처 관리</a>에서 먼저 등록하세요.</span>';
   const lineChips=live.map(l=>`<span class="hr-chip${selLines.has(l.line_id)?' on':''}" data-sl="${hrEsc(l.line_id)}">${hrEsc(lineLabel(l))}</span>`).join('');
   const blank=(DER&&DER.orderCount)?'':'';
   box.innerHTML=`<div class="hr-lbl hr-req">발송할 업체 (여러 곳 선택)</div><div class="hr-chips" id="spChips" style="margin:4px 0">${partyChips}</div><div class="hr-err" id="spErr"></div>
