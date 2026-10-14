@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 이력서 등록</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.82">
+<link rel="stylesheet" href="css/hr.css?v=2.9.82">
+</head>
+<body data-page="stf_intake">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>이력서 등록</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='candidate.html'" title="후보 목록">👥</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+  <div id="screen" style="display:none">
+    <div class="hr-steps">
+      <span class="hr-chip" onclick="location.href='candidate.html'">후보 목록</span>
+      <span class="hr-chip disabled" title="다음 개발 단계에서 열립니다">철수·재확인 일정</span>
+      <span class="hr-chip on">이력서 등록</span>
+    </div>
+
+    <div class="card">
+      <div class="card-title">이력서 읽기 에이전트</div>
+      <div id="agentStatus"></div>
+      <div class="hr-row" style="margin-top:12px"><button class="btn btn-primary" id="btnFolder" data-act="runFolder">신규 이력서 폴더 지금 읽기</button></div>
+      <div class="hr-row" style="margin-top:14px">
+        <div class="hr-field"><label for="fLink">Drive 파일 링크</label><input class="hr-input" id="fLink" placeholder="https://drive.google.com/file/d/…"><div class="hr-err" id="fLinkErr"></div></div>
+        <div class="hr-field fixed" style="min-width:180px"><label for="fParty">경로 (보낸 곳)</label><select class="hr-select" id="fParty"></select></div>
+        <button class="btn btn-secondary" id="btnFile" data-act="runFile">이 파일 읽기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">읽은 결과 가져오기</div>
+      <div class="hr-sub" style="margin-bottom:8px">Claude 에게 이력서를 읽게 해서 받은 결과(JSON)를 붙여 넣거나 파일로 올립니다. 미리보기로 건수를 확인한 뒤 가져옵니다.</div>
+      <details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">JSON 형식 안내</summary>
+        <pre class="hr-pre" id="impFormat" style="margin-top:6px"></pre></details>
+      <div class="hr-row"><div class="hr-field"><label for="impText">읽기 결과 (JSON)</label><textarea class="hr-textarea" id="impText" rows="5" placeholder='{"schema":"hfc-resume-import/1","resumes":[ … ]}'></textarea><div class="hr-err" id="impErr"></div></div></div>
+      <div class="hr-row" style="margin-top:8px"><input type="file" id="impFile" accept=".json,application/json" style="font-size:12px">
+        <button class="btn btn-secondary" id="btnPreview" data-act="impPreview">미리보기</button>
+        <button class="btn btn-primary" id="btnImport" data-act="impRun" disabled>가져오기</button></div>
+      <div id="impResult" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>처리 필요 <span class="hr-sub" id="needCount"></span></span></div>
+      <div class="hr-chips" id="needChips" style="margin-bottom:10px"></div>
+      <div id="needBox"></div>
+      <div id="panelBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">최근 처리 결과</div>
+      <div id="runBox"></div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.82"></script>
+<script src="js/common.js?v=2.9.82"></script>
+<script src="js/cmn-sheet.js?v=2.9.82"></script>
+<script src="js/cmn-derive.js?v=2.9.82"></script>
+<script src="js/cmn-alert.js?v=2.9.82"></script>
+<script src="js/cmn-person.js?v=2.9.82"></script>
+<script src="js/cmn-review.js?v=2.9.82"></script>
+<script src="js/cmn-merge.js?v=2.9.82"></script>
+<script src="js/cmn-resume.js?v=2.9.82"></script>
+<script src="js/hr-ui.js?v=2.9.82"></script>
+<script src="js/scr-intake.js?v=2.9.82"></script>
+<script src="js/nav.js?v=2.9.82"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

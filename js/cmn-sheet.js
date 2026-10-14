@@ -165,6 +165,31 @@ async function hrAppend(k,obj,opts={}){
   const m=/!A(\d+)/.exec((r.json&&r.json.updates&&r.json.updates.updatedRange)||'');
   return {ok:true,id:rec[idName],row:m?parseInt(m[1],10):undefined};
 }
+// 여러 행을 한 번의 호출로 추가한다(이력서 가져오기처럼 한 후보의 경력 줄을 한꺼번에 넣을 때). ID 가 비어 있는 행에만 CMN-02 로 연속 발번한다.
+// 반환 {ok:true, ids:[…], rows:[{…}]} / {ok:false, message}. 재시도로 성공해 같은 행이 두 번 쓰였으면 아래쪽 중복을 지운다.
+async function hrAppendMany(k,objs){
+  const t=HR_TABS[k]; if(!t) return {ok:false,code:'BAD_TAB',message:'알 수 없는 탭입니다: '+k};
+  if(!objs.length) return {ok:true,ids:[],rows:[]};
+  const h=await hrHeader(k); if(!h.ok) return h;
+  const idName=HEADERS[k][0], today=hrToday(); const recs=objs.map(o=>({...o}));
+  if(t.id){ const need=recs.filter(r=>!r[idName]); if(need.length){ const n=await hrNextIds(k,need.length); if(!n.ok) return n; need.forEach((r,i)=>{ r[idName]=n.ids[i]; }); } }
+  recs.forEach(rec=>{
+    if(HEADERS[k].includes('created_at')&&(rec.created_at===undefined||rec.created_at==='')) rec.created_at=today;
+    if(HEADERS[k].includes('updated_at')&&(rec.updated_at===undefined||rec.updated_at==='')) rec.updated_at=hrNow();
+  });
+  const url=hrRangeUrl(k,'A:'+t.last)+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+  const r=await hrSend('POST',url,{values:rowsFor(h.header,recs)});
+  const ids=t.id?recs.map(x=>x[idName]):[];
+  if(!r.ok){
+    if(r.retried&&ids.length){ const f=await hrFindRow(k,ids[0]); if(f&&f>0) return {ok:true,ids,rows:recs}; }
+    return {ok:false,code:'WRITE_FAIL',message:HR_MSG.write};
+  }
+  if(r.retried&&ids.length){
+    const all=await hrReadIds(k);
+    if(all){ for(const id of ids.slice().reverse()){ const hits=all.filter(x=>x.id===id); if(hits.length>1) await hrDeleteRowRaw(k,hits[hits.length-1].row); } }
+  }
+  return {ok:true,ids,rows:recs};
+}
 // 충돌 판단: 읽은 시점의 수정일시(초 단위)가 지금 시트의 수정일시와 다르면 충돌. (변경 001 — 수정일시를 일시로 저장해 같은 날 수정도 구분)
 function hrConflict(k,cur,opts){
   return HEADERS[k].includes('updated_at')&&String(cur.updated_at??'')!==String(opts.readUpdatedAt??'');

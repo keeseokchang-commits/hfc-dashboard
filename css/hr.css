@@ -60,6 +60,7 @@
 .hr-table td{font-size:12px;padding:9px 6px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hr-table tbody tr{cursor:pointer}
 .hr-table tbody tr:hover td{background:var(--surface2)}
+.hr-table.auto{table-layout:auto;min-width:0} .hr-table.auto th{cursor:default} .hr-table.auto td{white-space:normal;word-break:keep-all;overflow:visible} .hr-table.auto tbody tr{cursor:default}
 .hr-table .wrap{white-space:normal;word-break:keep-all}
 .hr-sort{color:var(--blue);margin-left:2px}
 .hr-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;display:inline-block;white-space:nowrap}

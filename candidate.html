@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 후보자 관리</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.82">
+<link rel="stylesheet" href="css/hr.css?v=2.9.82">
+</head>
+<body data-page="candidate">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>후보자 관리</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+
+  <div id="screen" style="display:none">
+    <div class="hr-steps" id="tabs">
+      <span class="hr-chip on" data-tab="list">후보 목록</span>
+      <span class="hr-chip disabled" data-tab="exit" title="다음 개발 단계에서 열립니다">철수·재확인 일정</span>
+      <span class="hr-chip" data-tab="intake" onclick="location.href='intake.html'">이력서 등록</span>
+    </div>
+
+    <div class="card">
+      <div class="hr-chips" id="quickChips"></div>
+    </div>
+
+    <div class="card">
+      <div class="hr-row">
+        <div class="hr-field"><label for="fSearch">검색어</label><input class="hr-input" id="fSearch" placeholder="이름·기술·업종·고객사·프로젝트명" oninput="onFilter()"></div>
+        <div class="hr-field fixed" style="min-width:110px"><label for="fGrade">등급</label><select class="hr-select" id="fGrade" onchange="onFilter()"></select></div>
+        <div class="hr-field fixed" style="min-width:130px"><label for="fFlag">구분</label><select class="hr-select" id="fFlag" onchange="onFilter()">
+          <option value="nb">블랙 제외</option><option value="all">전체</option><option value="white">화이트만</option><option value="black">블랙만</option></select></div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="hr-lbl" style="margin-bottom:6px">역할 <select class="hr-select" id="fRoleMode" style="width:auto;display:inline-block;margin-left:6px" onchange="onFilter()"><option value="any">하나라도</option><option value="all">모두</option></select>
+          <label style="margin-left:10px;font-weight:400"><input type="checkbox" id="fMulti" onchange="onFilter()"> 겸임 경험만</label></div>
+        <div class="hr-chips" id="roleChips"></div>
+      </div>
+      <details id="moreBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">상세 조건</summary>
+        <div class="hr-row" style="margin-top:8px">
+          <div class="hr-field fixed" style="min-width:90px"><label for="fAgeMin">만 나이 이상</label><input class="hr-input" id="fAgeMin" inputmode="numeric" oninput="onFilter()"></div>
+          <div class="hr-field fixed" style="min-width:90px"><label for="fAgeMax">만 나이 이하</label><input class="hr-input" id="fAgeMax" inputmode="numeric" oninput="onFilter()"></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fAgeAsOf">나이 기준일</label><input class="hr-input" type="date" id="fAgeAsOf" onchange="onFilter()"></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fAvail">가용일 (이 날짜까지)</label><input class="hr-input" type="date" id="fAvail" onchange="onFilter()"></div>
+          <div class="hr-field fixed" style="min-width:110px"><label for="fYears">경력 연차 이상</label><input class="hr-input" id="fYears" inputmode="decimal" oninput="onFilter()"></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fInd">업종 경험</label><select class="hr-select" id="fInd" onchange="onFilter()"></select></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fType">프로젝트 유형 경험</label><select class="hr-select" id="fType" onchange="onFilter()"></select></div>
+        </div>
+        <div class="hr-row" style="margin-top:8px">
+          <label><input type="checkbox" id="fShort" onchange="onFilter()"> 단기 이력 있음</label>
+          <label><input type="checkbox" id="fRoute" onchange="onFilter()"> 경유 서치업체 2곳 이상</label>
+          <label><input type="checkbox" id="fContact" onchange="onFilter()"> 연락처 확보됨</label>
+          <span class="hr-sub" id="contactNote"></span>
+        </div>
+      </details>
+      <div style="margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="clearFilters()">조건 해제</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>후보 목록 <span class="hr-sub" id="listCount"></span></span><span class="hr-sub">이름을 누르면 상세 화면으로 이동합니다</span></div>
+      <div id="listBox"></div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.82"></script>
+<script src="js/common.js?v=2.9.82"></script>
+<script src="js/cmn-sheet.js?v=2.9.82"></script>
+<script src="js/cmn-derive.js?v=2.9.82"></script>
+<script src="js/cmn-alert.js?v=2.9.82"></script>
+<script src="js/cmn-person.js?v=2.9.82"></script>
+<script src="js/hr-ui.js?v=2.9.82"></script>
+<script src="js/scr-candidate.js?v=2.9.82"></script>
+<script src="js/nav.js?v=2.9.82"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

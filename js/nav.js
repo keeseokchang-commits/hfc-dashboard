@@ -1,26 +1,26 @@
 // HFC nav.js v2.0 — 사이드바·탭바 단일 렌더(메뉴 변경은 이 파일만 수정)
 // v2.9.28: 배포 버전 표시 — 실제 실행 중인 배포가 어느 버전인지 화면에서 바로 구분할 수 있게(사용자 요청).
 // 새 버전 배포 시 이 상수 하나만 갱신하면 전 화면(사이드바+모바일 탭바)에 자동 반영된다.
-const HFC_VERSION='v2.9.80';
+const HFC_VERSION='v2.9.82';
 const NAV_ITEMS=[
   ['dash','🏠','대시보드','index.html',true],
   ['pipeline','📋','사업기회','pipeline.html',true],
   ['estimate','📊','견적','estimate.html',true],
   ['project','📁','프로젝트','project.html',true],
   ['input','🧾','세금계산서','input.html',true],
-  ['profile','👥','인력 프로필','profile.html',false],
   ['fixed','🏢','고정비','fixed.html',false],
   ['cashflow','💰','자금수지','cashflow.html',true],
   ['vat','🧾','부가세','vat.html',false],
-  // v2.9.76 인력 관리 그룹(통합 설계서 v0.9 §6.1·6.2: 부가세 다음에 구분선 + 그룹, 기존 메뉴 순서는 그대로). 후보자 관리 메뉴는 단계 ②에서 추가한다.
+  // v2.9.76 인력 관리 그룹(통합 설계서 v0.9 §6.1·6.2: 부가세 다음에 구분선 + 그룹, 기존 메뉴 순서는 그대로). v2.9.81 후보자 관리 메뉴 추가, 기존 LNB "인력 프로필" 제거(profile.html 파일과 데이터는 그대로 둔다).
   ['sep'],
   ['stf_req','🧑‍💼','인력 의뢰','request.html',false,'인력 관리'],
+  ['candidate','👥','후보자 관리','candidate.html',false],
   ['party','🤝','거래처 관리','party.html',false],
   ['sep'],
   ['settings','⚙️','설정','settings.html',false],
 ];
 // 구분선은 사이드바에서만 그리고, 모바일 탭바·더보기에서는 건너뛴다. 의뢰 상세는 인력 의뢰 메뉴를 활성으로 둔다(page 이름 별칭).
-const NAV_ALIAS={stf_req_detail:'stf_req'};
+const NAV_ALIAS={stf_req_detail:'stf_req',stf_cand_detail:'candidate',stf_intake:'candidate'};
 const navItemsOnly=()=>NAV_ITEMS.filter(x=>x[0]!=='sep');
 function renderNav(active){
   active=NAV_ALIAS[active]||active;
