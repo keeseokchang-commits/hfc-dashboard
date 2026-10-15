@@ -70,7 +70,18 @@ async function cmnImportOne(st,res,io,runId){
   const f=res.file||{}; const today=st.today; const out={file:cmnTxt(f.file_name)||cmnTxt(f.drive_file_id),action:'',notes:[],cnt:{new:0,updated:0,review:0,fail:0},name:''};
   const S=k=>st.tabs[k];
   const prior=S('S28').find(x=>(cmnTxt(f.file_hash)&&x.file_hash===f.file_hash)||x.drive_file_id===f.drive_file_id);
-  if(prior&&prior.parse_status!=='읽기실패'){ out.action='건너뜀'; out.notes.push('이미 읽은 파일입니다.'); return out; }
+  if(prior&&prior.parse_status!=='읽기실패'){
+    out.action='건너뜀'; out.notes.push('이미 읽은 파일입니다.');
+    // 예외(사용자 승인 2026-10-15): 건너뛰는 파일이라도 비어 있던 역할 근거(빈 칸·옛 표시 '이력서')와 비어 있던 요약만 채운다. 그 밖의 값은 건드리지 않는다.
+    let pid=cmnTxt(prior.person_id); const pers=x=>S('S20').find(y=>y.person_id===x); for(let i=0;i<5&&pid&&pers(pid)&&cmnTxt(pers(pid).merged_into);i++) pid=cmnTxt(pers(pid).merged_into);
+    const per=pid&&pers(pid); let filled=0;
+    if(per){
+      for(const r of (res.roles||[])){ const code=cmnTxt(r.role_code), basis=String(r.basis??'').trim().slice(0,1000); if(!code||!basis) continue; const row=S('S21').find(x=>x.person_id===pid&&x.role_code===code); if(!row) continue; const cur=cmnTxt(row.evidence); if(cur===''||cur==='이력서'){ await io.update('S21',row.prole_id,{evidence:basis},row); filled++; } }
+      const sm=cmnTxt((res.person||{}).summary); if(sm&&cmnBlank(per.summary)){ await io.update('S20',pid,{summary:sm},per); filled++; }
+    }
+    if(filled) out.notes.push(`비어 있던 근거·요약 ${filled}건을 채웠습니다.`);
+    return out;
+  }
   const fileBase={drive_file_id:cmnTxt(f.drive_file_id),file_name:cmnTxt(f.file_name),drive_url:cmnTxt(f.drive_url),file_hash:cmnTxt(f.file_hash),source_party_id:cmnTxt(f.source_party_id),received_at:cmnTxt(f.received_at)||today,run_id:runId||'',parsed_at:today};
   const writeFile=async(extra,id)=>{ const rec={...fileBase,...extra}; if(prior){ await io.update('S28',prior.file_id,rec,prior); return prior.file_id; } const ids=await io.appendMany('S28',[{...(id?{file_id:id}:{}),...rec}]); return ids[0]; };
   if(res.status==='읽기실패'){

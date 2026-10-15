@@ -70,10 +70,12 @@ async function saveBasic(btn){
   if('birth_date' in ch){ if(ch.birth_date){ ch.birth_precision='일'; ch.birth_source='수동'; } else { ch.birth_precision='미상'; } }
   await save(btn,()=>hrUpdate('S20',PID,ch,{readUpdatedAt:P.updated_at}));
 }
+const LEGACY_BASIS=['이력서','수동 등록'];   // 옛 가져오기·수동 추가가 남긴 표시값 — 근거가 아니므로 빈 칸으로 보여 준다
+const basisText=v=>{ const t=String(v||'').trim(); return LEGACY_BASIS.includes(t)?'':String(v||''); };
 function roleHtml(){
   const rows=mine('S21'); const months=Object.fromEntries(V.roles.map(r=>[r.code,r.months]));
   const have=new Set(rows.map(r=>r.role_code)); const free=CODES.role.filter(c=>!have.has(c));
-  const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td style="min-width:260px"><textarea class="hr-input" rows="3" data-role-basis="${hrEsc(r.prole_id)}" style="width:100%;resize:vertical;line-height:1.5" placeholder="수준을 정한 근거">${hrEsc(r.evidence||'')}</textarea><button class="btn btn-secondary btn-sm" data-act="saveBasis" data-prole="${hrEsc(r.prole_id)}" style="margin-top:4px">근거 저장</button></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
+  const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td style="min-width:260px"><textarea class="hr-input" rows="3" data-role-basis="${hrEsc(r.prole_id)}" style="width:100%;resize:vertical;line-height:1.5" placeholder="수준을 정한 근거를 적어 주세요">${hrEsc(basisText(r.evidence))}</textarea><button class="btn btn-secondary btn-sm" data-act="saveBasis" data-prole="${hrEsc(r.prole_id)}" style="margin-top:4px">근거 저장</button></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
     :'<tr><td colspan="4" class="hr-muted">등록된 역할이 없습니다.</td></tr>';
   return `<div class="card"><div class="card-title">역할 · 수준</div>
     <div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>역할</th><th>수준</th><th>판단 근거</th><th class="r">경력에서 센 경험</th></tr></thead><tbody>${body}</tbody></table></div>
@@ -88,7 +90,7 @@ async function addRole(btn){
 }
 async function saveBasis(btn){
   const row=D.S21.find(r=>r.prole_id===btn.dataset.prole); if(!row) return; const ta=document.querySelector(`[data-role-basis="${btn.dataset.prole}"]`); const nv=ta.value.trim();
-  hrQ('basisErr').textContent=''; if(nv===String(row.evidence||'').trim()){ toast('바뀐 내용이 없습니다.'); return; }
+  hrQ('basisErr').textContent=''; if(nv===basisText(row.evidence).trim()){ toast('바뀐 내용이 없습니다.'); return; }
   await save(btn,()=>hrUpdate('S21',row.prole_id,{evidence:nv},{readUpdatedAt:row.updated_at}));
 }
 async function setRoleLevel(selEl){
