@@ -84,7 +84,7 @@ function renderNeed(){
   hrQ('needBox').innerHTML=`<div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>구분</th><th>파일</th><th>후보</th><th>내용</th><th></th></tr></thead><tbody>${list.map(f=>{
     const st=f.parse_status; const cls=st==='읽기실패'?'red':st==='검토필요'?'amber':'blue';
     let info='', btn='';
-    if(st==='읽기실패'){ info=hrEsc(f.parse_error||'읽지 못했습니다.'); btn=`<button class="btn btn-secondary btn-sm" data-act="reread" data-file="${hrEsc(f.file_id)}">다시 읽기</button>`; }
+    if(st==='읽기실패'){ info=hrEsc(f.parse_error||'읽지 못했습니다.'); btn=`<button class="btn btn-secondary btn-sm" data-act="reread" data-file="${hrEsc(f.file_id)}">다시 읽기</button> <button class="btn btn-secondary btn-sm" data-act="closeFile" data-file="${hrEsc(f.file_id)}" title="목록에서 뺍니다. 파일은 그대로 보관됩니다.">처리 종료</button>`; }
     else if(st==='검토필요'){ const n=(pend.get(f.file_id)||[]).length; info=`변경 검토 ${n}건`; btn=`<button class="btn btn-primary btn-sm" data-act="openReview" data-file="${hrEsc(f.file_id)}">변경 검토</button>`; }
     else { info=`이름이 같은 기존 후보: ${hrEsc(pname(f.match_person_id))} (${hrEsc(f.match_person_id||'-')})`; btn=`<button class="btn btn-primary btn-sm" data-act="openMerge" data-file="${hrEsc(f.file_id)}">같은 사람</button> <button class="btn btn-secondary btn-sm" data-act="notSame" data-file="${hrEsc(f.file_id)}">다른 사람</button>`; }
     return `<tr data-file="${hrEsc(f.file_id)}"><td><span class="hr-badge ${cls}">${NEED_LABEL[st]}</span></td><td>${hrEsc(f.file_name||f.file_id)}<div class="hr-sub">${hrEsc(f.received_at||'')}${f.source_party_id?' · '+hrEsc(hrPartyLabel(PM,f.source_party_id)):''}</div></td><td>${f.person_id?`<a href="candidate-detail.html?id=${encodeURIComponent(f.person_id)}">${hrEsc(pname(f.person_id))}</a>`:'-'}</td><td>${info}</td><td style="white-space:nowrap">${btn}</td></tr>`; }).join('')}</tbody></table></div>`;
@@ -96,6 +96,13 @@ async function reread(btn){
   await request(btn,'수동 파일',f.source_party_id?`${ref} ; party=${f.source_party_id}`:ref);
 }
 
+// 읽기 실패 → 처리 종료 (설계서 §10.5·§10.9 R1 / 변경 006). 파일은 그대로 두고 목록에서만 뺀다. 이력에서는 상태 '처리종료'로 남는다.
+async function closeFile(btn){
+  const f=D.S28.find(x=>x.file_id===btn.dataset.file); if(!f||f.parse_status!=='읽기실패') return;
+  if(!confirm('이 파일을 처리 종료합니다. 목록에서 빠지며 파일은 그대로 보관됩니다.')) return;
+  await hrBusy(btn,async()=>{ const r=await hrUpdate('S28',f.file_id,{parse_status:'처리종료'},{readUpdatedAt:f.updated_at});
+    if(r.ok){ toast('처리 종료했습니다.'); await loadAll(); } else { toast(hrSaveFailText(r),true); await loadAll(); } });
+}
 // 다른 사람 — 새 후보로 확정(후보는 에이전트가 이미 만들어 두었다)
 async function notSame(btn){
   const f=D.S28.find(x=>x.file_id===btn.dataset.file); if(!f) return;
@@ -221,7 +228,7 @@ async function impRun(btn){
 }
 document.addEventListener('click',ev=>{
   const c=ev.target.closest('[data-filter]'); if(c&&c.closest('#needChips')){ filter=c.dataset.filter; panel=null; renderNeed(); return; }
-  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={runFolder,runFile,reread,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
+  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={runFolder,runFile,reread,closeFile,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
 });
 document.addEventListener('change',ev=>{ if(ev.target.id==='impFile'){ const f=ev.target.files&&ev.target.files[0]; if(f){ const rd=new FileReader(); rd.onload=()=>{ hrQ('impText').value=String(rd.result||''); impReset(); }; rd.readAsText(f); } return; }
    if(ev.target.id==='mKeep'&&panel&&panel.type==='merge'){ panel.keep=ev.target.value; panel.drop=ev.target.value===panel.a?panel.b:panel.a; panel.pv=null; renderPanel(); loadPreview(); } });

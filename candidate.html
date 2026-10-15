@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 후보자 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.87">
-<link rel="stylesheet" href="css/hr.css?v=2.9.87">
+<link rel="stylesheet" href="css/common.css?v=2.9.88">
+<link rel="stylesheet" href="css/hr.css?v=2.9.88">
 </head>
 <body data-page="candidate">
 
@@ -23,10 +23,11 @@
   <div id="screen" style="display:none">
     <div class="hr-steps" id="tabs">
       <span class="hr-chip on" data-tab="list">후보 목록</span>
-      <span class="hr-chip disabled" data-tab="exit" title="다음 개발 단계에서 열립니다">철수·재확인 일정</span>
+      <span class="hr-chip" data-tab="exit">철수·재확인 일정</span>
       <span class="hr-chip" data-tab="intake" onclick="location.href='intake.html'">이력서 등록</span>
     </div>
 
+    <div id="paneList">
     <div class="card">
       <div class="hr-chips" id="quickChips"></div>
     </div>
@@ -67,21 +68,24 @@
       <div class="card-title"><span>후보 목록 <span class="hr-sub" id="listCount"></span></span><span class="hr-sub">이름을 누르면 상세 화면으로 이동합니다</span></div>
       <div id="listBox"></div>
     </div>
+    </div>
+    <div id="paneExit" style="display:none"></div>
   </div>
 </main>
 
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.87"></script>
-<script src="js/common.js?v=2.9.87"></script>
-<script src="js/cmn-sheet.js?v=2.9.87"></script>
-<script src="js/cmn-derive.js?v=2.9.87"></script>
-<script src="js/cmn-alert.js?v=2.9.87"></script>
-<script src="js/cmn-person.js?v=2.9.87"></script>
-<script src="js/hr-ui.js?v=2.9.87"></script>
-<script src="js/scr-candidate.js?v=2.9.87"></script>
-<script src="js/nav.js?v=2.9.87"></script>
+<script src="js/schema.js?v=2.9.88"></script>
+<script src="js/common.js?v=2.9.88"></script>
+<script src="js/cmn-sheet.js?v=2.9.88"></script>
+<script src="js/cmn-derive.js?v=2.9.88"></script>
+<script src="js/cmn-alert.js?v=2.9.88"></script>
+<script src="js/cmn-person.js?v=2.9.88"></script>
+<script src="js/hr-ui.js?v=2.9.88"></script>
+<script src="js/scr-candidate.js?v=2.9.88"></script>
+<script src="js/scr-exit.js?v=2.9.88"></script>
+<script src="js/nav.js?v=2.9.88"></script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>
 </html>

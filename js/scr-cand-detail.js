@@ -5,7 +5,7 @@
 // 의존: schema.js, common.js, cmn-sheet.js, cmn-derive.js, cmn-person.js, cmn-review.js, hr-ui.js
 const KEYS=['S20','S21','S22','S23','S24','S25','S26','S27','S28','S29','S31','S32','S33','S10'];
 const GRADES=['특급','고급','중급','초급'];
-let PID='', D={}, P=null, V=null, ASOF='', PM=new Map(), CODES={role:[],industry:[],project_type:[]}, RULE=null, tab='overview', editCar='', contactState=null, busy=false;
+let tabFromUrl=false, PID='', D={}, P=null, V=null, ASOF='', PM=new Map(), CODES={role:[],industry:[],project_type:[]}, RULE=null, tab='overview', editCar='', contactState=null, busy=false;
 
 const sel=(items,cur,blank)=>(blank!==undefined?`<option value="">${hrEsc(blank)}</option>`:'')+items.map(x=>`<option${x===cur?' selected':''}>${hrEsc(x)}</option>`).join('');
 const fld=(id,label,val,o={})=>`<div class="hr-field${o.fixed?' fixed':''}"${o.w?` style="min-width:${o.w}px"`:''}><label for="${id}">${hrEsc(label)}</label>${o.html||(o.area?`<textarea class="hr-input" id="${id}" rows="${o.rows||5}" style="width:100%;min-height:96px;resize:vertical;line-height:1.5;white-space:pre-wrap">${hrEsc(val)}</textarea>`:`<input class="hr-input" id="${id}" type="${o.type||'text'}" value="${hrEsc(val)}"${o.ph?` placeholder="${hrEsc(o.ph)}"`:''}${o.inputmode?` inputmode="${o.inputmode}"`:''}>`)}<div class="hr-err" id="${id}Err"></div></div>`;
@@ -32,7 +32,9 @@ async function loadAll(){
   if(cmnPersonHidden(P)){
     hrQ('screen').style.display='none';
     box.innerHTML=`<div class="hr-empty">다른 후보에 합침되었습니다.${P.merged_into?`<br><a class="btn btn-secondary btn-sm" style="margin-top:10px" data-merged href="candidate-detail.html?id=${encodeURIComponent(P.merged_into)}">합침된 후보 보기</a>`:''}</div>`; return; }
-  box.innerHTML=''; hrQ('screen').style.display=''; V=view(); render();
+  box.innerHTML=''; hrQ('screen').style.display='';
+  if(!tabFromUrl){ tabFromUrl=true; const qt=new URLSearchParams(location.search).get('tab'); if(['career','contact','route'].includes(qt)) tab=qt; }  // 철수·재확인 일정(SCR-05)에서 접촉 탭으로 바로 들어온다
+  V=view(); render();
 }
 async function reload(){ const y=window.scrollY; const keepTab=tab; await loadAll(); tab=keepTab; if(V) render(); window.scrollTo(0,y); }
 
@@ -45,7 +47,7 @@ function render(){
     +card('현행 프로젝트',cur?hrEsc([cur.client,cur.project].filter(Boolean).join(' · ')||'-'):'-',cur?(cur.end_ym?`${hrEsc(cur.end_ym)} 종료`:(cur.kind==='resume'?'이력서 기준':'종료 미정')):'')
     +card('가용일',hrEsc(V.avail.text),`마지막 확인일 ${hrEsc(V.recon?V.recon.last:'-')}`);
   [...hrQ('tabs').children].forEach(c=>c.classList.toggle('on',c.dataset.tab===tab));
-  hrQ('body').innerHTML=tab==='career'?careerHtml():tab==='route'?routeHtml():overviewHtml();
+  hrQ('body').innerHTML=tab==='career'?careerHtml():tab==='route'?routeHtml():tab==='contact'?touchHtml():overviewHtml();
   if(tab==='overview') bindContact();
 }
 
@@ -75,7 +77,7 @@ const basisText=v=>{ const t=String(v||'').trim(); return LEGACY_BASIS.includes(
 function roleHtml(){
   const rows=mine('S21'); const months=Object.fromEntries(V.roles.map(r=>[r.code,r.months]));
   const have=new Set(rows.map(r=>r.role_code)); const free=CODES.role.filter(c=>!have.has(c));
-  const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td style="min-width:260px"><textarea class="hr-input" rows="3" data-role-basis="${hrEsc(r.prole_id)}" style="width:100%;resize:vertical;line-height:1.5" placeholder="수준을 정한 근거를 적어 주세요">${hrEsc(basisText(r.evidence))}</textarea><button class="btn btn-secondary btn-sm" data-act="saveBasis" data-prole="${hrEsc(r.prole_id)}" style="margin-top:4px">근거 저장</button></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
+  const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td style="min-width:260px"><textarea class="hr-input" rows="3" data-role-basis="${hrEsc(r.prole_id)}" style="width:100%;resize:vertical;line-height:1.5" placeholder="수준을 정한 근거를 적어 주세요">${hrEsc(basisText(r.evidence))}</textarea><button class="btn btn-secondary btn-sm" data-act="saveBasis" data-prole="${hrEsc(r.prole_id)}" style="margin-top:4px">근거 저장</button> <button class="btn btn-secondary btn-sm" data-act="delItem" data-k="S21" data-id="${hrEsc(r.prole_id)}" data-what="역할 '${hrEsc(r.role_code)}'" style="margin-top:4px">삭제</button></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
     :'<tr><td colspan="4" class="hr-muted">등록된 역할이 없습니다.</td></tr>';
   return `<div class="card"><div class="card-title">역할 · 수준</div>
     <div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>역할</th><th>수준</th><th>판단 근거</th><th class="r">경력 합산(개월)</th></tr></thead><tbody>${body}</tbody></table></div>
@@ -209,8 +211,8 @@ function careerHtml(){
   const compT=comp.length?`<div class="hr-scroll"><table class="hr-table auto" style="min-width:640px"><thead><tr><th>회사</th><th>기간</th><th class="r">개월</th><th>업무</th><th>종료 구분</th></tr></thead><tbody>${comp.map(c=>`<tr data-car="${hrEsc(c.career_id)}"><td>${hrEsc(c.employer||'-')}</td><td>${hrEsc(periodOf(c))}</td><td class="r">${hrEsc(fmtMon(cmnTenureMonths(c,ASOF)))}</td><td>${hrEsc(c.tasks||'-')}</td><td>${exitSel(c)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="hr-muted">회사 재직 이력이 없습니다.</div>';
   const projT=proj.length?`<div class="hr-scroll"><table class="hr-table auto" style="min-width:1100px"><thead><tr><th>고객사</th><th>프로젝트명</th><th>소속</th><th>업종·유형</th><th>역할</th><th>기술</th><th>기간</th><th class="r">개월</th><th>종료 구분</th><th>표시</th><th></th></tr></thead><tbody>${proj.map(c=>projRow(c,st)).join('')}</tbody></table></div>`:'<div class="hr-muted">프로젝트 이력이 없습니다.</div>';
   const skills=mine('S22'), certs=mine('S24');
-  const extra=`<div class="card"><div class="card-title">기술</div>${skills.length?skills.map(s=>`<span class="hr-badge gray">${hrEsc(s.skill_name)}${s.level?' · '+hrEsc(s.level):''}</span>`).join(' '):'<span class="hr-muted">등록된 기술이 없습니다.</span>'}</div>
-    <div class="card"><div class="card-title">학력 · 자격 · 교육</div>${certs.length?`<div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>구분</th><th>이름</th><th>기관</th><th>일자</th></tr></thead><tbody>${certs.map(c=>`<tr><td>${hrEsc(c.kind)}</td><td>${hrEsc(c.name)}</td><td>${hrEsc(c.org||'-')}</td><td>${hrEsc(c.cert_date||'-')}</td></tr>`).join('')}</tbody></table></div>`:'<span class="hr-muted">등록된 학력·자격이 없습니다.</span>'}</div>`;
+  const extra=`<div class="card"><div class="card-title">기술</div>${skills.length?skills.map(s=>`<span class="hr-badge gray" data-skill="${hrEsc(s.pskill_id)}">${hrEsc(s.skill_name)}${s.level?' · '+hrEsc(s.level):''} <a href="#" data-act="delItem" data-k="S22" data-id="${hrEsc(s.pskill_id)}" data-what="기술 '${hrEsc(s.skill_name)}'" title="삭제" style="text-decoration:none;color:inherit">×</a></span>`).join(' '):'<span class="hr-muted">등록된 기술이 없습니다.</span>'}</div>
+    <div class="card"><div class="card-title">학력 · 자격 · 교육</div>${certs.length?`<div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>구분</th><th>이름</th><th>기관</th><th>일자</th><th></th></tr></thead><tbody>${certs.map(c=>`<tr data-cert="${hrEsc(c.cert_id)}"><td>${hrEsc(c.kind)}</td><td>${hrEsc(c.name)}</td><td>${hrEsc(c.org||'-')}</td><td>${hrEsc(c.cert_date||'-')}</td><td><button class="btn btn-secondary btn-sm" data-act="delItem" data-k="S24" data-id="${hrEsc(c.cert_id)}" data-what="${hrEsc(c.kind)} '${hrEsc(c.name)}'">삭제</button></td></tr>`).join('')}</tbody></table></div>`:'<span class="hr-muted">등록된 학력·자격이 없습니다.</span>'}</div>`;
   return reviewHtml()+sum+`<div class="card"><div class="card-title">회사 재직</div>${compT}</div><div class="card"><div class="card-title">프로젝트</div>${projT}${editHtml()}</div>`+extra;
 }
 const periodOf=c=>cmnYm(c.start_ym)===null&&!c.start_ym?(c.duration_text||'기간 미상'):`${c.start_ym||'?'} ~ ${cmnYes(c.is_current)?'진행 중':(c.end_ym||'?')}`;
@@ -280,7 +282,16 @@ function routeHtml(){
 }
 
 // ── 이벤트 ───────────────────────────────────────────────────────────────────
-const ACT={saveBasic,saveBasis,addRole,saveGrade,saveManual,showContact,saveContact,saveRating,rvApply,rvDismiss,saveCar,revertCar,
+// 역할·기술·학력/자격 행 삭제 (변경 007, 사용자 승인 2026-10-15). 잘못 읽힌 행을 바로잡기 위한 것 — 확인창 후 행 삭제.
+async function delItem(a){
+  if(a.tagName==='A') event&&event.preventDefault();
+  const k=a.dataset.k, id=a.dataset.id, row=(D[k]||[]).find(r=>r[HEADERS[k][0]]===id); if(!row) return;
+  if(!confirm(`${a.dataset.what} 항목을 삭제합니다. 되돌릴 수 없습니다.`)) return;
+  const r=await hrDelete(k,id,{readUpdatedAt:row.updated_at});
+  if(r.ok){ toast('삭제했습니다.'); } else toast(hrSaveFailText(r),true);
+  await reload();
+}
+const ACT={delItem,saveBasic,saveBasis,addRole,saveGrade,saveManual,showContact,saveContact,saveRating,rvApply,rvDismiss,saveCar,revertCar,
   editCar:b=>{ editCar=b.dataset.car; render(); const e=hrQ('editBox'); if(e&&e.scrollIntoView) e.scrollIntoView({block:'center'}); },cancelEdit:()=>{ editCar=''; render(); }};
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-tab]'); if(t&&t.closest('#tabs')){ if(t.classList.contains('disabled')) return; tab=t.dataset.tab; editCar=''; render(); return; }

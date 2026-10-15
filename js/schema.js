@@ -149,7 +149,7 @@ const HR_TABS={
     enums:{type:['통화','문자','메일','미팅','기타'],direction:['발신','수신']}},
   S28:{tab:'S28_PERSON_FILE',rows:3000,mode:'row',id:{prefix:'FIL-',digits:5},
     cols:'file_id:ID,person_id:ID,drive_file_id:T,file_name:T,drive_url:T,file_hash:T,version_no:N0,source_party_id:ID,received_at:D,parse_status:E,parse_error:T,match_person_id:ID,run_id:ID,parsed_at:D,created_at:D',
-    enums:{parse_status:['대기','성공','읽기실패','검토필요','동일인확인','합침완료']}},
+    enums:{parse_status:['대기','성공','읽기실패','검토필요','동일인확인','합침완료','처리종료']}},
   S29:{tab:'S29_RATING',rows:1200,mode:'row',id:{prefix:'RTG-',digits:5},
     cols:'rating_id:ID,person_id:ID,flag:E,reason:TL,rated_at:D,created_at:D',
     enums:{flag:['화이트','일반','블랙']}},
@@ -179,7 +179,7 @@ const HR_ORDER=Object.keys(HR_TABS); // 신규 탭 18개(정의 순서)
   });
 })();
 // 행 단위 삭제를 허용하는 탭(물리 설계 §9 — 접촉 이력만)
-const HR_DELETABLE=new Set(['S26','S33','S32','S27','S36','S34']);   // S33: 설계서 §5.6 "후보 없는 라인만 삭제". S32·S27·S36: 변경 004, S34: 변경 005(사용자 요청 2026-10-12) — 쓰이지 않는 의뢰·거래처·담당자만 화면(SCR-02·11)이 사용 여부를 확인한 뒤 삭제
+const HR_DELETABLE=new Set(['S26','S33','S32','S27','S36','S34','S21','S22','S24']);   // S33: 설계서 §5.6 "후보 없는 라인만 삭제". S32·S27·S36: 변경 004, S34: 변경 005(사용자 요청 2026-10-12), S21·S22·S24: 변경 007(사용자 승인 2026-10-15, 후보 상세에서 잘못 들어간 역할·기술·학력/자격 행 삭제) — 쓰이지 않는 의뢰·거래처·담당자만 화면(SCR-02·11)이 사용 여부를 확인한 뒤 삭제
 // 숫자 컬럼 추가(물리 설계 §5). 단가·인원·연령·개월 수는 빈칸 유지(미정과 0을 구분), cnt_* 만 0 기본값.
 ['career_years_reported','career_years_manual','desired_rate','birth_year','headcount','line_no','rate_sell','rate_buy_target',
  'offered_rate_buy','rate_buy','age_min','age_max','duration_months','load_pct','version_no','cnt_new','cnt_updated','cnt_review','cnt_fail'
