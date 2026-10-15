@@ -78,7 +78,7 @@ function roleHtml(){
   const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td style="min-width:260px"><textarea class="hr-input" rows="3" data-role-basis="${hrEsc(r.prole_id)}" style="width:100%;resize:vertical;line-height:1.5" placeholder="수준을 정한 근거를 적어 주세요">${hrEsc(basisText(r.evidence))}</textarea><button class="btn btn-secondary btn-sm" data-act="saveBasis" data-prole="${hrEsc(r.prole_id)}" style="margin-top:4px">근거 저장</button></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
     :'<tr><td colspan="4" class="hr-muted">등록된 역할이 없습니다.</td></tr>';
   return `<div class="card"><div class="card-title">역할 · 수준</div>
-    <div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>역할</th><th>수준</th><th>판단 근거</th><th class="r">경력에서 센 경험</th></tr></thead><tbody>${body}</tbody></table></div>
+    <div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>역할</th><th>수준</th><th>판단 근거</th><th class="r">경력 합산(개월)</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="hr-help" id="roleHint" style="margin-top:6px">수준을 바꾸면 판단 근거도 함께 고쳐 주세요. 근거는 읽기 세션이 정한 이유이며 직접 수정할 수 있습니다.</div><div class="hr-err" id="basisErr"></div>
     <div class="hr-row" style="margin-top:10px"><div class="hr-field fixed" style="min-width:140px"><label for="rAdd">역할 추가</label><select class="hr-select" id="rAdd">${sel(free,'', '선택')}</select></div>
       <div class="hr-field fixed" style="min-width:100px"><label for="rLevel">수준</label><select class="hr-select" id="rLevel">${sel(CMN_LEVELS,'가능')}</select></div>

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 이력서 등록</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.85">
-<link rel="stylesheet" href="css/hr.css?v=2.9.85">
+<link rel="stylesheet" href="css/common.css?v=2.9.87">
+<link rel="stylesheet" href="css/hr.css?v=2.9.87">
 </head>
 <body data-page="stf_intake">
 
@@ -40,6 +40,17 @@
     <div class="card">
       <div class="card-title">읽은 결과 가져오기</div>
       <div class="hr-sub" style="margin-bottom:8px">Claude 에게 이력서를 읽게 해서 받은 결과(JSON)를 붙여 넣거나 파일로 올립니다. 미리보기로 건수를 확인한 뒤 가져옵니다.</div>
+      <div style="margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px">
+        <div style="font-weight:600;font-size:13px">① Claude 에게 읽기 요청하기</div>
+        <div class="hr-sub" style="margin:4px 0 8px">보낸 곳과 받은 날을 고르면 아래 문구가 만들어집니다. 복사해서 새 Claude 대화에 붙여 넣고, 이력서 파일을 첨부하세요. 받은 JSON 파일은 아래 ②에서 가져옵니다.</div>
+        <div class="hr-row">
+          <div class="hr-field fixed" style="min-width:220px"><label for="pParty">보낸 곳</label><select class="hr-select" id="pParty"></select></div>
+          <div class="hr-field fixed" style="min-width:150px"><label for="pDate">받은 날</label><input class="hr-input" id="pDate" type="date"></div>
+        </div>
+        <div class="hr-field" style="margin-top:8px"><label for="pText">요청 문구</label><textarea class="hr-textarea" id="pText" rows="3" readonly></textarea></div>
+        <div class="hr-row" style="margin-top:6px"><button class="btn btn-secondary" id="btnCopyPrompt" data-act="copyPrompt">문구 복사</button><span class="hr-sub" id="pMsg"></span></div>
+      </div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px">② 받은 결과 가져오기</div>
       <details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">JSON 형식 안내</summary>
         <pre class="hr-pre" id="impFormat" style="margin-top:6px"></pre></details>
       <div class="hr-row"><div class="hr-field"><label for="impText">읽기 결과 (JSON)</label><textarea class="hr-textarea" id="impText" rows="5" placeholder='{"schema":"hfc-resume-import/1","resumes":[ … ]}'></textarea><div class="hr-err" id="impErr"></div></div></div>
@@ -66,18 +77,18 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.85"></script>
-<script src="js/common.js?v=2.9.85"></script>
-<script src="js/cmn-sheet.js?v=2.9.85"></script>
-<script src="js/cmn-derive.js?v=2.9.85"></script>
-<script src="js/cmn-alert.js?v=2.9.85"></script>
-<script src="js/cmn-person.js?v=2.9.85"></script>
-<script src="js/cmn-review.js?v=2.9.85"></script>
-<script src="js/cmn-merge.js?v=2.9.85"></script>
-<script src="js/cmn-resume.js?v=2.9.85"></script>
-<script src="js/hr-ui.js?v=2.9.85"></script>
-<script src="js/scr-intake.js?v=2.9.85"></script>
-<script src="js/nav.js?v=2.9.85"></script>
+<script src="js/schema.js?v=2.9.87"></script>
+<script src="js/common.js?v=2.9.87"></script>
+<script src="js/cmn-sheet.js?v=2.9.87"></script>
+<script src="js/cmn-derive.js?v=2.9.87"></script>
+<script src="js/cmn-alert.js?v=2.9.87"></script>
+<script src="js/cmn-person.js?v=2.9.87"></script>
+<script src="js/cmn-review.js?v=2.9.87"></script>
+<script src="js/cmn-merge.js?v=2.9.87"></script>
+<script src="js/cmn-resume.js?v=2.9.87"></script>
+<script src="js/hr-ui.js?v=2.9.87"></script>
+<script src="js/scr-intake.js?v=2.9.87"></script>
+<script src="js/nav.js?v=2.9.87"></script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>
 </html>

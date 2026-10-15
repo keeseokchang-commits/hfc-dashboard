@@ -28,6 +28,7 @@ async function loadAll(){
 }
 function fillParties(){
   const cur=hrQ('fParty').value; const ps=D.S27.filter(p=>hrYes(p.is_active)&&hrSplit(p.roles).some(x=>['서치업체','경로'].includes(x)));
+  const pc=hrQ('pParty').value; hrQ('pParty').innerHTML='<option value="">선택 안 함</option>'+ps.map(p=>`<option value="${hrEsc(p.party_id)}">${hrEsc(p.name)} (${hrEsc(p.party_id)})</option>`).join(''); hrQ('pParty').value=pc; if(!hrQ('pDate').value) hrQ('pDate').value=hrToday(); refreshPrompt();
   hrQ('fParty').innerHTML='<option value="">선택 안 함</option>'+ps.map(p=>`<option value="${hrEsc(p.party_id)}">${hrEsc(p.name)} (${hrEsc(p.party_id)})</option>`).join(''); hrQ('fParty').value=cur;
 }
 function render(){ renderStatus(); renderNeed(); renderRuns(); }
@@ -178,13 +179,25 @@ const IMP_FORMAT=`{"schema":"hfc-resume-import/1",
  "resumes":[{
   "file":{"drive_file_id":"…","file_name":"…","drive_url":"https://drive.google.com/…","file_hash":"…","received_at":"2026-10-12","source_party_id":"PTY-004"},
   "status":"성공"  (또는 "읽기실패" + "error":"사유, 개인정보 값 금지"),
-  "person":{"name":"…","birth_date":"1980-02-03","gender":"남","region":"…","grade_reported":"고급","career_years_reported":"12","summary":"…"},
+  "person":{"name":"…","birth_date":"1980-02-03","gender":"남","region":"…","grade_reported":"고급","career_years_reported":"12","summary":"여러 줄(줄바꿈 \\n)"},
   "private":{"mobile":"010…","email":"…","rid_head7":"8002031"},
-  "roles":[{"role_code":"PM","level":"주력"}],
+  "roles":[{"role_code":"PM","level":"주력","basis":"수준을 정한 근거"}],
   "skills":[{"skill_type":"DBMS","skill_name":"Oracle","level":"상"}],
   "careers":[{"kind":"프로젝트","employer":"…","client_name":"…","project_name":"…","industry":"…","project_type":"…","role_codes":"PM","start_ym":"2025-01","end_ym":"2025-03","is_current":"N","tasks":"…","env":"…","tech":"…"}],
   "certs":[{"kind":"학력","name":"…","org":"…","cert_date":"2008-02"}]
  }]}`;
+// ① Claude 에게 보낼 읽기 요청 문구 (읽기 지침 문서 이름은 지침을 새 판으로 올릴 때 함께 바꾼다)
+const READING_GUIDE='claude/resume-reading-guide-v0.2';
+function promptText(){
+  const id=hrQ('pParty').value; const name=id?hrPartyName(PM,id):''; const day=hrQ('pDate').value||hrToday();
+  const from=id?`${name}(${id})`:'(아직 모름 — 먼저 나에게 물어봐 줘)';
+  return `이 프로젝트의 ${READING_GUIDE} 를 읽고, 첨부한 이력서를 읽어 가져오기용 JSON 파일을 만들어 줘. 보낸 곳은 ${from}, 받은 날은 ${day}.`;
+}
+function refreshPrompt(){ hrQ('pText').value=promptText(); hrQ('pMsg').textContent=''; }
+function copyPrompt(btn){
+  const t=hrQ('pText').value; const done=()=>{ hrQ('pMsg').textContent='복사했습니다.'; }; const fail=()=>{ const e=hrQ('pText'); e.focus(); e.select(); hrQ('pMsg').textContent='자동 복사가 안 됩니다. 선택된 문구를 직접 복사해 주세요.'; };
+  try{ navigator.clipboard.writeText(t).then(done,fail); }catch(_){ fail(); }
+}
 let impPayload=null;
 function impReset(){ impPayload=null; hrQ('btnImport').disabled=true; hrQ('impResult').innerHTML=''; hrQ('impErr').textContent=''; }
 function impTable(r){
@@ -208,9 +221,10 @@ async function impRun(btn){
 }
 document.addEventListener('click',ev=>{
   const c=ev.target.closest('[data-filter]'); if(c&&c.closest('#needChips')){ filter=c.dataset.filter; panel=null; renderNeed(); return; }
-  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={runFolder,runFile,reread,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun}[a.dataset.act]; if(fn) fn(a);
+  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={runFolder,runFile,reread,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
 });
 document.addEventListener('change',ev=>{ if(ev.target.id==='impFile'){ const f=ev.target.files&&ev.target.files[0]; if(f){ const rd=new FileReader(); rd.onload=()=>{ hrQ('impText').value=String(rd.result||''); impReset(); }; rd.readAsText(f); } return; }
    if(ev.target.id==='mKeep'&&panel&&panel.type==='merge'){ panel.keep=ev.target.value; panel.drop=ev.target.value===panel.a?panel.b:panel.a; panel.pv=null; renderPanel(); loadPreview(); } });
-document.addEventListener('input',ev=>{ if(ev.target.id==='impText') impReset(); });
+document.addEventListener('input',ev=>{ if(ev.target.id==='impText') impReset(); else if(ev.target.id==='pDate') refreshPrompt(); });
+document.addEventListener('change',ev=>{ if(ev.target.id==='pParty'||ev.target.id==='pDate') refreshPrompt(); });
 window.addEventListener('load',()=>{ hrQ('impFormat').textContent=IMP_FORMAT; loadAll(); });
