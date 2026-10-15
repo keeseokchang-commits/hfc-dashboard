@@ -8,7 +8,7 @@ const GRADES=['특급','고급','중급','초급'];
 let PID='', D={}, P=null, V=null, ASOF='', PM=new Map(), CODES={role:[],industry:[],project_type:[]}, RULE=null, tab='overview', editCar='', contactState=null, busy=false;
 
 const sel=(items,cur,blank)=>(blank!==undefined?`<option value="">${hrEsc(blank)}</option>`:'')+items.map(x=>`<option${x===cur?' selected':''}>${hrEsc(x)}</option>`).join('');
-const fld=(id,label,val,o={})=>`<div class="hr-field${o.fixed?' fixed':''}"${o.w?` style="min-width:${o.w}px"`:''}><label for="${id}">${hrEsc(label)}</label>${o.html||`<input class="hr-input" id="${id}" type="${o.type||'text'}" value="${hrEsc(val)}"${o.ph?` placeholder="${hrEsc(o.ph)}"`:''}${o.inputmode?` inputmode="${o.inputmode}"`:''}>`}<div class="hr-err" id="${id}Err"></div></div>`;
+const fld=(id,label,val,o={})=>`<div class="hr-field${o.fixed?' fixed':''}"${o.w?` style="min-width:${o.w}px"`:''}><label for="${id}">${hrEsc(label)}</label>${o.html||(o.area?`<textarea class="hr-input" id="${id}" rows="${o.rows||5}" style="width:100%;min-height:96px;resize:vertical;line-height:1.5;white-space:pre-wrap">${hrEsc(val)}</textarea>`:`<input class="hr-input" id="${id}" type="${o.type||'text'}" value="${hrEsc(val)}"${o.ph?` placeholder="${hrEsc(o.ph)}"`:''}${o.inputmode?` inputmode="${o.inputmode}"`:''}>`)}<div class="hr-err" id="${id}Err"></div></div>`;
 const mine=k=>(D[k]||[]).filter(r=>r.person_id===PID);
 function codesOf(rows){ const c={role:[],industry:[],project_type:[]}; rows.forEach(r=>{ const cat=String(r.category??'').trim(), key=String(r.setting_key??'').trim(); if(key&&c[cat]) c[cat].push(key); }); return c; }
 function ruleOf(rows){ const r=rows.find(x=>String(x.setting_key??'').trim()==='grade_rule'); return r?cmnParseGradeRule(r.setting_value):null; }
@@ -58,7 +58,7 @@ function basicHtml(){
     <div class="hr-row" style="margin-top:10px">${fld('bRegion','지역',P.region)}
       <div class="hr-field fixed" style="min-width:120px"><label for="bEmp">고용 형태</label><select class="hr-select" id="bEmp">${sel(['프리랜서','정규직','법인','기타'],P.employment_type,'미상')}</select></div>
       ${fld('bAvailFrom','가용 시작일',P.avail_from,{type:'date',w:150,fixed:1})}${fld('bAvailText','가용 메모',P.avail_text)}</div>
-    <div class="hr-row" style="margin-top:10px">${fld('bSummary','요약',P.summary)}</div>
+    <div class="hr-row" style="margin-top:10px">${fld('bSummary','요약 (줄바꿈이 그대로 저장·표시됩니다)',P.summary,{area:1,rows:6})}</div>
     <div style="margin-top:12px"><button class="btn btn-primary" id="btnBasic" data-act="saveBasic">저장</button></div></div>`;
 }
 async function saveBasic(btn){
@@ -73,10 +73,11 @@ async function saveBasic(btn){
 function roleHtml(){
   const rows=mine('S21'); const months=Object.fromEntries(V.roles.map(r=>[r.code,r.months]));
   const have=new Set(rows.map(r=>r.role_code)); const free=CODES.role.filter(c=>!have.has(c));
-  const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
-    :'<tr><td colspan="3" class="hr-muted">등록된 역할이 없습니다.</td></tr>';
+  const body=rows.length?rows.map(r=>`<tr><td>${hrEsc(r.role_code)}</td><td><select class="hr-select" data-role-level="${hrEsc(r.prole_id)}" style="width:auto">${sel(CMN_LEVELS,r.level)}</select></td><td style="min-width:260px"><textarea class="hr-input" rows="3" data-role-basis="${hrEsc(r.prole_id)}" style="width:100%;resize:vertical;line-height:1.5" placeholder="수준을 정한 근거">${hrEsc(r.evidence||'')}</textarea><button class="btn btn-secondary btn-sm" data-act="saveBasis" data-prole="${hrEsc(r.prole_id)}" style="margin-top:4px">근거 저장</button></td><td class="r">${months[r.role_code]!==undefined?hrEsc(months[r.role_code])+'개월':'-'}</td></tr>`).join('')
+    :'<tr><td colspan="4" class="hr-muted">등록된 역할이 없습니다.</td></tr>';
   return `<div class="card"><div class="card-title">역할 · 수준</div>
-    <div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>역할</th><th>수준</th><th class="r">경력에서 센 경험</th></tr></thead><tbody>${body}</tbody></table></div>
+    <div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>역할</th><th>수준</th><th>판단 근거</th><th class="r">경력에서 센 경험</th></tr></thead><tbody>${body}</tbody></table></div>
+    <div class="hr-help" id="roleHint" style="margin-top:6px">수준을 바꾸면 판단 근거도 함께 고쳐 주세요. 근거는 읽기 세션이 정한 이유이며 직접 수정할 수 있습니다.</div><div class="hr-err" id="basisErr"></div>
     <div class="hr-row" style="margin-top:10px"><div class="hr-field fixed" style="min-width:140px"><label for="rAdd">역할 추가</label><select class="hr-select" id="rAdd">${sel(free,'', '선택')}</select></div>
       <div class="hr-field fixed" style="min-width:100px"><label for="rLevel">수준</label><select class="hr-select" id="rLevel">${sel(CMN_LEVELS,'가능')}</select></div>
       <button class="btn btn-secondary" data-act="addRole">추가</button></div><div class="hr-err" id="rAddErr"></div></div>`;
@@ -84,6 +85,11 @@ function roleHtml(){
 async function addRole(btn){
   const code=hrQ('rAdd').value; hrQ('rAddErr').textContent=''; if(!code){ hrQ('rAddErr').textContent='추가할 역할을 선택해 주세요.'; return; }
   await save(btn,()=>hrAppend('S21',{person_id:PID,role_code:code,level:hrQ('rLevel').value,evidence:'수동 등록'}));
+}
+async function saveBasis(btn){
+  const row=D.S21.find(r=>r.prole_id===btn.dataset.prole); if(!row) return; const ta=document.querySelector(`[data-role-basis="${btn.dataset.prole}"]`); const nv=ta.value.trim();
+  hrQ('basisErr').textContent=''; if(nv===String(row.evidence||'').trim()){ toast('바뀐 내용이 없습니다.'); return; }
+  await save(btn,()=>hrUpdate('S21',row.prole_id,{evidence:nv},{readUpdatedAt:row.updated_at}));
 }
 async function setRoleLevel(selEl){
   const row=D.S21.find(r=>r.prole_id===selEl.dataset.roleLevel); if(!row||row.level===selEl.value) return;
@@ -272,7 +278,7 @@ function routeHtml(){
 }
 
 // ── 이벤트 ───────────────────────────────────────────────────────────────────
-const ACT={saveBasic,addRole,saveGrade,saveManual,showContact,saveContact,saveRating,rvApply,rvDismiss,saveCar,revertCar,
+const ACT={saveBasic,saveBasis,addRole,saveGrade,saveManual,showContact,saveContact,saveRating,rvApply,rvDismiss,saveCar,revertCar,
   editCar:b=>{ editCar=b.dataset.car; render(); const e=hrQ('editBox'); if(e&&e.scrollIntoView) e.scrollIntoView({block:'center'}); },cancelEdit:()=>{ editCar=''; render(); }};
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-tab]'); if(t&&t.closest('#tabs')){ if(t.classList.contains('disabled')) return; tab=t.dataset.tab; editCar=''; render(); return; }

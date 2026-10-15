@@ -7,7 +7,7 @@
 //      "status":"성공|읽기실패","error":"읽기실패 사유(개인정보 값 금지)",
 //      "person":{"name","name_en","birth_date","birth_year","gender","region","grade_reported","career_years_reported","avail_text","avail_from","summary","desired_rate_text","desired_rate"},
 //      "private":{"mobile","email","rid_head7"},                       // S39 에만 저장
-//      "roles":[{"role_code","level"}], "skills":[{"skill_type","skill_name","level"}],
+//      "roles":[{"role_code","level","basis"}], "skills":[{"skill_type","skill_name","level"}],
 //      "careers":[{"kind","employer","client_name","project_name","industry","project_type","role_text","role_codes","start_ym","end_ym","is_current","duration_months","duration_basis","duration_text","tasks","env","tech"}],
 //      "certs":[{"kind","name","org","cert_date"}]}]}
 // 규칙: 파일 해시가 S28 에 있으면 건너뜀(읽기실패였던 파일은 다시 읽은 결과로 그 행을 갱신) / 이름+생년월일(또는 주민번호 앞 7자리)이 같으면 기존 후보 갱신 / 이름만 같으면 새 후보 + 동일인확인 /
@@ -83,7 +83,7 @@ async function cmnImportOne(st,res,io,runId){
   const gender=['남','여'].includes(p.gender)?p.gender:(rid?rid.gender:'');
   const codes=st.codes, warn=new Set();
   const okRole=c=>{ if(!codes.role.length||codes.role.includes(c)) return true; warn.add('목록에 없는 역할 코드를 제외했습니다.'); return false; };
-  const roles=(res.roles||[]).map(r=>({role_code:cmnTxt(r.role_code),level:CMN_LEVELS.includes(r.level)?r.level:'가능'})).filter(r=>r.role_code&&okRole(r.role_code));
+  const roles=(res.roles||[]).map(r=>({role_code:cmnTxt(r.role_code),level:CMN_LEVELS.includes(r.level)?r.level:'가능',basis:String(r.basis??'').trim().slice(0,1000)})).filter(r=>r.role_code&&okRole(r.role_code));
   const skills=(res.skills||[]).map(s=>({skill_type:['DBMS','언어','도구','업무도메인'].includes(s.skill_type)?s.skill_type:'도구',skill_name:cmnTxt(s.skill_name),level:['상','중','하'].includes(s.level)?s.level:'중'})).filter(s=>s.skill_name);
   const careers=(res.careers||[]).map(c=>{ const o=cmnImportCareer(c,today);
     o.role_codes=cmnSplit(o.role_codes).filter(okRole).join(',');
@@ -106,7 +106,7 @@ async function cmnImportOne(st,res,io,runId){
       gender,region:cmnTxt(p.region),grade_reported:gradeRep,career_years_reported:years,avail_text:cmnTxt(p.avail_text),avail_from:/^\d{4}-\d{2}-\d{2}$/.test(cmnTxt(p.avail_from))?cmnTxt(p.avail_from):'',summary:cmnTxt(p.summary),desired_rate_text:cmnTxt(p.desired_rate_text),desired_rate:cmnTxt(p.desired_rate),
       review_state:reviewNeeded(careers,certs,'')?'검토필요':'확정',is_active:'Y'};
     const pid=(await io.appendMany('S20',[rec]))[0];
-    await io.appendMany('S21',roles.map(r=>({person_id:pid,role_code:r.role_code,level:r.level,evidence:'이력서'})));
+    await io.appendMany('S21',roles.map(r=>({person_id:pid,role_code:r.role_code,level:r.level,evidence:r.basis||''})));
     await io.appendMany('S22',skills.map(s=>({person_id:pid,...s})));
     await io.appendMany('S23',careers.map(c=>({person_id:pid,...c,origin:'resume',file_id:fileId,review_state:'확정',orig_json:JSON.stringify(cmnOrigOf(c))})));
     await io.appendMany('S24',certs.map(c=>({person_id:pid,...c})));
@@ -143,7 +143,9 @@ async function cmnImportOne(st,res,io,runId){
   const est=cmnGradeEstimate(allC,allCert,st.rule,today).grade; const known=[...new Set([est,repAfter,finalGrade].filter(g=>CMN_GRADES.includes(g)))];
   if((known.length>1||pendingN)&&String(exact.review_state||'').trim()!=='검토필요') ch.review_state='검토필요';
   if(Object.keys(ch).length){ await io.update('S20',pid,ch,exact); changed=true; }
-  if(newRoles.length){ await io.appendMany('S21',newRoles.map(r=>({person_id:pid,role_code:r.role_code,level:r.level,evidence:'이력서'}))); changed=true; }
+  if(newRoles.length){ await io.appendMany('S21',newRoles.map(r=>({person_id:pid,role_code:r.role_code,level:r.level,evidence:r.basis||''}))); changed=true; }
+  // 이미 있는 역할: 근거가 비어 있거나 옛 표시('이력서')뿐이면 새 근거를 채운다. 수준과 사용자가 쓴 근거는 바꾸지 않는다.
+  for(const r of roles){ if(!r.basis) continue; const row=S('S21').find(x=>x.person_id===pid&&x.role_code===r.role_code); if(!row) continue; const cur=cmnTxt(row.evidence); if(cur===''||cur==='이력서'){ await io.update('S21',row.prole_id,{evidence:r.basis},row); changed=true; } }
   if(newSkills.length){ await io.appendMany('S22',newSkills.map(s=>({person_id:pid,...s}))); changed=true; }
   if(newCerts.length){ await io.appendMany('S24',newCerts.map(c=>({person_id:pid,...c}))); changed=true; }
   if(addC.length){ await io.appendMany('S23',addC.map(c=>({person_id:pid,...c,origin:'resume',file_id:fileId,review_state:'확정',orig_json:JSON.stringify(cmnOrigOf(c))}))); changed=true; }
