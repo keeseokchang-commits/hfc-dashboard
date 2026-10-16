@@ -1,7 +1,7 @@
 // HFC nav.js v2.0 — 사이드바·탭바 단일 렌더(메뉴 변경은 이 파일만 수정)
 // v2.9.28: 배포 버전 표시 — 실제 실행 중인 배포가 어느 버전인지 화면에서 바로 구분할 수 있게(사용자 요청).
 // 새 버전 배포 시 이 상수 하나만 갱신하면 전 화면(사이드바+모바일 탭바)에 자동 반영된다.
-const HFC_VERSION='v2.9.88';
+const HFC_VERSION='v2.9.90';
 const NAV_ITEMS=[
   ['dash','🏠','대시보드','index.html',true],
   ['pipeline','📋','사업기회','pipeline.html',true],
@@ -20,7 +20,7 @@ const NAV_ITEMS=[
   ['settings','⚙️','설정','settings.html',false],
 ];
 // 구분선은 사이드바에서만 그리고, 모바일 탭바·더보기에서는 건너뛴다. 의뢰 상세는 인력 의뢰 메뉴를 활성으로 둔다(page 이름 별칭).
-const NAV_ALIAS={stf_req_detail:'stf_req',stf_cand_detail:'candidate',stf_intake:'candidate'};
+const NAV_ALIAS={stf_req_detail:'stf_req',stf_cand_detail:'candidate',stf_intake:'candidate',stf_cand_add:'stf_req'};
 const navItemsOnly=()=>NAV_ITEMS.filter(x=>x[0]!=='sep');
 function renderNav(active){
   active=NAV_ALIAS[active]||active;

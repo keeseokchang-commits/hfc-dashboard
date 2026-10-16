@@ -46,7 +46,7 @@ async function loadAll(){
   ORDERS=REQ?D.S34.filter(o=>o.request_id===REQ.request_id):[];
   DER=REQ?cmnDeriveRequests({reqs:[REQ],lines:D.S33,cands:D.S31,orders:D.S34},hrToday())[REQ.request_id]:null;
   if(!selLines.size||[...selLines].some(id=>!LINES.some(l=>l.line_id===id&&!cmnYes(l.is_cancelled)))) selLines=new Set(LINES.filter(l=>!cmnYes(l.is_cancelled)).map(l=>l.line_id));
-  MSGS=[]; renderTop(); fillInfo(); renderLines(); renderSend(); renderOrders(); hrQ('fMemo').value=REQ?REQ.memo:'';
+  MSGS=[]; renderTop(); fillInfo(); renderLines(); renderSend(); renderOrders(); hrQ('fMemo').value=REQ?REQ.memo:''; if(typeof renderCands==='function') renderCands();
   ['btnSaveMemo'].forEach(i=>hrQ(i).disabled=!REQ);
 }
 const needSaved=()=>'<div class="hr-empty">의뢰 정보를 먼저 저장해 주세요.</div>';

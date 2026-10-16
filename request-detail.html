@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 인력 의뢰 상세</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.88">
-<link rel="stylesheet" href="css/hr.css?v=2.9.88">
+<link rel="stylesheet" href="css/common.css?v=2.9.90">
+<link rel="stylesheet" href="css/hr.css?v=2.9.90">
 </head>
 <body data-page="stf_req_detail">
 
@@ -36,7 +36,7 @@
         <button class="btn btn-secondary btn-sm" id="btnPromote" disabled title="사업기회 승격 후 사용할 수 있습니다.">사업기회 승격</button>
         <button class="btn btn-secondary btn-sm" id="btnEstimate" disabled title="사업기회 승격 후 사용할 수 있습니다.">견적에 반영</button>
       </div>
-      <div class="hr-help" style="margin-top:6px" id="promoteHelp">사업기회 승격과 견적 반영은 후보 단계가 열리는 다음 개발 단계에서 사용할 수 있습니다.</div>
+      <div class="hr-help" style="margin-top:6px" id="promoteHelp">사업기회 승격과 견적 반영은 이번 개발 단계에서는 열지 않습니다(별도 승인 후 사용).</div>
       <div id="closePanel" style="display:none;margin-top:10px" class="hr-line-card">
         <div class="hr-lbl" id="closeTitle"></div>
         <div class="hr-field" id="closeReasonWrap" style="margin-top:6px"><label class="hr-req" for="closeReason">실패 사유</label><select class="hr-select" id="closeReason"></select><div class="hr-err" id="closeReasonErr"></div></div>
@@ -99,13 +99,13 @@
     <!-- ⑤ 후보 단계 -->
     <div class="card" id="secCands">
       <div class="card-title"><span><span class="hr-block-no">5</span>후보 단계</span></div>
-      <div class="hr-empty">후보 등록과 단계 관리는 다음 개발 단계에서 열립니다.</div>
+      <div id="candBox"></div>
     </div>
 
     <!-- ⑥ Claude 질문 -->
     <div class="card" id="secClaude">
       <div class="card-title"><span><span class="hr-block-no">6</span>Claude 질문</span></div>
-      <div class="hr-empty">후보를 등록한 뒤 사용할 수 있습니다. (개발 4단계)</div>
+      <div id="askBox"></div>
     </div>
 
     <!-- ⑦ 메모 -->
@@ -121,14 +121,18 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.88"></script>
-<script src="js/common.js?v=2.9.88"></script>
-<script src="js/cmn-sheet.js?v=2.9.88"></script>
-<script src="js/cmn-derive.js?v=2.9.88"></script>
-<script src="js/cmn-msg.js?v=2.9.88"></script>
-<script src="js/hr-ui.js?v=2.9.88"></script>
-<script src="js/scr-request-detail.js?v=2.9.88"></script>
-<script src="js/nav.js?v=2.9.88"></script>
+<script src="js/schema.js?v=2.9.90"></script>
+<script src="js/common.js?v=2.9.90"></script>
+<script src="js/cmn-sheet.js?v=2.9.90"></script>
+<script src="js/cmn-derive.js?v=2.9.90"></script>
+<script src="js/cmn-msg.js?v=2.9.90"></script>
+<script src="js/cmn-stage.js?v=2.9.90"></script>
+<script src="js/cmn-person.js?v=2.9.90"></script>
+<script src="js/cmn-prompt.js?v=2.9.90"></script>
+<script src="js/hr-ui.js?v=2.9.90"></script>
+<script src="js/scr-request-detail.js?v=2.9.90"></script>
+<script src="js/scr-request-cands.js?v=2.9.90"></script>
+<script src="js/nav.js?v=2.9.90"></script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>
 </html>

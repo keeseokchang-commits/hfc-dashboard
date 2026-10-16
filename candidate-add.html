@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 후보 선택·적합 평가</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.90">
+<link rel="stylesheet" href="css/hr.css?v=2.9.90">
+</head>
+<body data-page="stf_cand_add">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>후보 선택·적합 평가</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='index.html'" title="대시보드">🏠</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+  <div id="screen" style="display:none">
+    <div class="hr-row" style="margin-bottom:8px"><a href="request.html" class="btn btn-secondary btn-sm" id="btnBack">← 의뢰 상세</a></div>
+    <div class="hr-page-title" id="title"></div>
+    <div class="hr-sub" id="lineInfo" style="margin-bottom:10px"></div>
+    <div id="doneBox"></div>
+
+    <div class="card" id="secSearch">
+      <div class="card-title"><span><span class="hr-block-no">1</span>후보 검색·선택</span><span class="hr-sub" id="listCount"></span></div>
+      <div class="hr-row">
+        <div class="hr-field"><label for="fSearch">검색어</label><input class="hr-input" id="fSearch" placeholder="이름·기술·업종·고객사·프로젝트명"></div>
+        <div class="hr-field fixed" style="min-width:140px"><label for="fGrade">등급</label><select class="hr-select" id="fGrade"></select></div>
+        <div class="hr-field"><label for="fSkills">기술 (쉼표, 하나라도)</label><input class="hr-input" id="fSkills"></div>
+      </div>
+      <div style="margin-top:8px"><div class="hr-lbl" style="margin-bottom:6px">역할 <select class="hr-select" id="fRoleMode" style="width:auto;display:inline-block;margin-left:6px"><option value="any">하나라도</option><option value="all">모두</option></select>
+        <label style="margin-left:10px;font-weight:400"><input type="checkbox" id="fMulti"> 겸임 경험만</label></div><div class="hr-chips" id="roleChips"></div></div>
+      <details id="moreBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">상세 조건</summary>
+        <div class="hr-row" style="margin-top:8px">
+          <div class="hr-field fixed" style="min-width:90px"><label for="fAgeMin">만 나이 이상</label><input class="hr-input" id="fAgeMin" inputmode="numeric"></div>
+          <div class="hr-field fixed" style="min-width:90px"><label for="fAgeMax">만 나이 이하</label><input class="hr-input" id="fAgeMax" inputmode="numeric"></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fAvail">가용일 (이 날짜까지)</label><input class="hr-input" type="date" id="fAvail"></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fInd">업종 경험</label><select class="hr-select" id="fInd"></select></div>
+          <div class="hr-field fixed" style="min-width:140px"><label for="fType">프로젝트 유형 경험</label><select class="hr-select" id="fType"></select></div>
+        </div>
+      </details>
+      <div class="hr-row" style="margin-top:8px"><label><input type="checkbox" id="fNoBlack" checked> 블랙 제외</label><button class="btn btn-secondary btn-sm" id="btnReset">조건을 라인 기준으로 되돌리기</button></div>
+      <div id="listBox" style="margin-top:10px"></div>
+    </div>
+
+    <div id="formBox"></div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.90"></script>
+<script src="js/common.js?v=2.9.90"></script>
+<script src="js/cmn-sheet.js?v=2.9.90"></script>
+<script src="js/cmn-derive.js?v=2.9.90"></script>
+<script src="js/cmn-alert.js?v=2.9.90"></script>
+<script src="js/cmn-person.js?v=2.9.90"></script>
+<script src="js/cmn-fit.js?v=2.9.90"></script>
+<script src="js/cmn-prompt.js?v=2.9.90"></script>
+<script src="js/hr-ui.js?v=2.9.90"></script>
+<script src="js/scr-cand-add.js?v=2.9.90"></script>
+<script src="js/nav.js?v=2.9.90"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>
