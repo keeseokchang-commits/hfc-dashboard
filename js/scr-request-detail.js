@@ -1,6 +1,6 @@
 // HFC scr-request-detail.js v2.9.76 — STF-SCR-02 의뢰 상세 (개발 단계 ①: 영역 ①②③④⑦ + 실패·취소)
 // 근거: 프로그램 설계서 §5(SCR-02). 한 의뢰를 접수 → 요청 라인 → 서치업체 발송 → 회신 관리 순서로 처리한다.
-// 이 단계에서 열지 않는 것: ⑤ 후보 단계, ⑥ Claude 질문, 사업기회 승격, 견적에 반영 (후보가 생기는 다음 단계에서 연다)
+// 사업기회 승격·견적에 반영은 js/scr-request-promote.js (v2.9.94)
 // 의존: schema.js, common.js, cmn-sheet.js, cmn-derive.js, cmn-msg.js, hr-ui.js
 const q$=(root,sel)=>root.querySelector(sel);
 let REQ_ID=null, IS_NEW=false;
@@ -46,7 +46,7 @@ async function loadAll(){
   ORDERS=REQ?D.S34.filter(o=>o.request_id===REQ.request_id):[];
   DER=REQ?cmnDeriveRequests({reqs:[REQ],lines:D.S33,cands:D.S31,orders:D.S34},hrToday())[REQ.request_id]:null;
   if(!selLines.size||[...selLines].some(id=>!LINES.some(l=>l.line_id===id&&!cmnYes(l.is_cancelled)))) selLines=new Set(LINES.filter(l=>!cmnYes(l.is_cancelled)).map(l=>l.line_id));
-  MSGS=[]; renderTop(); fillInfo(); renderLines(); renderSend(); renderOrders(); hrQ('fMemo').value=REQ?REQ.memo:''; if(typeof renderCands==='function') renderCands();
+  MSGS=[]; renderTop(); fillInfo(); renderLines(); renderSend(); renderOrders(); hrQ('fMemo').value=REQ?REQ.memo:''; if(typeof renderCands==='function') renderCands(); if(typeof renderPromote==='function') renderPromote();
   ['btnSaveMemo'].forEach(i=>hrQ(i).disabled=!REQ);
 }
 const needSaved=()=>'<div class="hr-empty">의뢰 정보를 먼저 저장해 주세요.</div>';

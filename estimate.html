@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.92">
+<link rel="stylesheet" href="css/common.css?v=2.9.94">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -29,6 +29,9 @@
   .item-del{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:4px}
   .fr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
   .fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+  .calcopt{margin-bottom:8px}.calcopt-h{font-size:11px;font-weight:600;color:var(--text2);margin:2px 0 4px}
+  .fr-opt{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .fr-opt select{width:100%;min-width:0;text-overflow:clip}
   .fl{font-size:11px;color:var(--text3);display:block;margin-bottom:3px}
   .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;background:var(--surface)}
   .fi:focus{border-color:var(--blue)}
@@ -131,10 +134,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.92"></script>
-<script src="js/common.js?v=2.9.92"></script>
-<script src="js/calc.js?v=2.9.92"></script>
-<script src="js/nav.js?v=2.9.92"></script>
+<script src="js/schema.js?v=2.9.94"></script>
+<script src="js/common.js?v=2.9.94"></script>
+<script src="js/calc.js?v=2.9.94"></script>
+<script src="js/nav.js?v=2.9.94"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -221,7 +224,7 @@ function loadOpp(){
     const buyDisplay=isSalaried?(ovVals.length?ovVals[0]:0):(num(e.buy_price)||0);
     return {name:e.item_name,grade:e.grade,setId:e.grade_set_id,
       sell:num(e.unit_price)||0,buy:buyDisplay,
-      start:e.start_date,end:e.end_date,mm:mmVal,payType,monthlyOverride,mmRound:e.mm_round||'',cutUnit:e.cut_unit||'',cutMode:e.cut_mode||'',bMmRound:e.buy_mm_round||'',bCutUnit:e.buy_cut_unit||'',bCutMode:e.buy_cut_mode||''};
+      start:e.start_date,end:e.end_date,mm:mmVal,payType,monthlyOverride,mmRound:e.mm_round||'',cutUnit:e.cut_unit||'',cutMode:e.cut_mode||'',mmMode:e.mm_mode||'',bMmMode:e.buy_mm_mode||'',bMmRound:e.buy_mm_round||'',bCutUnit:e.buy_cut_unit||'',bCutMode:e.buy_cut_mode||''};
   });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
@@ -335,8 +338,8 @@ function monthlyOverrideHtml(p,i){
 // 나열되어야 한다. v2.9.26에서 사업소득형을 별도 필드(buyAmount, 총액 직접입력)로 분리한 것은
 // 이중계산은 막았지만 매출 칸과 비대칭인 UI를 만드는 설계 미스였다 — 되돌리고, 세금계산서형과 동일하게
 // p.buy(단가)×p.mm=총액 구조로 통일한다(이중계산 방지는 저장·로드 시점의 단가↔총액 변환 규율로 지킨다).
-// v2.9.92: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
-function laborRow(p){ return {unit_price:p.sell,buy_price:p.buy,mm:p.mm,start_date:p.start,end_date:p.end,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||'',memo:p.payType==='급여형'?'급여형':''}; }
+// v2.9.94: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
+function laborRow(p){ return {unit_price:p.sell,buy_price:p.buy,mm:p.mm,start_date:p.start,end_date:p.end,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',mm_mode:p.mmMode||'',buy_mm_mode:p.bMmMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||'',memo:p.payType==='급여형'?'급여형':''}; }
 function laborSellTotal(p){ return laborAmt(laborRow(p),'unit_price'); }
 // 월별 미리보기 — 입사월은 일수 비율로 계산해 절사, 마지막 달은 총액에서 앞 달을 뺀 잔액(급여형은 월별 지급액 표를 쓰므로 매출만)
 function laborPreview(p){
@@ -348,11 +351,14 @@ function laborPreview(p){
 const CALC_UNIT_TXT={1:'원',1000:'천원',10000:'만원'};
 function calcOptHtml(p,i,side){
   const b=side==='b'; if(b&&p.payType==='급여형') return '';
-  const kR=b?'bMmRound':'mmRound', kU=b?'bCutUnit':'cutUnit', kM=b?'bCutMode':'cutMode';
+  const kR=b?'bMmRound':'mmRound', kRM=b?'bMmMode':'mmMode', kU=b?'bCutUnit':'cutUnit', kM=b?'bCutMode':'cutMode', nm=b?'매입':'매출';
   const opt=(arr,cur)=>arr.map(([v,t])=>`<option value="${v}" ${String(cur||'')===v?'selected':''}>${t}</option>`).join('');
-  return `<div class="fr3"><div><label class="fl">${b?'매입':'매출'} 일할 비율 반올림</label><select class="fi" onchange="labor[${i}].${kR}=this.value;renderLabor();recalc()">${opt([['','설정 기본값 ('+CALC_OPT.mmRound+'째 자리)'],['2','2째 자리에서 반올림 (0.4)'],['3','3째 자리에서 반올림 (0.42)'],['4','4째 자리에서 반올림 (0.419)']],p[kR])}</select></div>
-    <div><label class="fl">${b?'매입':'매출'} 입사·퇴사월 금액 단위</label><select class="fi" onchange="labor[${i}].${kU}=this.value;renderLabor();recalc()">${opt([['','설정 기본값 ('+CALC_UNIT_TXT[CALC_OPT.cutUnit]+')'],['1','원 단위'],['1000','천원 단위'],['10000','만원 단위']],p[kU])}</select></div>
-    <div><label class="fl">${b?'매입':'매출'} 금액 처리</label><select class="fi" onchange="labor[${i}].${kM}=this.value;renderLabor();recalc()">${opt([['','설정 기본값 ('+CALC_OPT.cutMode+')'],['절사','절사'],['반올림','반올림']],p[kM])}</select></div></div>`;
+  const sel=(k,arr)=>`<select class="fi" onchange="labor[${i}].${k}=this.value;renderLabor();recalc()">${opt(arr,p[k])}</select>`;
+  return `<div class="calcopt"><div class="calcopt-h">${nm} 일할 계산 (입사·퇴사월)</div><div class="fr-opt">
+    <div><label class="fl">비율 자리</label>${sel(kR,[['','설정 기본값 ('+CALC_OPT.mmRound+'째 자리)'],['2','2째 자리 (예 0.4)'],['3','3째 자리 (예 0.42)'],['4','4째 자리 (예 0.419)']])}</div>
+    <div><label class="fl">비율 처리</label>${sel(kRM,[['','설정 기본값 ('+CALC_OPT.mmMode+')'],['반올림','반올림'],['올림','올림'],['버림','버림']])}</div>
+    <div><label class="fl">금액 단위</label>${sel(kU,[['','설정 기본값 ('+CALC_UNIT_TXT[CALC_OPT.cutUnit]+')'],['1','원 단위'],['1000','천원 단위'],['10000','만원 단위']])}</div>
+    <div><label class="fl">금액 처리</label>${sel(kM,[['','설정 기본값 ('+CALC_OPT.cutMode+')'],['절사','절사 (버림)'],['반올림','반올림'],['올림','올림']])}</div></div></div>`;
 }
 function laborBuyTotal(p){
   if(p.payType!=='급여형') return laborAmt(laborRow(p),'buy_price');
@@ -480,6 +486,14 @@ async function saveEstimate(){
   if(!cur){toast('사업기회를 먼저 선택하세요',true);return;}
   const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='저장 중…';
   const today=new Date().toISOString().slice(0,10);
+  // v2.9.94: 이 화면을 연 뒤 다른 곳(의뢰 상세의 '견적에 반영' 등)이 S12에 행을 추가했는데 그대로 전체를 덮어쓰면 그 행이 사라진다 — 저장 직전에 다시 읽어 확인한다.
+  try{
+    const fresh=toObj(await fetchSheet(...R.S12)).filter(e=>e.estimate_id);
+    const known=new Set(estimates.map(e=>e.estimate_id));
+    const added=fresh.filter(e=>!known.has(e.estimate_id));
+    if(added.length&&!confirm(`이 화면을 연 뒤 견적 ${added.length}건이 다른 곳에서 추가되었습니다.\n그대로 저장하면 그 ${added.length}건이 사라집니다.\n\n확인 = 그래도 저장 / 취소 = 저장 중단(새로고침 후 다시 작업)`)){
+      btn.disabled=false;btn.textContent='견적 저장 (S12)';return; }
+  }catch(e){ btn.disabled=false;btn.textContent='견적 저장 (S12)';toast('견적 시트를 다시 읽지 못해 저장을 중단했습니다',true);return; }
   const prevItems=estimates.filter(e=>e.pipeline_id===cur.pipeline_id);
   // v2.9.31: S12.buy_price는 급여형만 "월별 합계 총액"으로 저장되고, 세금계산서형·사업소득형은
   // 항상 "단가"로 저장된다(위 저장부 수정과 동일 원칙) — 여기서도 그 규칙을 그대로 따라야 정확한
@@ -514,7 +528,7 @@ async function saveEstimate(){
     rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
     comp_type:'인건비',item_name:p.name||`${p.grade} 인력`,grade:p.grade,grade_set_id:p.setId,qty:1,
     unit_price:p.sell,buy_price:buyToSave,amount:laborSellTotal(p),mm:p.mm,start_date:p.start,end_date:p.end,
-    memo,created_at:today,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||''});});
+    memo,created_at:today,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',mm_mode:p.mmMode||'',buy_mm_mode:p.bMmMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||''});});
   // v2.9.35: 세금계산서 미수취 항목은 memo에 "_NOINVOICE_" 접두사로 표시(비고 텍스트는 그대로 뒤에 보존).
   // 인건비의 급여형|{JSON}/사업소득형 태그와는 다른 네임스페이스라 comp_type이 인건비가 아닌 것으로
   // 이미 구분되니 충돌 없음. 기본값(수취=true)은 태그를 붙이지 않아 기존 데이터와 완전 호환.

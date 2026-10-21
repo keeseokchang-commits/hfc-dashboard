@@ -31,28 +31,31 @@ function addMonthsKeepDay(d,k){
 // 일수를 다음 앵커 구간의 일수로 나누는" 방식이라 이런 왜곡이 생기지 않는다.
 // 검증(사용자 확정 사례): 3/12~9/11=6.00, 3/12~11/11=8.00(v2.9.19 도입 전 원래 값),
 // 10/26~2/25=4.00(2026-09-27 이번 사례로 재확인).
-// v2.9.92~92: 일할 계산 옵션(사용자 승인 2026-10-21, KB증권 계약서 사례) — 계약마다 다르고, 매출과 매입을 따로 지정할 수 있다.
+// v2.9.94~92: 일할 계산 옵션(사용자 승인 2026-10-21, KB증권 계약서 사례) — 계약마다 다르고, 매출과 매입을 따로 지정할 수 있다.
 //  · mmRound: 일할 비율을 소수 몇째 자리에서 반올림할지(2→0.4, 3→0.42, 4→0.419). 이 반올림한 비율을 단가에 곱한다. M/M 표시도 같은 자리.
 //  · cutUnit: 곱한 입사월 금액을 처리할 단위(1=원, 1000=천원, 10000=만원). 만근월은 단가 그대로, 종료월은 총액에서 앞 달을 뺀 잔액.
 //  · cutMode: 위 단위로 '절사' 또는 '반올림'.
 // 기본값은 설정 화면(S10 hr_setting: mm_round_digit, cut_unit, cut_mode) — 값이 없으면 3째 자리(루틴 B)·만원·절사. 행의 값이 있으면 행이 우선.
-// 행의 열: 매출 = mm_round·cut_unit·cut_mode / 매입 = buy_mm_round·buy_cut_unit·buy_cut_mode (비어 있으면 설정 기본값)
-let CALC_OPT={mmRound:3,cutUnit:10000,cutMode:'절사'};
-const CALC_ROUNDS=[2,3,4], CALC_CUTS=[1,1000,10000], CALC_MODES=['절사','반올림'];
+// 행의 열: 매출 = mm_round·mm_mode·cut_unit·cut_mode / 매입 = buy_ 접두어 (비어 있으면 설정 기본값). mm_mode = 비율 반올림/올림/버림, cut_mode = 금액 절사/반올림/올림 (비어 있으면 설정 기본값)
+let CALC_OPT={mmRound:3,mmMode:'반올림',cutUnit:10000,cutMode:'절사'};
+const CALC_ROUNDS=[2,3,4], CALC_CUTS=[1,1000,10000], CALC_MODES=['절사','반올림','올림'], CALC_RMODES=['반올림','올림','버림'];
+// 비율 처리(mmMode): 지정 자리에서 반올림/올림/버림. 금액 처리(cutMode): 단위로 절사/반올림/올림.
+const calcRatio=(x,digit,mode)=>{ const k=Math.pow(10,digit-1), y=Math.round(x*1e9)/1e9; return (mode==='올림'?Math.ceil(y*k-1e-9):mode==='버림'?Math.floor(y*k+1e-9):Math.round(y*k+1e-9))/k; };
 function calcApplySettings(rows){
   (rows||[]).forEach(r=>{ if(String(r.category||'')!=='hr_setting') return; const raw=String(r.setting_value??'').replace(/,/g,'').trim(), v=parseInt(raw,10);
     if(r.setting_key==='mm_round_digit'&&CALC_ROUNDS.includes(v)) CALC_OPT.mmRound=v;
+    if(r.setting_key==='mm_mode'&&CALC_RMODES.includes(raw)) CALC_OPT.mmMode=raw;
     if(r.setting_key==='cut_unit'&&CALC_CUTS.includes(v)) CALC_OPT.cutUnit=v;
     if(r.setting_key==='cut_mode'&&CALC_MODES.includes(raw)) CALC_OPT.cutMode=raw; });
 }
 // field: 'unit_price'(매출) / 'buy_price'(매입) — 행의 해당 열을 읽는다
 function calcOpt(e,field){
   const pre=field==='buy_price'?'buy_':''; const g=k=>(e&&e[pre+k]);
-  const r=parseInt(String(g('mm_round')??'').trim(),10), c=parseInt(String(g('cut_unit')??'').replace(/,/g,'').trim(),10), m=String(g('cut_mode')??'').trim();
-  return {mmRound:CALC_ROUNDS.includes(r)?r:CALC_OPT.mmRound, cutUnit:CALC_CUTS.includes(c)?c:CALC_OPT.cutUnit, cutMode:CALC_MODES.includes(m)?m:CALC_OPT.cutMode};
+  const r=parseInt(String(g('mm_round')??'').trim(),10), c=parseInt(String(g('cut_unit')??'').replace(/,/g,'').trim(),10), m=String(g('cut_mode')??'').trim(), rm=String(g('mm_mode')??'').trim();
+  return {mmRound:CALC_ROUNDS.includes(r)?r:CALC_OPT.mmRound, mmMode:CALC_RMODES.includes(rm)?rm:CALC_OPT.mmMode, cutUnit:CALC_CUTS.includes(c)?c:CALC_OPT.cutUnit, cutMode:CALC_MODES.includes(m)?m:CALC_OPT.cutMode};
 }
 // 단위 처리 — 절사는 내림, 반올림은 사사오입. 부동소수 오차 방어
-const calcUnit=(v,unit,mode)=>{ const x=Math.round(v*1e6)/1e6; return (mode==='반올림'?Math.floor(x/unit+0.5):Math.floor(x/unit))*unit; };
+const calcUnit=(v,unit,mode)=>{ const x=Math.round(v*1e6)/1e6; return (mode==='반올림'?Math.floor(x/unit+0.5):mode==='올림'?Math.ceil(x/unit-1e-9):Math.floor(x/unit))*unit; };
 // 투입일 앵커 방식의 총 M/M — {months:완전월 수, frac:남은 일수/앵커 구간 일수(정확값)}. 못 구하면 null
 function mmParts(s,e){
   if(!s||!e) return null;
@@ -86,7 +89,7 @@ function monthList(sd,ed){
 function firstFrac(sd){ const a=new Date(sd); const dim=new Date(a.getFullYear(),a.getMonth()+1,0).getDate(); return (dim-a.getDate()+1)/dim; }
 // 월별 M/M. 구조는 v2.9.62 그대로: 총M/M는 투입일 앵커, 시작월=일수 비율(지정 자리에서 반올림), 중간월=1, 마지막 월=총M/M−앞 달 합.
 function mmMonthly(sd,ed,opt){
-  const o=opt||calcOpt(); const d=o.mmRound-1, k=Math.pow(10,d), rd=x=>Math.round(x*k+1e-9)/k;
+  const o=opt||calcOpt(); const rd=x=>calcRatio(x,o.mmRound,o.mmMode);
   const pr=mmParts(sd,ed); if(!pr) return [];
   const total=pr.months+pr.frac;
   const list=monthList(sd,ed).map(x=>({...x,mm:0}));
@@ -102,7 +105,7 @@ function mmMonthly(sd,ed,opt){
 function monthlyAmounts(price,sd,ed,opt){
   const o=opt||calcOpt(); const pr=mmParts(sd,ed); if(!pr) return [];
   const mms=mmMonthly(sd,ed,o); const n=mms.length; if(!n) return [];
-  const k=Math.pow(10,o.mmRound-1), rd=x=>Math.round(x*k+1e-9)/k;
+  const rd=x=>calcRatio(x,o.mmRound,o.mmMode);
   const part=ratio=>calcUnit(price*rd(ratio),o.cutUnit,o.cutMode);
   const totalAmt=price*pr.months+(pr.frac>0?part(pr.frac):0);
   if(n===1) return [{...mms[0],amount:totalAmt}];
@@ -148,7 +151,7 @@ function monthlyProfile(items,priceField,defStart,defEnd){
     // 분기를 유지했다면 이제 "단가"를 "총액"으로 오인해 이중으로 나누는 반대 방향의 결함이 재발했을 것).
     const p=_n(e[priceField]); if(!p)return;
     if(e.comp_type==='인건비'){
-      // v2.9.92: 금액은 M/M 표시값(반올림)이 아니라 정확한 일수 비율로 계산하고 절사 단위를 적용한다(행의 mm_round·cut_unit, 없으면 설정 기본값)
+      // v2.9.94: 금액은 M/M 표시값(반올림)이 아니라 정확한 일수 비율로 계산하고 절사 단위를 적용한다(행의 mm_round·cut_unit, 없으면 설정 기본값)
       monthlyAmounts(p,e.start_date||defStart,e.end_date||defEnd,calcOpt(e,priceField)).forEach(x=>{
         const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+x.amount;});
     } else {

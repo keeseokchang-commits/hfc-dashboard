@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.92">
+<link rel="stylesheet" href="css/common.css?v=2.9.94">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -226,8 +226,12 @@
       <span><input class="param-input" type="number" min="0" step="1" id="param_reconfirm_days" value="90"><span class="param-unit">일</span></span>
     </div>
     <div class="param-row">
-      <span class="param-label">일할 계산 — 일할 비율 반올림 <small style="color:var(--text3)">(입사·퇴사월 비율. 견적·청구 스케줄 기본값이며 인력 행에서 매출·매입 따로 바꿀 수 있음)</small></span>
-      <span><select class="param-input" id="param_mm_round_digit" style="width:230px"><option value="2">2째 자리에서 반올림 (0.4)</option><option value="3">3째 자리에서 반올림 (0.42)</option><option value="4">4째 자리에서 반올림 (0.419)</option></select></span>
+      <span class="param-label">일할 계산 — 일할 비율 자리 <small style="color:var(--text3)">(입사·퇴사월 비율. 견적·청구 스케줄 기본값이며 인력 행에서 매출·매입 따로 바꿀 수 있음)</small></span>
+      <span><select class="param-input" id="param_mm_round_digit" style="width:230px"><option value="2">2째 자리 (예 0.4)</option><option value="3">3째 자리 (예 0.42)</option><option value="4">4째 자리 (예 0.419)</option></select></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">일할 계산 — 일할 비율 처리 <small style="color:var(--text3)">(위 자리에서 반올림·올림·버림)</small></span>
+      <span><select class="param-input" id="param_mm_mode" style="width:230px"><option value="반올림">반올림</option><option value="올림">올림</option><option value="버림">버림</option></select></span>
     </div>
     <div class="param-row">
       <span class="param-label">일할 계산 — 입사·퇴사월 금액 단위 <small style="color:var(--text3)">(만근월은 단가 그대로)</small></span>
@@ -235,7 +239,7 @@
     </div>
     <div class="param-row">
       <span class="param-label">일할 계산 — 금액 처리</span>
-      <span><select class="param-input" id="param_cut_mode" style="width:230px"><option value="절사">절사</option><option value="반올림">반올림</option></select></span>
+      <span><select class="param-input" id="param_cut_mode" style="width:230px"><option value="절사">절사 (버림)</option><option value="반올림">반올림</option><option value="올림">올림</option></select></span>
     </div>
     <div style="margin-top:14px;display:flex;justify-content:flex-end">
       <button class="btn btn-primary" onclick="saveParams()">파라미터 저장</button>
@@ -264,12 +268,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.92"></script>
-<script src="js/common.js?v=2.9.92"></script>
-<script src="js/cmn-sheet.js?v=2.9.92"></script>
-<script src="js/cmn-init.js?v=2.9.92"></script>
-<script src="js/calc.js?v=2.9.92"></script>
-<script src="js/nav.js?v=2.9.92"></script>
+<script src="js/schema.js?v=2.9.94"></script>
+<script src="js/common.js?v=2.9.94"></script>
+<script src="js/cmn-sheet.js?v=2.9.94"></script>
+<script src="js/cmn-init.js?v=2.9.94"></script>
+<script src="js/calc.js?v=2.9.94"></script>
+<script src="js/nav.js?v=2.9.94"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -521,11 +525,11 @@ async function saveParams(){
   const hrUpd={};
   for(const [k,,label] of HR_SETTING_FIELDS){
     const v=document.getElementById('param_'+k).value.trim();
-    if(k==='cut_mode'){ hrUpd[k]=v; continue; }
+    if(k==='cut_mode'||k==='mm_mode'){ hrUpd[k]=v; continue; }
     if(!/^\d+$/.test(v)){ toast('숫자만 입력해 주세요. ('+label+')',true); return; }
     hrUpd[k]=parseInt(v,10);
   }
-  if(![2,3,4].includes(hrUpd.mm_round_digit)||![1,1000,10000].includes(hrUpd.cut_unit)||!['절사','반올림'].includes(hrUpd.cut_mode)){ toast('일할 계산 설정값을 다시 선택해 주세요.',true); return; }
+  if(![2,3,4].includes(hrUpd.mm_round_digit)||![1,1000,10000].includes(hrUpd.cut_unit)||!['절사','반올림','올림'].includes(hrUpd.cut_mode)||!['반올림','올림','버림'].includes(hrUpd.mm_mode)){ toast('일할 계산 설정값을 다시 선택해 주세요.',true); return; }
   ['param_alert_threshold','param_alert_days','param_cash_warn_months','param_base_balance','param_base_ym'].forEach(k=>{
     settingsMap[k]=document.getElementById(k).value;
   });
