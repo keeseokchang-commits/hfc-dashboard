@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.90">
+<link rel="stylesheet" href="css/common.css?v=2.9.92">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -131,10 +131,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.90"></script>
-<script src="js/common.js?v=2.9.90"></script>
-<script src="js/calc.js?v=2.9.90"></script>
-<script src="js/nav.js?v=2.9.90"></script>
+<script src="js/schema.js?v=2.9.92"></script>
+<script src="js/common.js?v=2.9.92"></script>
+<script src="js/calc.js?v=2.9.92"></script>
+<script src="js/nav.js?v=2.9.92"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -151,8 +151,9 @@ let pendingAuth=null;
 // ── 로드 ──
 async function loadAll(){
   try{
-    const [plR,rtR,esR]=await Promise.all([
-      fetchSheet(...R.S01),fetchSheet(...R.S11),fetchSheet(...R.S12)]);
+    const [plR,rtR,esR,s10R]=await Promise.all([
+      fetchSheet(...R.S01),fetchSheet(...R.S11),fetchSheet(...R.S12),fetchSheet(...R.S10).catch(()=>[])]);
+    calcApplySettings(toObj(s10R));
     opps=toObj(plR).filter(o=>o.pipeline_id);
     rates=toObj(rtR).filter(r=>r.set_id);
     estimates=dedupe(toObj(esR).filter(e=>e.estimate_id),'estimate_id');
@@ -220,7 +221,7 @@ function loadOpp(){
     const buyDisplay=isSalaried?(ovVals.length?ovVals[0]:0):(num(e.buy_price)||0);
     return {name:e.item_name,grade:e.grade,setId:e.grade_set_id,
       sell:num(e.unit_price)||0,buy:buyDisplay,
-      start:e.start_date,end:e.end_date,mm:mmVal,payType,monthlyOverride};
+      start:e.start_date,end:e.end_date,mm:mmVal,payType,monthlyOverride,mmRound:e.mm_round||'',cutUnit:e.cut_unit||'',cutMode:e.cut_mode||'',bMmRound:e.buy_mm_round||'',bCutUnit:e.buy_cut_unit||'',bCutMode:e.buy_cut_mode||''};
   });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
@@ -299,9 +300,12 @@ function renderLabor(){
         <div><label class="fl">종료예정일</label><input class="fi" type="date" value="${p.end}" onchange="labor[${i}].end=this.value;autoMM(${i})"></div>
         <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 월별 지급액 합계':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" ${p.payType==='급여형'?'disabled':''} oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
       </div>
+      ${calcOptHtml(p,i,'')}
+      ${calcOptHtml(p,i,'b')}
+      <div style="font-size:11px;color:var(--text3);margin:2px 0 6px" id="prv_${i}">${laborPreview(p)}</div>
       ${p.payType==='급여형'?monthlyOverrideHtml(p,i):''}
       <div style="text-align:right;font-size:12px;color:var(--text2)">
-        매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(Math.round(p.sell*p.mm))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(laborBuyTotal(p))}</b>
+        매출 <b style="color:var(--blue)" id="amtL_s_${i}">${wf(laborSellTotal(p))}</b> · 매입 <b style="color:var(--amber)" id="amtL_b_${i}">${wf(laborBuyTotal(p))}</b>
       </div>
     </div>`).join('')||'<div class="empty">인력을 추가하세요</div>';
 }
@@ -331,8 +335,27 @@ function monthlyOverrideHtml(p,i){
 // 나열되어야 한다. v2.9.26에서 사업소득형을 별도 필드(buyAmount, 총액 직접입력)로 분리한 것은
 // 이중계산은 막았지만 매출 칸과 비대칭인 UI를 만드는 설계 미스였다 — 되돌리고, 세금계산서형과 동일하게
 // p.buy(단가)×p.mm=총액 구조로 통일한다(이중계산 방지는 저장·로드 시점의 단가↔총액 변환 규율로 지킨다).
+// v2.9.92: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
+function laborRow(p){ return {unit_price:p.sell,buy_price:p.buy,mm:p.mm,start_date:p.start,end_date:p.end,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||'',memo:p.payType==='급여형'?'급여형':''}; }
+function laborSellTotal(p){ return laborAmt(laborRow(p),'unit_price'); }
+// 월별 미리보기 — 입사월은 일수 비율로 계산해 절사, 마지막 달은 총액에서 앞 달을 뺀 잔액(급여형은 월별 지급액 표를 쓰므로 매출만)
+function laborPreview(p){
+  if(!p.start||!p.end) return '';
+  const row=laborRow(p); const line=(label,price,field)=>{ const rows=monthlyAmounts(price||0,p.start,p.end,calcOpt(row,field)); return rows.length?`${label}: `+rows.map(x=>`${x.m}월 ${x.mm}MM ${comma(x.amount)}`).join(' · '):''; };
+  return [line('월별 매출',p.sell,'unit_price'),p.payType==='급여형'?'':line('월별 매입',p.buy,'buy_price')].filter(Boolean).join('<br>');
+}
+// 일할 계산 옵션 입력칸 — 매출('')·매입('b') 각각. 비워 두면 설정 기본값. 계약에 따라 매출은 A, 매입은 B처럼 다르게 줄 수 있다(마진 목적)
+const CALC_UNIT_TXT={1:'원',1000:'천원',10000:'만원'};
+function calcOptHtml(p,i,side){
+  const b=side==='b'; if(b&&p.payType==='급여형') return '';
+  const kR=b?'bMmRound':'mmRound', kU=b?'bCutUnit':'cutUnit', kM=b?'bCutMode':'cutMode';
+  const opt=(arr,cur)=>arr.map(([v,t])=>`<option value="${v}" ${String(cur||'')===v?'selected':''}>${t}</option>`).join('');
+  return `<div class="fr3"><div><label class="fl">${b?'매입':'매출'} 일할 비율 반올림</label><select class="fi" onchange="labor[${i}].${kR}=this.value;renderLabor();recalc()">${opt([['','설정 기본값 ('+CALC_OPT.mmRound+'째 자리)'],['2','2째 자리에서 반올림 (0.4)'],['3','3째 자리에서 반올림 (0.42)'],['4','4째 자리에서 반올림 (0.419)']],p[kR])}</select></div>
+    <div><label class="fl">${b?'매입':'매출'} 입사·퇴사월 금액 단위</label><select class="fi" onchange="labor[${i}].${kU}=this.value;renderLabor();recalc()">${opt([['','설정 기본값 ('+CALC_UNIT_TXT[CALC_OPT.cutUnit]+')'],['1','원 단위'],['1000','천원 단위'],['10000','만원 단위']],p[kU])}</select></div>
+    <div><label class="fl">${b?'매입':'매출'} 금액 처리</label><select class="fi" onchange="labor[${i}].${kM}=this.value;renderLabor();recalc()">${opt([['','설정 기본값 ('+CALC_OPT.cutMode+')'],['절사','절사'],['반올림','반올림']],p[kM])}</select></div></div>`;
+}
 function laborBuyTotal(p){
-  if(p.payType!=='급여형') return Math.round(p.buy*p.mm);
+  if(p.payType!=='급여형') return laborAmt(laborRow(p),'buy_price');
   if(!p.start||!p.end) return Math.round(p.buy*p.mm);
   const months=ymList(p.start,p.end);
   return months.reduce((s,m)=>{const key=`${m.y}-${pad2(m.m)}`; const v=(p.monthlyOverride&&p.monthlyOverride[key]!==undefined)?p.monthlyOverride[key]:p.buy; return s+v;},0);
@@ -400,7 +423,7 @@ function compTab(ev,k){
 
 // ── 계산 ──
 function recalc(){
-  const lS=labor.reduce((s,p)=>s+Math.round(p.sell*p.mm),0);
+  const lS=labor.reduce((s,p)=>s+laborSellTotal(p),0);
   const lB=labor.reduce((s,p)=>s+laborBuyTotal(p),0);
   const iS=items.infra.reduce((s,x)=>s+x.qty*x.price,0), iB=items.infra.reduce((s,x)=>s+x.qty*(x.buy||0),0);
   const sS=items.sol.reduce((s,x)=>s+x.qty*x.price,0),  sB=items.sol.reduce((s,x)=>s+x.qty*(x.buy||0),0);
@@ -413,7 +436,8 @@ function recalc(){
   // 항목별 금액 라이브 갱신
   labor.forEach((p,i)=>{
     const a=document.getElementById(`amtL_s_${i}`), b=document.getElementById(`amtL_b_${i}`);
-    if(a)a.textContent=wf(Math.round(p.sell*p.mm)); if(b)b.textContent=wf(laborBuyTotal(p));
+    if(a)a.textContent=wf(laborSellTotal(p)); if(b)b.textContent=wf(laborBuyTotal(p));
+    const pv=document.getElementById(`prv_${i}`); if(pv)pv.innerHTML=laborPreview(p);
   });
   ['infra','sol','etc'].forEach(k=>items[k].forEach((it,i)=>{
     const a=document.getElementById(`amt_${k}_s_${i}`), b=document.getElementById(`amt_${k}_b_${i}`);
@@ -439,7 +463,7 @@ function renderAllSummary(){
   const sell=list.reduce((s,o)=>s+un(o.contract_amount),0);
   const pids=new Set(list.map(o=>o.pipeline_id));
   const cost=estimates.filter(e=>pids.has(e.pipeline_id)).reduce((s,e)=>{
-    if(e.comp_type==='인건비')return s+Math.round((num(e.buy_price)||0)*(numF(e.mm)||0));
+    if(e.comp_type==='인건비')return s+laborAmt(e,'buy_price');
     const bp=num(e.buy_price)||0;
     return s+(bp?bp*(num(e.qty)||1):(num(e.amount)||0));},0);
   const profit=sell-cost, rate=sell?(profit/sell*100).toFixed(1):0;
@@ -461,8 +485,8 @@ async function saveEstimate(){
   // 항상 "단가"로 저장된다(위 저장부 수정과 동일 원칙) — 여기서도 그 규칙을 그대로 따라야 정확한
   // "변경 전" 금액을 비교할 수 있다.
   const prevLaborBuy=e=>{ if((e.memo||'').startsWith('급여형')) return num(e.buy_price)||0; // 저장 시 이미 월별 합계 총액
-    return Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)); };
-  const prevSell=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
+    return laborAmt(e,'buy_price'); };
+  const prevSell=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?laborAmt(e,'unit_price'):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
   const prevBuy=prevItems.reduce((x,e)=>x+(e.comp_type==='인건비'?prevLaborBuy(e):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
   const others=estimates.filter(e=>e.pipeline_id!==cur.pipeline_id);
   let n=estimates.reduce((m,e)=>{const x=parseInt((e.estimate_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,x);},0);
@@ -489,8 +513,8 @@ async function saveEstimate(){
     const buyToSave=p.payType==='급여형'?laborBuyTotal(p):p.buy;
     rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
     comp_type:'인건비',item_name:p.name||`${p.grade} 인력`,grade:p.grade,grade_set_id:p.setId,qty:1,
-    unit_price:p.sell,buy_price:buyToSave,amount:Math.round(p.sell*p.mm),mm:p.mm,start_date:p.start,end_date:p.end,
-    memo,created_at:today});});
+    unit_price:p.sell,buy_price:buyToSave,amount:laborSellTotal(p),mm:p.mm,start_date:p.start,end_date:p.end,
+    memo,created_at:today,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||''});});
   // v2.9.35: 세금계산서 미수취 항목은 memo에 "_NOINVOICE_" 접두사로 표시(비고 텍스트는 그대로 뒤에 보존).
   // 인건비의 급여형|{JSON}/사업소득형 태그와는 다른 네임스페이스라 comp_type이 인건비가 아닌 것으로
   // 이미 구분되니 충돌 없음. 기본값(수취=true)은 태그를 붙이지 않아 기존 데이터와 완전 호환.
@@ -505,14 +529,14 @@ async function saveEstimate(){
   if(!rows.length){n++;rows.push({estimate_id:`EST-2026-${String(n).padStart(3,'0')}`,pipeline_id:cur.pipeline_id,
     comp_type:'_EMPTY',item_name:'',grade:'',grade_set_id:'',qty:'',unit_price:'',buy_price:'',
     amount:'',mm:'',start_date:'',end_date:'',memo:'견적 항목 없음(의도적 삭제 표시)',created_at:today});}
-  const H=['estimate_id','pipeline_id','comp_type','item_name','grade','grade_set_id','qty','unit_price','buy_price','amount','mm','start_date','end_date','memo','created_at'];
+  const H=HEADERS.S12;
   const all=dedupe([...others,...rows],'estimate_id'); // PK 무결성 규칙
   const ok=await clearAndWrite(...W.S12,[H,...rowsFor(H,all)]);
   btn.disabled=false;btn.textContent='견적 저장 (S12)';
   if(ok){estimates=all;savedOnceThisSession.add(cur.pipeline_id);toast('✓ 견적 저장 완료');renderAllSummary();
     const newItems=all.filter(e=>e.pipeline_id===cur.pipeline_id);
-    const newSell=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.unit_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
-    const newBuy=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?Math.round((num(e.buy_price)||0)*(numF(e.mm)||0)):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
+    const newSell=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?laborAmt(e,'unit_price'):(num(e.qty)||1)*(num(e.unit_price)||0)),0);
+    const newBuy=newItems.reduce((x,e)=>x+(e.comp_type==='인건비'?laborAmt(e,'buy_price'):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
     const hist=[];
     if(prevItems.length&&prevSell!==newSell)hist.push({pl:cur.pipeline_id,target:'견적매출합계',old:prevSell,newv:newSell,reason:'견적 수정',source:'estimate'});
     if(prevItems.length&&prevBuy!==newBuy)hist.push({pl:cur.pipeline_id,target:'견적매입합계',old:prevBuy,newv:newBuy,reason:'견적 수정',source:'estimate'});

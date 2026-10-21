@@ -13,7 +13,7 @@ const R={ // 읽기 [시트명, 범위]
   S09:['S09_DASHBOARD','A1:H24'],
   S10:['S10_SETTINGS','A1:E300'],
   S11:['S11_GRADE_RATE','A1:H100'],
-  S12:['S12_ESTIMATE','A1:O500'],
+  S12:['S12_ESTIMATE','A1:U500'],
   S13:['S13_VAT','A1:N20'],
   S14:['S14_HISTORY','A1:H999'],
   S17:['S17_MILESTONE','A1:D300'],
@@ -32,7 +32,7 @@ const W={ // 쓰기 [시트명, 범위]
   S09:['S09_DASHBOARD','A:H'],
   S10:['S10_SETTINGS','A:E'],
   S11:['S11_GRADE_RATE','A:H'],
-  S12:['S12_ESTIMATE','A:O'],
+  S12:['S12_ESTIMATE','A:U'],
   S13:['S13_VAT','A:N'],
   S14:['S14_HISTORY','A:H'],
   S17:['S17_MILESTONE','A:D'],
@@ -59,7 +59,7 @@ const HEADERS={
   // v2.9.9: 저장 로직(settings.html)의 실제 헤더는 setting_key/setting_value — 구 정의(key/value)는 결함이었음(설계서 결정2 반영, 즉시 수정)
   S10:["setting_key", "setting_value", "description", "category", "updated_at"],
   S11:["set_id","set_name","grade","sell_price","buy_price","description","is_default","updated_at"],
-  S12:["estimate_id","pipeline_id","comp_type","item_name","grade","grade_set_id","qty","unit_price","buy_price","amount","mm","start_date","end_date","memo","created_at"],
+  S12:["estimate_id","pipeline_id","comp_type","item_name","grade","grade_set_id","qty","unit_price","buy_price","amount","mm","start_date","end_date","memo","created_at","mm_round","cut_unit","cut_mode","buy_mm_round","buy_cut_unit","buy_cut_mode"],
   S13:["vat_id","year","quarter_code","period_start","period_end","due_date","sales_vat","purchase_vat","estimated_payment","actual_payment","paid_date","cashflow_reflected","status","memo"],
   S14:["hist_id","changed_at","pipeline_id","target","old_value","new_value","reason","source"],
 };
@@ -232,4 +232,4 @@ const S10_CODE_USAGE={
 };
 const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유'};
 // 인력 설정값(S10 category=hr_setting) 중 파라미터 카드에서 편집하는 항목 [키, 기본값, 화면 라벨]
-const HR_SETTING_FIELDS=[['short_tenure_months',3,'단기 이력 기준'],['exit_alert_days',30,'철수 알림'],['reconfirm_days',90,'재확인']];
+const HR_SETTING_FIELDS=[['short_tenure_months',3,'단기 이력 기준'],['exit_alert_days',30,'철수 알림'],['reconfirm_days',90,'재확인'],['mm_round_digit',3,'일할 비율 반올림 자리'],['cut_unit',10000,'입사·퇴사월 금액 단위'],['cut_mode','절사','입사·퇴사월 금액 처리']];

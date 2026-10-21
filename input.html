@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.90">
+<link rel="stylesheet" href="css/common.css?v=2.9.92">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -243,10 +243,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.90"></script>
-<script src="js/common.js?v=2.9.90"></script>
-<script src="js/calc.js?v=2.9.90"></script>
-<script src="js/nav.js?v=2.9.90"></script>
+<script src="js/schema.js?v=2.9.92"></script>
+<script src="js/common.js?v=2.9.92"></script>
+<script src="js/calc.js?v=2.9.92"></script>
+<script src="js/nav.js?v=2.9.92"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -270,11 +270,13 @@ function nextId(list,key,prefix){
 // ── 로드 (재무필터 적용) ──
 async function loadAll(){
   try{
-    const [plR,prR,rvR,csR,fxR,esR,msR]=await Promise.all([
+    const [plR,prR,rvR,csR,fxR,esR,msR,s10R]=await Promise.all([
       fetchSheet(...R.S01),fetchSheet(...R.S03),
       fetchSheet(...R.S04),fetchSheet(...R.S05),fetchSheet(...R.S06),
       fetchSheet(...R.S12).catch(()=>[]),
-      fetchSheetSafe(...R.S17).catch(()=>null)]);
+      fetchSheetSafe(...R.S17).catch(()=>null),
+      fetchSheet(...R.S10).catch(()=>[])]);
+    calcApplySettings(toObj(s10R||[]));
     estAll=toObj(esR).filter(e=>e.estimate_id);
     milestonesLoadOk=(msR!==null);
     milestones=toObj(msR||[]).filter(m=>m.project_id);
@@ -411,8 +413,8 @@ function closeGenModal(){document.getElementById('genModal').classList.remove('o
 // v2.9.14: _EMPTY 마커(v2.9.13 — 견적을 의도적으로 비웠다는 표시)는 실제 견적 항목이 아니므로
 // 이 함수를 쓰는 모든 곳(신규 호출 포함)이 자동으로 안전하도록 여기서 한 번에 제외한다.
 function estOf(plId){return estAll.filter(e=>e.pipeline_id===plId&&e.comp_type!=='_EMPTY');}
-function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round(num(e.unit_price)*numF(e.mm)):(num(e.qty)||1)*num(e.unit_price)),0);}
-function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?Math.round(num(e.buy_price)*numF(e.mm)):(num(e.qty)||1)*num(e.buy_price)),0);}
+function estSellSum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?laborAmt(e,'unit_price'):(num(e.qty)||1)*num(e.unit_price)),0);}
+function estBuySum(it){return it.reduce((s,e)=>s+(e.comp_type==='인건비'?laborAmt(e,'buy_price'):(num(e.qty)||1)*num(e.buy_price)),0);}
 function cut100(v){return Math.floor(v/100)*100;}
 function profileToRows(byM,totalExact){
   // 라운딩 표준: 각 월 백원단위 절사, 차액은 마지막 월 산입 → 합계=totalExact 정확 일치
