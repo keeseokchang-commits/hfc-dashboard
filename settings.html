@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.96">
+<link rel="stylesheet" href="css/common.css?v=2.9.97">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -163,6 +163,8 @@
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">④ 기술 태그 <small style="color:var(--text3)">(인력 프로필 검색용 — 동의어는 콤마: React / 리액트,react)</small>
       <button onclick="addCode('skill_tag')" style="font-size:11px;margin-left:8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:3px 9px;cursor:pointer">+ 추가</button></div>
     <div id="ctSkill"></div>
+    <div style="font-size:12px;font-weight:700;margin:16px 0 6px">⑨ 누적 잔액 항목 <small style="color:var(--text3)">(나갔다가 나중에 돌아오는 돈 — 보증금·적금·가지급금 등. 자금수지의 「유형별 누적 잔액」 카드에 표시됩니다. 유형은 ①에 먼저 등록)</small></div>
+    <div id="ctBalance"></div><button class="btn-mini" onclick="addCode('balance_item')">+ 항목 추가</button>
     <!-- v2.9.73 SCR-12: 인력 모듈 코드표 ⑤~⑧ — 기술 태그와 같은 방식(이름 + 설명·동의어, ▲▼ 순서가 저장 순서) -->
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">⑤ 역할 <small style="color:var(--text3)">(인력 의뢰·후보자의 역할 구분 — 설명 칸에 동의어를 콤마로 적을 수 있습니다)</small></div>
     <div id="ctRole"></div><button class="btn-mini" onclick="addCode('role')">+ 역할 추가</button>
@@ -268,12 +270,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.96"></script>
-<script src="js/common.js?v=2.9.96"></script>
-<script src="js/cmn-sheet.js?v=2.9.96"></script>
-<script src="js/cmn-init.js?v=2.9.96"></script>
-<script src="js/calc.js?v=2.9.96"></script>
-<script src="js/nav.js?v=2.9.96"></script>
+<script src="js/schema.js?v=2.9.97"></script>
+<script src="js/common.js?v=2.9.97"></script>
+<script src="js/cmn-sheet.js?v=2.9.97"></script>
+<script src="js/cmn-init.js?v=2.9.97"></script>
+<script src="js/calc.js?v=2.9.97"></script>
+<script src="js/nav.js?v=2.9.97"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -541,7 +543,7 @@ async function saveParams(){
 window.addEventListener('load',()=>{ loadRates(); loadSettings(); });
 
 // ═══ v1.2 코드 관리 (#10,#14,#15) ═══
-let codeRows={txn_type:[],branch_rule:[],fixed_item:[],skill_tag:[],role:[],industry:[],project_type:[],fail_reason:[]}; // v2.9.73: 인력 모듈 코드 4종 추가
+let codeRows={txn_type:[],branch_rule:[],fixed_item:[],skill_tag:[],balance_item:[],role:[],industry:[],project_type:[],fail_reason:[]}; // v2.9.73: 인력 모듈 코드 4종 추가
 const DEF_TYPES=[['매출입금',''],['매입지급',''],['고정비',''],['급여',''],['세금',''],['법인카드',''],['AI사용료',''],['기타비용',''],['기타입금','']];
 async function loadCodes(){
  try{
@@ -549,7 +551,7 @@ async function loadCodes(){
   // v2.9.45: txn_type만 description 컬럼에 저장된 "집계 버킷"을 세 번째 요소로 함께 복원.
   // description은 그동안 이 카테고리들에서 항상 빈 문자열로만 저장되던 컬럼이라 스키마 변경 없이 재사용.
   codeRows.txn_type=rows.filter(r=>r.category==='txn_type').map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.description||'']);
-  ['branch_rule','fixed_item','skill_tag',...S10_HR_CODE_CATS].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
+  ['branch_rule','fixed_item','skill_tag','balance_item',...S10_HR_CODE_CATS].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
   if(!codeRows.txn_type.length){
     // v2.9.42: 이 폴백도 옛 key/value 필드명이라 항상 빈 값만 반환하던 결함 — setting_key/setting_value로 정정.
     const kw=k=>(rows.find(r=>r.setting_key===k)||{}).setting_value||'';
@@ -590,6 +592,21 @@ function renderCodes(){
     <button onclick="moveCode('txn_type',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
     <button onclick="moveCode('txn_type',${i},1)" title="우선순위 내리기" ${i===codeRows.txn_type.length-1?'disabled style="opacity:.25"':''}>▼</button>
     <button onclick="codeRows['txn_type'].splice(${i},1);renderCodes()">✕</button></div>`).join('');
+  document.getElementById('ctBalance').innerHTML=codeRows.balance_item.map((r,i)=>{
+    const names=codeRows.txn_type.map(t=>String(t[0]||'').trim()).filter(Boolean);
+    const cur=String(r[0]||'').trim(), miss=cur&&!names.includes(cur);
+    return `<div class="code-row">
+    <select onchange="codeRows['balance_item'][${i}][0]=this.value;renderCodes()">
+      <option value="">거래 유형 선택…</option>
+      ${(miss?[cur]:[]).concat(names).map(n=>`<option value="${escAttr(n)}" ${n===cur?'selected':''}>${escAttr(n)}${n===cur&&miss?' (①에 없음)':''}</option>`).join('')}
+    </select>
+    <select onchange="codeRows['balance_item'][${i}][1]=this.value">
+      <option value="출금" ${r[1]!=='입금'?'selected':''}>먼저 나간 돈 (출금 → 나중에 입금으로 회수)</option>
+      <option value="입금" ${r[1]==='입금'?'selected':''}>먼저 받은 돈 (입금 → 나중에 출금으로 반환)</option>
+    </select>
+    <button onclick="moveCode('balance_item',${i},-1)" title="순서 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
+    <button onclick="moveCode('balance_item',${i},1)" title="순서 내리기" ${i===codeRows.balance_item.length-1?'disabled style="opacity:.25"':''}>▼</button>
+    <button onclick="codeRows['balance_item'].splice(${i},1);renderCodes()">✕</button></div>`;}).join('');
   document.getElementById('ctBranch').innerHTML=mk('branch_rule','거래점 패턴 (예: 하나은행0026)','적용 유형 (예: 법인카드)',true);
   document.getElementById('ctFixed').innerHTML=mk('fixed_item','항목명 (예: 임차료)','대사 키워드(선택)');
   document.getElementById('ctSkill').innerHTML=mk('skill_tag','태그명 (예: React)','동의어 콤마구분 (예: 리액트,react)');
@@ -607,7 +624,7 @@ function moveCode(c,i,d){
   [codeRows[c][i],codeRows[c][j]]=[codeRows[c][j],codeRows[c][i]];
   renderCodes();
 }
-function addCode(c){codeRows[c].push(['','']);renderCodes();}
+function addCode(c){codeRows[c].push(c==='balance_item'?['','출금']:['','']);renderCodes();}
 // v2.9.73 SCR-12 — 코드 삭제 전 사용 건수 확인(설계서 R2: 사용 중이어도 확인 뒤 삭제 허용, 기존 기록에는 값만 남음)
 async function codeUsage(c,name){
   const spec=S10_CODE_USAGE[c]||[]; const keys=[...new Set(spec.map(x=>x[0]))];
@@ -628,11 +645,12 @@ async function delCode(c,i){
 function dupCodeName(){
   for(const c of S10_HR_CODE_CATS){ const seen=new Set();
     for(const r of codeRows[c]){ const n=String(r[0]||'').trim(); if(!n) continue; if(seen.has(n)) return {c,n}; seen.add(n); } }
+  { const seen=new Set(); for(const r of codeRows.balance_item){ const n=String(r[0]||'').trim(); if(!n) continue; if(seen.has(n)) return {c:'balance_item',n}; seen.add(n); } }
   return null;
 }
 async function saveCodes(){
   const dup=dupCodeName();
-  if(dup){ toast(`같은 이름의 코드가 있습니다. (${S10_CODE_LABEL[dup.c]}: ${dup.n})`,true); return; }
+  if(dup){ toast(`같은 이름의 코드가 있습니다. (${S10_CODE_LABEL[dup.c]||'누적 잔액 항목'}: ${dup.n})`,true); return; }
   const today=new Date().toISOString().slice(0,10);
   // v2.9.38: 헤더 컬럼 순서를 saveSettingsToSheet()와 통일 — 항상 category가 C열, description이 D열.
   const H=['setting_key','setting_value','category','description','updated_at'];

@@ -1,6 +1,6 @@
 // HFC scr-request-detail.js v2.9.76 — STF-SCR-02 의뢰 상세 (개발 단계 ①: 영역 ①②③④⑦ + 실패·취소)
 // 근거: 프로그램 설계서 §5(SCR-02). 한 의뢰를 접수 → 요청 라인 → 서치업체 발송 → 회신 관리 순서로 처리한다.
-// 사업기회 승격·견적에 반영은 js/scr-request-promote.js (v2.9.96)
+// 사업기회 승격·견적에 반영은 js/scr-request-promote.js (v2.9.97)
 // 의존: schema.js, common.js, cmn-sheet.js, cmn-derive.js, cmn-msg.js, hr-ui.js
 const q$=(root,sel)=>root.querySelector(sel);
 let REQ_ID=null, IS_NEW=false;

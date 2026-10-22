@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.96">
+<link rel="stylesheet" href="css/common.css?v=2.9.97">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -205,6 +205,18 @@
     </div>
   </div>
 
+  <!-- v2.9.97: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
+       설정 ⑨(S10 category=balance_item)에 등록한 유형의 전체 기간 누적 지급·반환·잔액을 보여준다. -->
+  <div class="card" id="balCard">
+    <div class="card-title">유형별 누적 잔액 <span style="font-size:11px;color:var(--text3);font-weight:400">※ 전체 기간 누적 · 항목은 설정 ⑨에서 추가/삭제</span></div>
+    <div style="overflow-x:auto">
+      <table class="cf-table">
+        <thead><tr><th>유형</th><th>구분</th><th>누적 출금</th><th>누적 입금</th><th>잔액</th><th>최근 거래일</th></tr></thead>
+        <tbody id="balBody"><tr><td colspan="6"><div class="empty-state">등록된 항목이 없습니다. 설정 ⑨에서 추가하세요.</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- 통장 대사 -->
   <div class="card" id="reconCard" style="display:none">
     <div class="card-title">🔗 통장 대사 <button onclick="openTxModal()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-lt,#EFF6FF);color:var(--blue);cursor:pointer;font-weight:600">📄 CSV 거래 내역</button> <span id="reconSummary" style="font-size:11px;color:var(--text3);font-weight:400"></span></div>
@@ -361,10 +373,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.96"></script>
-<script src="js/common.js?v=2.9.96"></script>
-<script src="js/calc.js?v=2.9.96"></script>
-<script src="js/nav.js?v=2.9.96"></script>
+<script src="js/schema.js?v=2.9.97"></script>
+<script src="js/common.js?v=2.9.97"></script>
+<script src="js/calc.js?v=2.9.97"></script>
+<script src="js/nav.js?v=2.9.97"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1099,6 +1111,7 @@ async function loadSheets(){
     renderPlanAct();
     initFixCompareSelectors();
     renderFixCompareItems();
+    renderBalanceCard();
     renderStaleEstBanner();
     renderVatBanner();
     renderAging();
@@ -1199,6 +1212,40 @@ function fciDetailRow(c,ym){
 document.addEventListener('click',e=>{
   const tr=e.target.closest&&e.target.closest('#fixCompareBody tr.fci-row'); if(!tr) return;
   const c=tr.dataset.cat; if(fciOpen.has(c)) fciOpen.delete(c); else fciOpen.add(c); renderFixCompareItems();
+});
+const balOpen=new Set();
+const balNorm=v=>String(v??'').replace(/\s+/g,'');
+function balItems(){ return (s10All||[]).filter(r=>r.category==='balance_item'&&(r.setting_key||'').trim()).map(r=>({name:r.setting_key.trim(),dir:r.setting_value==='입금'?'입금':'출금'})); }
+function balTxs(name){ const k=balNorm(name); return detailAll.filter(t=>balNorm(t.category)===k).sort((a,b)=>String(a.txn_date||'').localeCompare(String(b.txn_date||''))||String(a.txn_id||'').localeCompare(String(b.txn_id||''))); }
+function balDetailRow(it){
+  const txs=balTxs(it.name);
+  const th='font-size:10px;color:var(--text3);font-weight:600;padding:4px 6px;text-align:right;border-bottom:1px solid var(--border)';
+  const td='font-size:11px;padding:4px 6px;text-align:right;border-bottom:1px dashed var(--border);font-weight:400';
+  let run=0;
+  const body=txs.length?txs.map(t=>{ const o=num(t.outflow_amt)||0,i=num(t.inflow_amt)||0; run+=it.dir==='출금'?(o-i):(i-o);
+    return `<tr><td style="${td};text-align:left">${fciEsc(t.txn_date||'─')}</td><td style="${td};text-align:left">${fciEsc(t.description||'─')}</td><td style="${td}">${o?won(o,false):'─'}</td><td style="${td}">${i?won(i,false):'─'}</td><td style="${td}">${won(run,false)}</td></tr>`;}).join('')
+    :`<tr><td colspan="5" style="${td};text-align:left;color:var(--text3)">거래 내역이 없습니다.</td></tr>`;
+  return `<tr class="bal-detail"><td colspan="6" style="background:var(--surface2,#F8FAFC);padding:8px 12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th};text-align:left">거래일</th><th style="${th};text-align:left">내용</th><th style="${th}">출금</th><th style="${th}">입금</th><th style="${th}">누적 잔액</th></tr></thead><tbody>${body}</tbody></table></td></tr>`;
+}
+function renderBalanceCard(){
+  const el=document.getElementById('balBody'); if(!el) return;
+  const items=balItems();
+  if(!items.length){ el.innerHTML='<tr><td colspan="6"><div class="empty-state">등록된 항목이 없습니다. 설정 ⑨에서 추가하세요.</div></td></tr>'; return; }
+  el.innerHTML=items.map(it=>{
+    const txs=balTxs(it.name);
+    const o=txs.reduce((a,t)=>a+(num(t.outflow_amt)||0),0), i=txs.reduce((a,t)=>a+(num(t.inflow_amt)||0),0);
+    const bal=it.dir==='출금'?o-i:i-o;
+    const last=txs.length?(txs[txs.length-1].txn_date||'─'):'─';
+    const open=balOpen.has(it.name);
+    return `<tr class="bal-row" data-name="${fciEsc(it.name)}" style="cursor:pointer" title="클릭하면 거래별 잔액 흐름을 보여줍니다"><td><span style="color:var(--text3);font-size:10px;margin-right:4px">${open?'▼':'▶'}</span>${fciEsc(it.name)}</td>
+      <td style="text-align:center">${it.dir==='출금'?'받을 돈':'갚을 돈'}</td>
+      <td style="text-align:right">${o?won(o,false):'─'}</td><td style="text-align:right">${i?won(i,false):'─'}</td>
+      <td style="text-align:right;font-weight:700" class="${bal<0?'neg':''}">${won(bal,false)}</td><td style="text-align:center">${fciEsc(last)}</td></tr>${open?balDetailRow(it):''}`;
+  }).join('');
+}
+document.addEventListener('click',e=>{
+  const tr=e.target.closest&&e.target.closest('#balBody tr.bal-row'); if(!tr) return;
+  const n=tr.dataset.name; if(balOpen.has(n)) balOpen.delete(n); else balOpen.add(n); renderBalanceCard();
 });
 function renderFixCompareItems(){
   const y=document.getElementById('fciYear').value, m=document.getElementById('fciMonth').value;
@@ -1778,7 +1825,7 @@ async function recalcEstimate(){
     if(ok){
       const er=await fetchSheet(...R.S02); estData=toObj(er);
       document.getElementById('recalcInfo').textContent=`마지막 재계산 ${today} (${weighted?'확도가중 ON':'확정분만'})`;
-      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderFixCompareItems(); renderStaleEstBanner();
+      toast('✓ 추정 자금수지 재계산 완료'); renderAll(); renderPlanAct(); renderFixCompareItems(); renderBalanceCard(); renderStaleEstBanner();
     } else toast('재계산 저장 실패',true);
   }catch(e){toast('재계산 오류: '+e.message,true);}
   btn.disabled=false;btn.textContent='추정 재계산 실행';
