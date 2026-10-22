@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.95">
+<link rel="stylesheet" href="css/common.css?v=2.9.96">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -243,10 +243,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.95"></script>
-<script src="js/common.js?v=2.9.95"></script>
-<script src="js/calc.js?v=2.9.95"></script>
-<script src="js/nav.js?v=2.9.95"></script>
+<script src="js/schema.js?v=2.9.96"></script>
+<script src="js/common.js?v=2.9.96"></script>
+<script src="js/calc.js?v=2.9.96"></script>
+<script src="js/nav.js?v=2.9.96"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -539,7 +539,7 @@ function buildGen(){
     if(document.getElementById('genDoRev').checked&&c.revAmt){
       // v2.9.32: UI 표준(매출·매입 대칭) — 매입 미리보기의 "항목" 컬럼과 동일하게 매출도 항목명을 유지.
       const ms=ymList(c.start,c.end); const totW=ms.reduce((x,y)=>x+y.w,0); let acc=0;
-      // v2.9.95(사용자 지적 2026-10-21): 매출 기준이 "견적 매출 합계"이고 견적의 월별 매출(일할 계산 반영)이 프로젝트 기간의 달과
+      // v2.9.96(사용자 지적 2026-10-21): 매출 기준이 "견적 매출 합계"이고 견적의 월별 매출(일할 계산 반영)이 프로젝트 기간의 달과
       // 정확히 같은 달들이면, 견적의 월별 금액(입사·퇴사월 일할, 비율·올림/절사 옵션 포함)을 그대로 쓴다 — 일수 가중 안분은 견적과 다른 금액을 만든다.
       // 달이 다르면(견적 기간이 계약기간을 못 채우는 경우 등, v2.9.64 사례) 기존처럼 계약기간 안분.
       const byM=(c.revBase==='est'&&c.hasEst)?monthlyProfile(c.items,'unit_price',c.start,c.end):null;

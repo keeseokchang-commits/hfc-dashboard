@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.95">
+<link rel="stylesheet" href="css/common.css?v=2.9.96">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -194,8 +194,8 @@
        재집계한다(계획과 실적이 같은 이름 체계를 공유한다는 원칙, 원칙40 참고). -->
   <div class="card">
     <div class="card-title">고정비 항목별 계획 대비 실적 <span style="font-size:11px;color:var(--text3)">※ 항목명이 코드 관리에서 등록한 유형명과 일치해야 정확히 비교됨</span>
-      <select id="fciYear" onchange="renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select>
-      <select id="fciMonth" onchange="renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></select>
+      <select id="fciYear" onchange="fciOpen.clear();renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select>
+      <select id="fciMonth" onchange="fciOpen.clear();renderFixCompareItems()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></select>
     </div>
     <div style="overflow-x:auto">
       <table class="cf-table">
@@ -361,10 +361,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.95"></script>
-<script src="js/common.js?v=2.9.95"></script>
-<script src="js/calc.js?v=2.9.95"></script>
-<script src="js/nav.js?v=2.9.95"></script>
+<script src="js/schema.js?v=2.9.96"></script>
+<script src="js/common.js?v=2.9.96"></script>
+<script src="js/calc.js?v=2.9.96"></script>
+<script src="js/nav.js?v=2.9.96"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1171,6 +1171,35 @@ function initFixCompareSelectors(){
   ms.innerHTML=['01','02','03','04','05','06','07','08','09','10','11','12']
     .map(m=>`<option value="${m}" ${m===curM?'selected':''}>${parseInt(m)}월</option>`).join('');
 }
+// 고정비 항목별 계획 대비 실적 — 행을 누르면 그 달의 계획 내역(fixed.html 계획 행)과 실적 내역(통장 거래)을 펼쳐 보여준다(사용자 요청 2026-10-22).
+// 실적은 합계와 같은 기준(순지출: 출금−입금)이며, 같은 유형명으로 들어온 입금(환급·회수)도 거래 목록에 함께 보여 순지출이 어떻게 나왔는지 확인할 수 있다.
+const fciOpen=new Set();
+const fciEsc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function fciDetailRow(c,ym){
+  const plans=planFix.filter(f=>f.year_month===ym&&(f.category||'미지정')===c).sort((a,b)=>String(a.payment_date||'').localeCompare(String(b.payment_date||'')));
+  const txs=detailAll.filter(t=>t.year_month===ym&&(t.category||'미분류')===c&&((num(t.outflow_amt)||0)-(num(t.inflow_amt)||0))).sort((a,b)=>String(a.txn_date||'').localeCompare(String(b.txn_date||'')));
+  const th='font-size:10px;color:var(--text3);font-weight:600;padding:4px 6px;text-align:right;border-bottom:1px solid var(--border)';
+  const td='font-size:11px;padding:4px 6px;text-align:right;border-bottom:1px dashed var(--border);font-weight:400';
+  const tdl=td+';text-align:left';
+  const planBody=plans.length?plans.map(f=>{
+    const amt=f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0);
+    const ids=splitIds?splitIds(f.matched_txn_id):[];
+    return `<tr><td style="${tdl}">${fciEsc(f.payment_date||'─')}</td><td style="${tdl}">${fciEsc(f.memo||'─')}${f.has_tax_invoice==='Y'?' <span style="font-size:10px;color:var(--text3)">(세금계산서·부가세 포함)</span>':''}</td><td style="${td}">${won(amt,false)}</td><td style="${td}">${ids.length?'대사 '+ids.length+'건':'<span style="color:var(--text3)">미대사</span>'}</td></tr>`;}).join('')
+    :`<tr><td colspan="4" style="${tdl};color:var(--text3)">이 달 계획이 없는 항목입니다(예산 외).</td></tr>`;
+  let sum=0;
+  const txBody=txs.length?txs.map(t=>{ const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0); sum+=net;
+    return `<tr><td style="${tdl}">${fciEsc(t.txn_date||'─')}</td><td style="${tdl}">${fciEsc(t.description||'─')}</td><td style="${td}" class="${net<0?'pos':''}">${net<0?'−'+won(-net,false)+' (입금)':won(net,false)}</td></tr>`;}).join('')
+    +`<tr><td colspan="2" style="${tdl};font-weight:600">순지출 합계</td><td style="${td};font-weight:700">${won(sum,false)}</td></tr>`
+    :`<tr><td colspan="3" style="${tdl};color:var(--text3)">이 달 통장 거래가 없습니다(미집행).</td></tr>`;
+  return `<tr class="fci-detail"><td colspan="4" style="background:var(--surface2,#F7F8FA);padding:10px 12px;text-align:left"><div style="display:flex;gap:16px;flex-wrap:wrap">
+    <div style="flex:1 1 300px;min-width:0"><div style="font-size:11px;font-weight:700;margin-bottom:4px">계획 내역 (${plans.length}건)</div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th};text-align:left">지급 예정일</th><th style="${th};text-align:left">내용</th><th style="${th}">금액</th><th style="${th}">대사</th></tr></thead><tbody>${planBody}</tbody></table></div>
+    <div style="flex:1 1 300px;min-width:0"><div style="font-size:11px;font-weight:700;margin-bottom:4px">실적 내역 (통장 거래 ${txs.length}건)</div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th};text-align:left">거래일</th><th style="${th};text-align:left">내용</th><th style="${th}">순지출</th></tr></thead><tbody>${txBody}</tbody></table></div>
+  </div></td></tr>`;
+}
+document.addEventListener('click',e=>{
+  const tr=e.target.closest&&e.target.closest('#fixCompareBody tr.fci-row'); if(!tr) return;
+  const c=tr.dataset.cat; if(fciOpen.has(c)) fciOpen.delete(c); else fciOpen.add(c); renderFixCompareItems();
+});
 function renderFixCompareItems(){
   const y=document.getElementById('fciYear').value, m=document.getElementById('fciMonth').value;
   if(!y||!m){ document.getElementById('fixCompareBody').innerHTML='<tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr>'; return; }
@@ -1205,9 +1234,10 @@ function renderFixCompareItems(){
     const diff=a-p;
     const tag=!plan[c]&&actual[c]?'<span style="font-size:10px;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:1px 4px;margin-left:4px">예산 외</span>'
       :plan[c]&&!actual[c]?'<span style="font-size:10px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 4px;margin-left:4px">미집행</span>':'';
-    return `<tr><td>${c}${tag}</td><td style="text-align:right">${p?won(p,false):'─'}</td>
+    const open=fciOpen.has(c);
+    return `<tr class="fci-row" data-cat="${fciEsc(c)}" style="cursor:pointer" title="클릭하면 상세 내역을 보여줍니다"><td><span style="color:var(--text3);font-size:10px;margin-right:4px">${open?'▼':'▶'}</span>${fciEsc(c)}${tag}</td><td style="text-align:right">${p?won(p,false):'─'}</td>
       <td style="text-align:right">${a?won(a,false):'─'}</td>
-      <td style="text-align:right" class="${diff<=0?'pos':'neg'}">${diff===0?'─':(diff>0?'+':'')+won(diff,false)}</td></tr>`;
+      <td style="text-align:right" class="${diff<=0?'pos':'neg'}">${diff===0?'─':(diff>0?'+':'')+won(diff,false)}</td></tr>${open?fciDetailRow(c,ym):''}`;
   }).join('');
   const totalRow=`<tr style="border-top:2px solid var(--border);font-weight:700"><td>합계</td>
     <td style="text-align:right">${won(tp,false)}</td><td style="text-align:right">${won(ta,false)}</td>
