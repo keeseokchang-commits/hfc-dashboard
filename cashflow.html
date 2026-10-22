@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.97">
+<link rel="stylesheet" href="css/common.css?v=2.9.98">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -205,14 +205,15 @@
     </div>
   </div>
 
-  <!-- v2.9.97: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
+  <!-- v2.9.98: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
        설정 ⑨(S10 category=balance_item)에 등록한 유형의 전체 기간 누적 지급·반환·잔액을 보여준다. -->
   <div class="card" id="balCard">
-    <div class="card-title">유형별 누적 잔액 <span style="font-size:11px;color:var(--text3);font-weight:400">※ 전체 기간 누적 · 항목은 설정 ⑨에서 추가/삭제</span></div>
+    <div class="card-title">유형별 누적 잔액 <select id="balYear" onchange="renderBalanceCard()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select> <span style="font-size:11px;color:var(--text3);font-weight:400">※ 잔액은 연도와 무관하게 처음부터 누적 · 항목은 설정 ⑨에서 추가/삭제</span></div>
+    <div id="balWarn" style="display:none;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#B91C1C"></div>
     <div style="overflow-x:auto">
       <table class="cf-table">
-        <thead><tr><th>유형</th><th>구분</th><th>누적 출금</th><th>누적 입금</th><th>잔액</th><th>최근 거래일</th></tr></thead>
-        <tbody id="balBody"><tr><td colspan="6"><div class="empty-state">등록된 항목이 없습니다. 설정 ⑨에서 추가하세요.</div></td></tr></tbody>
+        <thead><tr><th>유형</th><th>구분</th><th>연초 이월</th><th>해당 연도 출금</th><th>해당 연도 입금</th><th>잔액</th><th>최근 거래일</th></tr></thead>
+        <tbody id="balBody"><tr><td colspan="7"><div class="empty-state">등록된 항목이 없습니다. 설정 ⑨에서 추가하세요.</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -373,10 +374,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.97"></script>
-<script src="js/common.js?v=2.9.97"></script>
-<script src="js/calc.js?v=2.9.97"></script>
-<script src="js/nav.js?v=2.9.97"></script>
+<script src="js/schema.js?v=2.9.98"></script>
+<script src="js/common.js?v=2.9.98"></script>
+<script src="js/calc.js?v=2.9.98"></script>
+<script src="js/nav.js?v=2.9.98"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1225,20 +1226,35 @@ function balDetailRow(it){
   const body=txs.length?txs.map(t=>{ const o=num(t.outflow_amt)||0,i=num(t.inflow_amt)||0; run+=it.dir==='출금'?(o-i):(i-o);
     return `<tr><td style="${td};text-align:left">${fciEsc(t.txn_date||'─')}</td><td style="${td};text-align:left">${fciEsc(t.description||'─')}</td><td style="${td}">${o?won(o,false):'─'}</td><td style="${td}">${i?won(i,false):'─'}</td><td style="${td}">${won(run,false)}</td></tr>`;}).join('')
     :`<tr><td colspan="5" style="${td};text-align:left;color:var(--text3)">거래 내역이 없습니다.</td></tr>`;
-  return `<tr class="bal-detail"><td colspan="6" style="background:var(--surface2,#F8FAFC);padding:8px 12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th};text-align:left">거래일</th><th style="${th};text-align:left">내용</th><th style="${th}">출금</th><th style="${th}">입금</th><th style="${th}">누적 잔액</th></tr></thead><tbody>${body}</tbody></table></td></tr>`;
+  return `<tr class="bal-detail"><td colspan="7" style="background:var(--surface2,#F8FAFC);padding:8px 12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th};text-align:left">거래일</th><th style="${th};text-align:left">내용</th><th style="${th}">출금</th><th style="${th}">입금</th><th style="${th}">누적 잔액</th></tr></thead><tbody>${body}</tbody></table></td></tr>`;
 }
 function renderBalanceCard(){
   const el=document.getElementById('balBody'); if(!el) return;
   const items=balItems();
-  if(!items.length){ el.innerHTML='<tr><td colspan="6"><div class="empty-state">등록된 항목이 없습니다. 설정 ⑨에서 추가하세요.</div></td></tr>'; return; }
+  // 기준 연도 선택: 거래가 있는 연도 + 올해, 기본 올해. '전체'는 이월 없이 처음부터 합산.
+  const sel=document.getElementById('balYear'), thisY=String(new Date().getFullYear());
+  const ys=[...new Set([thisY,...detailAll.map(t=>String(t.txn_date||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y))])].sort().reverse();
+  const keep=sel.value||thisY;
+  sel.innerHTML=ys.map(y=>`<option value="${y}">${y}년</option>`).join('')+'<option value="all">전체</option>';
+  sel.value=(keep==='all'||ys.includes(keep))?keep:thisY;
+  const Y=sel.value;
+  // 읽기 범위(S08_DETAIL 2000행) 경고: 범위가 차면 오래된 거래가 빠져 잔액이 틀릴 수 있다.
+  const warn=document.getElementById('balWarn'), n=detailAll.length;
+  if(n>=1900){ warn.style.display='block'; warn.textContent=n>=1990?`⚠ 거래 내역이 읽기 범위(2,000행)를 채웠습니다. 오래된 거래가 빠져 잔액이 실제와 다를 수 있으니 범위 확대가 필요합니다.`:`⚠ 거래 내역이 ${n.toLocaleString()}건으로 읽기 범위(2,000행)에 가까워졌습니다. 곧 범위 확대가 필요합니다.`; }
+  else warn.style.display='none';
+  if(!items.length){ el.innerHTML='<tr><td colspan="7"><div class="empty-state">등록된 항목이 없습니다. 설정 ⑨에서 추가하세요.</div></td></tr>'; return; }
   el.innerHTML=items.map(it=>{
-    const txs=balTxs(it.name);
-    const o=txs.reduce((a,t)=>a+(num(t.outflow_amt)||0),0), i=txs.reduce((a,t)=>a+(num(t.inflow_amt)||0),0);
-    const bal=it.dir==='출금'?o-i:i-o;
+    const txs=balTxs(it.name), sg=t=>it.dir==='출금'?(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0):(num(t.inflow_amt)||0)-(num(t.outflow_amt)||0);
+    const inY=t=>Y==='all'||String(t.txn_date||'').slice(0,4)===Y;
+    const carry=Y==='all'?0:txs.filter(t=>String(t.txn_date||'').slice(0,4)<Y).reduce((a,t)=>a+sg(t),0);
+    const cur=txs.filter(inY);
+    const o=cur.reduce((a,t)=>a+(num(t.outflow_amt)||0),0), i=cur.reduce((a,t)=>a+(num(t.inflow_amt)||0),0);
+    const bal=txs.filter(t=>Y==='all'||String(t.txn_date||'').slice(0,4)<=Y).reduce((a,t)=>a+sg(t),0);
     const last=txs.length?(txs[txs.length-1].txn_date||'─'):'─';
     const open=balOpen.has(it.name);
     return `<tr class="bal-row" data-name="${fciEsc(it.name)}" style="cursor:pointer" title="클릭하면 거래별 잔액 흐름을 보여줍니다"><td><span style="color:var(--text3);font-size:10px;margin-right:4px">${open?'▼':'▶'}</span>${fciEsc(it.name)}</td>
       <td style="text-align:center">${it.dir==='출금'?'받을 돈':'갚을 돈'}</td>
+      <td style="text-align:right">${carry?won(carry,false):'─'}</td>
       <td style="text-align:right">${o?won(o,false):'─'}</td><td style="text-align:right">${i?won(i,false):'─'}</td>
       <td style="text-align:right;font-weight:700" class="${bal<0?'neg':''}">${won(bal,false)}</td><td style="text-align:center">${fciEsc(last)}</td></tr>${open?balDetailRow(it):''}`;
   }).join('');

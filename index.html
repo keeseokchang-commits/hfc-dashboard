@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 경영관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.97">
+<link rel="stylesheet" href="css/common.css?v=2.9.98">
 <style>
   :root {
     --bg:        #F2F4F7;
@@ -271,10 +271,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.97"></script>
-<script src="js/common.js?v=2.9.97"></script>
-<script src="js/calc.js?v=2.9.97"></script>
-<script src="js/nav.js?v=2.9.97"></script>
+<script src="js/schema.js?v=2.9.98"></script>
+<script src="js/common.js?v=2.9.98"></script>
+<script src="js/calc.js?v=2.9.98"></script>
+<script src="js/nav.js?v=2.9.98"></script>
 <script>
 // ── 설정 ──────────────────────────────────────────────────────
 
@@ -388,7 +388,7 @@ async function render() {
     const yrCosts = costs.filter(c => (c.year_month||'').startsWith(yr));
     const yrFixed = fixed.filter(f => (f.year_month||'').startsWith(yr));
 
-    // v2.9.97: 이월 잔고 = 올해 12월을 넘어 내년 이후로 잡힌 매출(공급가액) 합 — 프로젝트 상태 필터는 연간 매출과 동일
+    // v2.9.98: 이월 잔고 = 올해 12월을 넘어 내년 이후로 잡힌 매출(공급가액) 합 — 프로젝트 상태 필터는 연간 매출과 동일
     const carryRevs = revenues.filter(r => (r.year_month||'').slice(0,4) > yr);
     const carryOver = carryRevs.reduce((s, r) => s + (num(r.tax_invoice_amt)||0), 0);
     const carryPrj  = new Set(carryRevs.map(r => r.project_id)).size;
