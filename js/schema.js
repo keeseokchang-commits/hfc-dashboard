@@ -191,7 +191,7 @@ Object.assign(ST,{STAGE8,GRADE4,
   PARTY_ROLES:['고객','최종 고객사','중개업자','서치업체','인력업체','개인','경로'],
   PERSON_LEVEL:['주력','가능','보조']});
 // 코드 관리(S10) 카테고리 — 설정 저장·코드 저장이 함께 쓰는 단일 목록(SCR-12: 두 곳으로 흩어져 있던 목록을 한 곳으로 합침)
-const S10_LEGACY_CODE_CATS=['txn_type','branch_rule','fixed_item','skill_tag','balance_item'];          // 기존 코드 카테고리(balance_item: 자금수지 유형별 누적 잔액 대상 — key=거래유형명, value=기준 방향 출금/입금)
+const S10_LEGACY_CODE_CATS=['txn_type','branch_rule','fixed_item','skill_tag','balance_item','recon_exclude'];          // 기존 코드 카테고리(balance_item: 자금수지 유형별 누적 잔액 대상 — key=거래유형명, value=기준 방향 출금/입금; recon_exclude: 통장 대사 목록에서 뺄 유형 — key=거래유형명)
 const S10_HR_CODE_CATS=['role','industry','project_type','fail_reason'];                  // 인력 모듈 코드 카테고리
 const S10_CODE_CATS=[...S10_LEGACY_CODE_CATS,...S10_HR_CODE_CATS];                         // 코드 관리 화면이 관리하는 카테고리
 const S10_HR_SETTING_CAT='hr_setting';                                                     // 인력 설정값 카테고리(코드 저장·키워드 저장 모두 보존)

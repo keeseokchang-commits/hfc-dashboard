@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.98">
+<link rel="stylesheet" href="css/common.css?v=2.9.99">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -205,7 +205,7 @@
     </div>
   </div>
 
-  <!-- v2.9.98: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
+  <!-- v2.9.99: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
        설정 ⑨(S10 category=balance_item)에 등록한 유형의 전체 기간 누적 지급·반환·잔액을 보여준다. -->
   <div class="card" id="balCard">
     <div class="card-title">유형별 누적 잔액 <select id="balYear" onchange="renderBalanceCard()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select> <span style="font-size:11px;color:var(--text3);font-weight:400">※ 잔액은 연도와 무관하게 처음부터 누적 · 항목은 설정 ⑨에서 추가/삭제</span></div>
@@ -374,10 +374,10 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.98"></script>
-<script src="js/common.js?v=2.9.98"></script>
-<script src="js/calc.js?v=2.9.98"></script>
-<script src="js/nav.js?v=2.9.98"></script>
+<script src="js/schema.js?v=2.9.99"></script>
+<script src="js/common.js?v=2.9.99"></script>
+<script src="js/calc.js?v=2.9.99"></script>
+<script src="js/nav.js?v=2.9.99"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1341,6 +1341,9 @@ function renderVatBanner(){
 // isCat()으로 두 함수 모두 bucketOf()를 거치도록 통일 — 코드관리에 등록이 없어 하드코딩 폴백이 그대로
 // canonical 문자열을 반환하는 기존 케이스(raw===canon)도 그대로 보존되어 회귀 없음.
 function isCat(raw,canon){ return raw===canon || bucketOf(raw)===canon; }
+// v2.9.99: 설정 ⑩ 「대사 제외 유형」(S10 category=recon_exclude) — 매입 건이 없는 지급(보증금 등)·계산서 없는 지급이 미매칭 목록에 영원히 남는 문제.
+// 대사(자동·수동) 대상에서만 빼며 월별 집계·버킷은 그대로다.
+function reconExcluded(cat){ const k=String(cat??'').replace(/\s+/g,''); return (s10All||[]).some(r=>r.category==='recon_exclude'&&String(r.setting_key||'').replace(/\s+/g,'')===k&&k); }
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 // v2.9.69(사용자 지적): 고정비 계획은 예산 추정치라 실제 지급과 금액이 정확히 안 맞을 수 있고,
 // 계획 1건에 실제 지급이 여러 건(분할 지급 — 예: 차량구입 500만원 계획을 100만원×5회로 지급)으로
@@ -1373,7 +1376,7 @@ async function saveS06(next){
 async function reconcile(){
   if(!parsedTxns.length){renderAging();return;}
   // v2.4.2 보수 원칙(매입과 대칭): 발행 완료 건만 · 후보 정확히 1건일 때만 자동 · 사용된 거래ID 재매칭 금지
-  const deps=parsedTxns.filter(t=>isCat(t.cat,'매출입금')&&t.inAmt>0);
+  const deps=parsedTxns.filter(t=>isCat(t.cat,'매출입금')&&t.inAmt>0&&!reconExcluded(t.cat));
   const usedTxnR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const open=s04All.filter(r=>r.is_received!=='Y'&&r.invoice_date);
   const used=new Set(); unmatchedDep=[]; const matches=[];
@@ -1393,7 +1396,7 @@ async function reconcile(){
     else toast('대사 결과 저장 실패',true);
   }
   // ── 매입 지급 대사 (승인 범위: 재무 프로젝트 + 세금계산서 수취완료 건만 · 후보 1건일 때만 자동) ──
-  const outs=parsedTxns.filter(t=>isCat(t.cat,'매입지급')&&t.outAmt>0);
+  const outs=parsedTxns.filter(t=>isCat(t.cat,'매입지급')&&t.outAmt>0&&!reconExcluded(t.cat));
   const eligible=()=>s05All.filter(c=>okPrjSet.has(c.project_id)&&c.invoice_date&&!c.pay_actual_date);
   unmatchedOut=[]; const cMatches=[];
   const usedC=new Set();
@@ -1416,7 +1419,7 @@ async function reconcile(){
   // ── v2.9.41: 고정비 지급 대사(매입 지급 대사와 동일 원칙, 사용자 확정) — 세금계산서 수취 항목만
   // amount+vat_amt(부가세 포함 실지급액), 미수취 항목은 amount 그대로가 실제 지급액. 매입처럼
   // 발행/수취 개념이 없으므로 "이미 대사되지 않은 모든 고정비 계획"이 대상.
-  const foutS=parsedTxns.filter(t=>isCat(t.cat,'고정비')&&t.outAmt>0);
+  const foutS=parsedTxns.filter(t=>isCat(t.cat,'고정비')&&t.outAmt>0&&!reconExcluded(t.cat));
   const fixedEligible=()=>planFix.filter(f=>!f.pay_actual_date);
   unmatchedFix=[]; const fMatches=[];
   const usedF=new Set();
@@ -1447,11 +1450,11 @@ function rebuildRecon(){ // v1.2(#11,#13): 재진입 시 S08_DETAIL로 대사 �
   const mR=new Set(s04All.map(r=>r.matched_txn_id).filter(Boolean));
   const mC=new Set(s05All.map(c=>c.matched_txn_id).filter(Boolean));
   const mF=new Set(planFix.flatMap(f=>splitIds(f.matched_txn_id))); // v2.9.41, 콤마 목록 지원(v2.9.69)
-  unmatchedDep=detailAll.filter(t=>isCat(t.category,'매출입금')&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
+  unmatchedDep=detailAll.filter(t=>isCat(t.category,'매출입금')&&!reconExcluded(t.category)&&!mR.has(t.txn_id)&&(num(t.inflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,inAmt:num(t.inflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedOut=detailAll.filter(t=>isCat(t.category,'매입지급')&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+  unmatchedOut=detailAll.filter(t=>isCat(t.category,'매입지급')&&!reconExcluded(t.category)&&!mC.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
-  unmatchedFix=detailAll.filter(t=>isCat(t.category,'고정비')&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
+  unmatchedFix=detailAll.filter(t=>isCat(t.category,'고정비')&&!reconExcluded(t.category)&&!mF.has(t.txn_id)&&(num(t.outflow_amt)||0)>0)
     .map(t=>({date:t.txn_date,ym:t.year_month,desc:t.description,recv:t.recv,outAmt:num(t.outflow_amt)||0,txnId:t.txn_id,cat:t.category}));
   renderRecon();
   const rc=document.getElementById('reconCard'); if(rc) rc.style.display='block';
