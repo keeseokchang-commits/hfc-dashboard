@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 월마감 리포트</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.105">
+<link rel="stylesheet" href="css/common.css?v=2.9.106">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -140,7 +140,7 @@
     <div class="rp-opt">
       <label><input type="checkbox" id="optSub" onchange="applyOpt()"> 출금 예정은 소계만 출력 (한 장 맞춤)</label>
       <button class="btn btn-secondary" style="flex:none;padding:6px 12px" onclick="skipAllOverdue()">기준일 이전 경과 미결 전체 처리됨</button>
-      <button class="btn btn-secondary" style="flex:none;padding:6px 12px" onclick="clearSkips()">처리됨 표시 모두 해제</button>
+      <button class="btn btn-secondary" style="flex:none;padding:6px 12px" onclick="clearSkips()">처리됨 모두 되돌리기</button>
       <button class="btn btn-green" style="flex:none;padding:6px 16px" onclick="window.print()">🖨 인쇄 / PDF 저장</button>
     </div>
     <div id="srcNote" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
@@ -151,12 +151,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.105"></script>
-<script src="js/common.js?v=2.9.105"></script>
-<script src="js/calc.js?v=2.9.105"></script>
-<script src="js/payout.js?v=2.9.105"></script>
-<script src="js/nav.js?v=2.9.105"></script>
+<script src="js/schema.js?v=2.9.106"></script>
+<script src="js/common.js?v=2.9.106"></script>
+<script src="js/calc.js?v=2.9.106"></script>
+<script src="js/payout.js?v=2.9.106"></script>
+<script src="js/nav.js?v=2.9.106"></script>
 <script>
+let cutoff='',showDone=false;
 let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const todayStr=()=>new Date(Date.now()+9*3600*1000).toISOString().slice(0,10);
@@ -174,7 +175,7 @@ async function loadAll(){
     D.fix=toObj(fxR||[]).filter(f=>f.fixed_id); D.vat=toObj(vtR||[]).filter(v=>v.vat_id);
     D.detail=dedupe(toObj(dtR).filter(r=>r.txn_id),'txn_id');
     s10=toObj(stR); const settings={}; s10.forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
-    D.settings=settings; skips={}; s10.filter(r=>r.category==='report_skip').forEach(r=>skips[r.setting_key.replace(/^rskip:/,'')]=r.setting_value);
+    D.settings=settings; cutoff=(s10.find(r=>r.setting_key==='report_cutoff')||{}).setting_value||''; skips={}; s10.filter(r=>r.category==='report_skip').forEach(r=>skips[r.setting_key.replace(/^rskip:/,'')]=r.setting_value);
     const est=toObj(esR).filter(e=>e.estimate_id); D.po=poR?toObj(poR).filter(r=>r.payout_id):[];
     const plan=poBuildPlan(prjOk,est,D.po,okPrj); D.poCosts=plan.costs; D.fallback=plan.fallbackProjects;
     // 기준 잔액: 저장된 값 → 없으면 통장 CSV의 마지막 잔액
@@ -211,7 +212,7 @@ function recalc(){
   document.getElementById('srcNote').textContent=usedCsv?'통장 CSV의 마지막 잔액이 더 최신이라 그 값을 기준으로 씁니다 ('+csvBal.date+').':'';
   if(!base||!end){ document.getElementById('paper').innerHTML=''; return; }
   const all=buildItems().filter(x=>x.date<=end);
-  all.forEach(x=>{ x.over=x.date<=base; x.skip=!!skips[x.id]&&x.over; });
+  all.forEach(x=>{ x.over=x.date<=base; x.byCut=!!cutoff&&x.date<=cutoff; x.skip=x.over&&(x.byCut||!!skips[x.id]); });
   items=all;
   const live=all.filter(x=>!x.skip);
   const sum=dir=>live.filter(x=>x.dir===dir).reduce((s,x)=>s+x.amt,0);
@@ -260,12 +261,17 @@ function render(s){
   const inv2=D.cost.filter(c=>!c.invoice_date&&c.invoice_plan_date&&c.invoice_plan_date<=s.end&&num2(c.amount)).sort((a,b)=>a.invoice_plan_date.localeCompare(b.invoice_plan_date));
   const invT=(list,vatf,amtf)=>list.length?`<table class="rp-t"><thead><tr><th style="width:44px">예정일</th><th>프로젝트</th><th style="width:84px">공급가액</th><th style="width:76px">부가세</th></tr></thead><tbody>`+list.map(r=>`<tr><td class="c">${r.invoice_plan_date.slice(5)}</td><td class="l">${esc(P(r.project_id))}${r.person_name?' · '+esc(r.person_name):''}</td><td class="n">${won(amtf(r))}</td><td class="n">${won(vatf(r))}</td></tr>`).join('')+'</tbody></table>':'<div style="color:#777;font-size:10px">없음</div>';
   h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="rp-h"><span>발행할 매출 세금계산서 (${inv1.length}건)</span></div>${invT(inv1,r=>num2(r.vat_amt),r=>num2(r.tax_invoice_amt))}</div><div><div class="rp-h"><span>수취할 매입 세금계산서 (${inv2.length}건)</span></div>${invT(inv2,r=>num2(r.vat_amt)||Math.round(num2(r.amount)*0.1),r=>num2(r.amount))}</div></div>`;
-  // 경과 미결
-  h+=`<div class="rp-h"><span>경과 미결 (기준일 이전 예정일, 아직 입금·지급 처리가 안 된 건)</span><span>${over.length}건</span></div>`+
-    (over.length?`<table class="rp-t"><thead><tr><th style="width:44px">예정일</th><th>내용</th><th style="width:40px">구분</th><th style="width:96px">금액</th><th class="scr-only" style="width:70px">이미 처리됨</th></tr></thead><tbody>`+
-      over.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>`<tr class="${x.skip?'skip':''}${x.skip?' nov-print':''}"><td class="c">${x.date.slice(5)}</td><td class="l">${esc(x.grp)} · ${esc(x.label)}${estTag(x)}</td><td class="c">${x.dir==='in'?'입금':'출금'}</td><td class="n">${x.dir==='in'?'':'-'}${won(x.amt)}</td><td class="c scr-only"><input type="checkbox" ${x.skip?'checked':''} onchange="toggleSkip('${esc(x.id)}',this.checked)"></td></tr>`).join('')+'</tbody></table>'
+  // 경과 미결 — 처리됨으로 표시한 건은 목록에서 빼고 화면 아래에 접어 둔다(출력에는 나오지 않는다)
+  const shown=over.filter(x=>!x.skip).sort((a,b)=>a.date.localeCompare(b.date)), done=over.filter(x=>x.skip).sort((a,b)=>a.date.localeCompare(b.date));
+  h+=`<div class="rp-h"><span>경과 미결 (기준일 이전 예정일, 아직 입금·지급 처리가 안 된 건)</span><span>${shown.length}건</span></div>`+
+    (shown.length?`<table class="rp-t"><thead><tr><th style="width:44px">예정일</th><th>내용</th><th style="width:40px">구분</th><th style="width:96px">금액</th><th class="scr-only" style="width:70px">이미 처리됨</th></tr></thead><tbody>`+
+      shown.map(x=>`<tr><td class="c">${x.date.slice(5)}</td><td class="l">${esc(x.grp)} · ${esc(x.label)}${estTag(x)}</td><td class="c">${x.dir==='in'?'입금':'출금'}</td><td class="n">${x.dir==='in'?'':'-'}${won(x.amt)}</td><td class="c scr-only"><input type="checkbox" onchange="toggleSkip('${esc(x.id)}',this.checked)"></td></tr>`).join('')+'</tbody></table>'
       :'<div style="color:#777;font-size:10px">없음</div>');
-  h+=`<div class="rp-memo">가정: 기준 잔액(${s.base}) 이후의 계획만 반영합니다. 경과 미결은 예상 잔액에 포함하고, 「이미 처리됨」으로 표시한 건은 제외했습니다. 「추정」은 금액이 아직 확정되지 않은 건입니다. 사업소득·급여의 원천세·4대보험은 지급 익월 10일 납부 기준입니다.</div>`;
+  if(done.length){
+    h+=`<div class="scr-only" style="margin-top:6px;font-size:11px;color:#555"><a href="#" onclick="showDone=!showDone;recalc();return false" style="color:#2563EB">처리됨 ${done.length}건 ${showDone?'접기':'펼치기'}</a>${cutoff?` · ${cutoff} 이전 예정분은 일괄 처리됨`:''}</div>`;
+    if(showDone) h+=`<table class="rp-t scr-only" style="margin-top:4px;color:#777"><tbody>`+done.map(x=>`<tr><td class="c" style="width:44px">${x.date.slice(5)}</td><td class="l">${esc(x.grp)} · ${esc(x.label)}</td><td class="c" style="width:40px">${x.dir==='in'?'입금':'출금'}</td><td class="n" style="width:96px">${x.dir==='in'?'':'-'}${won(x.amt)}</td><td class="c" style="width:70px">${x.byCut?'<span style="font-size:9px">일괄</span>':`<input type="checkbox" checked onchange="toggleSkip('${esc(x.id)}',this.checked)">`}</td></tr>`).join('')+'</tbody></table>';
+  }
+  h+=`<div class="rp-memo">가정: 기준 잔액(${s.base}) 이후의 계획만 반영합니다. 경과 미결은 예상 잔액에 포함하고, 「이미 처리됨」으로 표시한 건은 제외했습니다. 「추정」은 금액이 아직 확정되지 않은 건입니다. 사업소득·급여의 원천세·4대보험은 지급 스케줄에 정한 납부일 기준입니다.</div>`;
   document.getElementById('paper').innerHTML=h; applyOpt();
 }
 function applyOpt(){ document.getElementById('paper').classList.toggle('sub-only',document.getElementById('optSub').checked); }
@@ -275,25 +281,49 @@ async function writeS10(mut){
   const ok=await clearAndWrite(...W.S10,[HEADERS.S10,...rows.map(r=>HEADERS.S10.map(h=>r[h]??''))]);
   if(ok) s10=rows; return ok;
 }
+const mkRow=(k,v,desc,cat)=>({setting_key:k,setting_value:v,description:desc,category:cat,updated_at:todayStr()});
+// 처리됨 표시 정리: 이미 통장 대사·지급 처리가 끝났거나 사라진 건, 일괄 처리 기준일 이전 건의 개별 표시는 지운다 — 시간이 지나도 쌓이지 않게 한다
+function pruneSkips(rows,cut){
+  const valid=new Set(buildItems().filter(x=>!(cut&&x.date<=cut)).map(x=>x.id));
+  return rows.filter(r=>r.category!=='report_skip'||valid.has(r.setting_key.replace(/^rskip:/,'')));
+}
+function syncSkips(rows){ skips={}; rows.filter(r=>r.category==='report_skip').forEach(r=>skips[r.setting_key.replace(/^rskip:/,'')]=r.setting_value); }
 async function saveBase(){
   const d=document.getElementById('baseDate').value, a=un(document.getElementById('baseBal').value);
   if(!d){ toast('기준일을 입력해 주세요',true); return; }
-  let reset=false; if(Object.keys(skips).length) reset=confirm('새 기준 잔액에는 그 이후 처리분이 이미 들어 있으므로, 이전에 「이미 처리됨」으로 표시한 건을 모두 해제할까요?\n(확인 = 해제, 취소 = 유지)');
+  const pend=buildItems().filter(x=>x.date<=d&&!(cutoff&&x.date<=cutoff)&&!skips[x.id]).length;
+  let cut=cutoff; if(pend&&confirm(`새 기준 잔액에는 ${d} 이전에 처리된 입금·지급이 이미 반영되어 있습니다.\n그 날짜 이전 예정인 미결 ${pend}건을 모두 「처리됨」으로 볼까요?\n(확인 = 처리됨으로 정리, 취소 = 경과 미결 목록에 그대로 둠)`)) cut=d;
   const btn=document.getElementById('btnSaveBase'); btn.disabled=true;
-  const ok=await writeS10(rows=>{ rows=rows.filter(r=>r.setting_key!=='report_balance'&&!(reset&&r.category==='report_skip'));
-    rows.push({setting_key:'report_balance',setting_value:d+'|'+a,description:'월마감 리포트 기준 잔액(기준일|금액)',category:'report_balance',updated_at:todayStr()}); return rows; });
+  const ok=await writeS10(rows=>{ rows=rows.filter(r=>r.setting_key!=='report_balance'&&r.setting_key!=='report_cutoff');
+    rows.push(mkRow('report_balance',d+'|'+a,'월마감 리포트 기준 잔액(기준일|금액)','report_balance'));
+    if(cut) rows.push(mkRow('report_cutoff',cut,'월마감 리포트 처리 완료 기준일(이 날짜 이전 예정 미결은 처리됨)','report_cutoff'));
+    rows=pruneSkips(rows,cut); syncSkips(rows); return rows; });
   btn.disabled=false;
-  if(ok){ if(reset) skips={}; usedCsv=false; toast('✓ 기준 잔액을 저장했습니다'); recalc(); } else toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true);
+  if(ok){ cutoff=cut; usedCsv=false; toast('✓ 기준 잔액을 저장했습니다'); recalc(); } else toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true);
 }
 async function setSkips(ids,on){
   const ok=await writeS10(rows=>{ rows=rows.filter(r=>!(r.category==='report_skip'&&ids.includes(r.setting_key.replace(/^rskip:/,''))));
-    if(on) ids.forEach(id=>rows.push({setting_key:'rskip:'+id,setting_value:todayStr(),description:'월마감 리포트 처리됨 표시',category:'report_skip',updated_at:todayStr()})); return rows; });
-  if(ok){ ids.forEach(id=>{ if(on) skips[id]=todayStr(); else delete skips[id]; }); recalc(); } else { toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true); recalc(); }
+    if(on) ids.forEach(id=>rows.push(mkRow('rskip:'+id,todayStr(),'월마감 리포트 처리됨 표시','report_skip')));
+    rows=pruneSkips(rows,cutoff); syncSkips(rows); return rows; });
+  if(!ok) toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true);
+  recalc();
 }
 function toggleSkip(id,on){ setSkips([id],on); }
-function skipAllOverdue(){ const ids=items.filter(x=>x.over&&!x.skip).map(x=>x.id); if(!ids.length){ toast('처리됨으로 바꿀 경과 미결이 없습니다'); return; }
-  if(confirm(`기준일 이전 경과 미결 ${ids.length}건을 모두 「이미 처리됨」으로 표시할까요? (원본 데이터는 바뀌지 않습니다)`)) setSkips(ids,true); }
-function clearSkips(){ const ids=Object.keys(skips); if(!ids.length){ toast('해제할 표시가 없습니다'); return; } if(confirm(`처리됨 표시 ${ids.length}건을 모두 해제할까요?`)) setSkips(ids,false); }
+async function skipAllOverdue(){
+  const base=document.getElementById('baseDate').value; const n=items.filter(x=>x.over&&!x.skip).length;
+  if(!n){ toast('처리됨으로 바꿀 경과 미결이 없습니다'); return; }
+  if(!confirm(`기준일(${base}) 이전 경과 미결 ${n}건을 모두 「이미 처리됨」으로 정리할까요?\n날짜 한 줄만 저장하며, 원본 데이터는 바뀌지 않습니다.`)) return;
+  const ok=await writeS10(rows=>{ rows=rows.filter(r=>r.setting_key!=='report_cutoff'); rows.push(mkRow('report_cutoff',base,'월마감 리포트 처리 완료 기준일(이 날짜 이전 예정 미결은 처리됨)','report_cutoff')); rows=pruneSkips(rows,base); syncSkips(rows); return rows; });
+  if(ok) cutoff=base; else toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true);
+  recalc();
+}
+async function clearSkips(){
+  const n=items.filter(x=>x.skip).length; if(!n){ toast('해제할 표시가 없습니다'); return; }
+  if(!confirm(`처리됨으로 정리한 ${n}건을 모두 경과 미결로 되돌릴까요?`)) return;
+  const ok=await writeS10(rows=>{ rows=rows.filter(r=>r.category!=='report_skip'&&r.setting_key!=='report_cutoff'); syncSkips(rows); return rows; });
+  if(ok) cutoff=''; else toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true);
+  recalc();
+}
 window.addEventListener('load',loadAll);
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
