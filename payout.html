@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 지급 스케줄</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.103">
+<style>
+  :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .main{padding:14px 14px 80px}
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+  .q-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+  .q-card:hover{border-color:var(--blue)}
+  .q-card.sel{border-color:var(--blue);background:var(--blue-lt)}
+  .q-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .q-name{font-size:14px;font-weight:700}
+  .q-due{font-size:11px;color:var(--text3)}
+  .badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px}
+  .b-wait{background:var(--amber-lt);color:var(--amber)}
+  .b-done{background:var(--green-lt);color:var(--green)}
+  .b-calc{background:#F1F5F9;color:#64748B}
+  .q-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px}
+  .q-nums .lbl{color:var(--text3);margin-bottom:2px}
+  .q-nums .val{font-weight:700;font-size:13px}
+  .q-nums .val.pay{color:var(--red)}
+  .detail-table{width:100%;border-collapse:collapse;font-size:12px}
+  .detail-table th{font-size:11px;color:var(--text3);text-align:right;padding:6px;border-bottom:2px solid var(--border)}
+  .detail-table th:first-child,.detail-table td:first-child{text-align:left}
+  .detail-table td{padding:7px 6px;border-bottom:1px solid var(--border);text-align:right}
+  .detail-table tr.sum td{font-weight:700;color:var(--blue);border-bottom:none}
+  .fi{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+  .fi:focus{border-color:var(--blue)}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .fl{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+  .btn{padding:11px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;flex:1}
+  .btn-primary{background:var(--blue);color:#fff}.btn-primary:disabled{background:var(--text3)}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-row{display:flex;gap:8px;margin-top:12px}
+  .pay-formula{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:12px;font-size:13px;color:#92400E;margin-bottom:12px;line-height:1.6}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}.tab-item .tab-icon{font-size:20px}
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:760px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);outline:none}
+  .po-wrap{overflow-x:auto}
+  .po-t{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
+  .po-t th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;white-space:nowrap}
+  .po-t td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .po-t td.c{text-align:center;white-space:nowrap}.po-t td.n{text-align:right;white-space:nowrap}
+  .po-t input.fi{padding:5px 6px;font-size:12px;text-align:right}
+  .po-t input.fi.d{text-align:center}
+  .po-t tr.remit td{background:var(--surface2);color:var(--text2)}
+  .po-t tr.lock td{opacity:.75}
+  .tag{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap}
+  .tag-est{background:var(--amber-lt);color:var(--amber)}.tag-ok{background:var(--green-lt);color:var(--green)}.tag-old{background:var(--red-lt);color:var(--red)}.tag-n{background:var(--blue-lt);color:var(--blue)}
+  .po-note{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:10px;line-height:1.6}
+  .po-info{background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;font-size:12px;color:#1E40AF;margin-bottom:10px;line-height:1.6}
+  .po-sum{width:100%;border-collapse:collapse;font-size:12px}
+  .po-sum th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center}
+  .po-sum td{padding:6px 4px;border-bottom:1px solid var(--border);text-align:right}.po-sum td:first-child{text-align:center}
+
+</style>
+</head>
+<body data-page="payout">
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>지급 스케줄</span></div>
+  <button class="btn-icon" onclick="location.href='cashflow.html'">💵</button>
+  <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
+</header>
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div class="card">
+    <div class="card-title">프로젝트 선택 <span style="font-size:11px;color:var(--text3);font-weight:400">계산서 없는 지급(급여·사업소득·기타경비)과 원천세·4대보험 납부를 월별로 관리합니다</span></div>
+    <select class="fi" id="prjSel" onchange="selectProject(this.value)"><option value="">불러오는 중…</option></select>
+  </div>
+
+  <div class="card" id="schCard" style="display:none">
+    <div class="card-title"><span id="schTitle"></span>
+      <span style="display:flex;gap:6px"><button class="btn btn-primary" style="flex:none;padding:8px 14px" id="btnSave" onclick="saveSchedule()">저장</button></span></div>
+    <div id="schInfo"></div>
+    <div class="po-wrap"><table class="po-t"><thead><tr><th>귀속월</th><th>구분</th><th style="text-align:left">대상</th><th>세전</th><th>원천세</th><th>근로자 4대보험</th><th>회사부담</th><th>실지급·납부액</th><th>지급일</th><th>상태</th><th></th></tr></thead><tbody id="schBody"></tbody></table></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">지급일을 직접 바꾸면 그 행은 다시 생성해도 유지됩니다. 확정한 행은 견적을 바꿔도 덮어쓰지 않고 금액이 다르면 알려 드립니다. 기본 지급일은 설정 화면에서 정합니다.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">월별 현금 합계 <span style="font-size:11px;color:var(--text3);font-weight:400">저장된 지급 스케줄 전체 (지급일 기준)</span></div>
+    <div class="po-wrap" id="sumArea"></div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.103"></script>
+<script src="js/common.js?v=2.9.103"></script>
+<script src="js/calc.js?v=2.9.103"></script>
+<script src="js/payout.js?v=2.9.103"></script>
+<script src="js/nav.js?v=2.9.103"></script>
+<script>
+let prjs=[],ests=[],payouts=[],settings={},sel=null,work=[],dirty=false,merged=null,haveSheet=false;
+const TYPE_ORDER={'급여':1,'사업소득':2,'기타경비':3,'원천세':4,'4대보험':5};
+const wf=n=>comma(n);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nowStr=()=>new Date(Date.now()+9*3600*1000).toISOString().slice(0,10);
+async function loadAll(){
+  try{
+    const [plR,prR,esR,stR,poR]=await Promise.all([fetchSheet(...R.S01),fetchSheet(...R.S03),fetchSheet(...R.S12),fetchSheetSafe(...R.S10).catch(()=>null),fetchSheetSafe(...R.S15).catch(()=>null)]);
+    const pls=toObj(plR), okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    prjs=toObj(prR).filter(p=>p.project_id&&okPl.has(p.pipeline_id));
+    ests=toObj(esR).filter(e=>e.pipeline_id);
+    settings={}; toObj(stR||[]).forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
+    haveSheet=!!poR; payouts=poR?toObj(poR).filter(r=>r.payout_id):[];
+    renderSelect(); renderSummary();
+  }catch(e){ toast('로드 실패: '+e.message,true); }
+}
+function renderSelect(){
+  const has=new Set(payouts.map(r=>r.project_id));
+  const opt=prjs.map(p=>{
+    const hasItems=ests.some(e=>e.pipeline_id===p.pipeline_id&&poIsNonInvoice(e));
+    return `<option value="${esc(p.project_id)}">${esc(p.project_name||p.project_id)}${hasItems?(has.has(p.project_id)?'  ✓ 생성됨':'  · 지급 스케줄 미생성'):'  (계산서 없는 지급 없음)'}</option>`;
+  }).join('');
+  document.getElementById('prjSel').innerHTML='<option value="">프로젝트를 선택하세요</option>'+opt;
+}
+function selectProject(pid){
+  if(dirty&&!confirm('저장하지 않은 변경이 있습니다. 다른 프로젝트로 이동할까요?')){ document.getElementById('prjSel').value=sel?sel.project_id:''; return; }
+  dirty=false; sel=prjs.find(p=>p.project_id===pid)||null;
+  document.getElementById('schCard').style.display=sel?'block':'none';
+  if(!sel) return;
+  const items=ests.filter(e=>e.pipeline_id===sel.pipeline_id), gen=poGenerate(sel,items,settings);
+  const saved=payouts.filter(r=>r.project_id===pid);
+  if(saved.length){ merged=poMerge(saved,gen); work=merged.rows.map(r=>({...r}));
+    work.filter(r=>(r.pay_type==='급여'||r.pay_type==='사업소득')&&r.date_edited==='Y').forEach(syncRemit);
+    const sig=r=>[r.payout_id,...poAmtKeys.map(k=>poN(r[k])),r.payment_date,r.est_status,r.memo||''].join('|');
+    const a=new Set(saved.map(sig)); dirty=work.length!==saved.length||work.some(r=>!a.has(sig(r))); }
+  else { merged=null; work=gen.map(r=>({...r})); dirty=gen.length>0; }
+  renderSchedule();
+}
+function sorted(){ return work.map((r,i)=>({r,i})).sort((a,b)=>a.r.year_month.localeCompare(b.r.year_month)||String(a.r.person_name).replace(/^.* · /,'').localeCompare(String(b.r.person_name).replace(/^.* · /,''))||(TYPE_ORDER[a.r.pay_type]-TYPE_ORDER[b.r.pay_type])); }
+function renderSchedule(){
+  document.getElementById('schTitle').textContent=(sel.project_name||sel.project_id)+' — 지급 스케줄';
+  let info='';
+  const saved=payouts.some(r=>r.project_id===sel.project_id);
+  if(!work.length) info='<div class="po-info">이 프로젝트의 견적에는 계산서 없는 지급(급여형·사업소득형·계산서 미수취 비용)이 없습니다.</div>';
+  else if(!saved) info='<div class="po-note">아직 저장되지 않은 미리보기입니다. 지급일·금액을 확인하고 「저장」을 누르면 자금수지에 반영됩니다. 그 전까지 자금수지는 견적 계산(기존 방식)을 사용합니다.</div>';
+  else if(merged&&(merged.added||merged.updated)) info=`<div class="po-note">견적 변경이 반영된 미리보기입니다(추가 ${merged.added}건·변경 ${merged.updated}건). 「저장」을 눌러야 자금수지에 반영됩니다.</div>`;
+  if(merged&&merged.changedLocked.length) info+=`<div class="po-note">확정·지급완료 행 ${merged.changedLocked.length}건은 견적 금액이 달라졌지만 덮어쓰지 않았습니다. 필요하면 해당 행을 직접 수정하세요.</div>`;
+  if(merged&&merged.orphans.length) info+=`<div class="po-note">견적에서 사라진 기존 행 ${merged.orphans.length}건이 있습니다(「견적에 없음」 표시). 필요 없으면 행 끝의 삭제 버튼으로 지우세요.</div>`;
+  document.getElementById('schInfo').innerHTML=info;
+  const orphan=new Set(merged?merged.orphans:[]);
+  document.getElementById('schBody').innerHTML=sorted().map(({r,i})=>{
+    const remit=PO_REMIT.includes(r.pay_type), lock=poLocked(r), isSal=r.pay_type==='급여', isBiz=r.pay_type==='사업소득';
+    const num=(f,editable)=>editable?`<input class="fi" value="${poN(r[f])?comma(r[f]):''}" onchange="editAmt(${i},'${f}',this.value)">`:(poN(r[f])?comma(r[f]):'');
+    const edG=!remit, edW=isSal||isBiz, edI=isSal, edE=isSal;
+    const cash=poCash(r);
+    const memoTag=r.memo?` <span class="tag tag-old">${esc(r.memo)}</span>`:'';
+    return `<tr class="${remit?'remit':''}${lock?' lock':''}"><td class="c">${esc(r.year_month)}</td><td class="c">${esc(r.pay_type)}</td>
+      <td>${esc(r.person_name)}${memoTag}${orphan.has(r.payout_id)?' <span class="tag tag-old">견적에 없음</span>':''}</td>
+      <td class="n">${remit?'':num('gross_amt',edG)}</td><td class="n">${remit?'':num('withheld_amt',edW)}</td><td class="n">${remit?'':num('ins_emp_amt',edI)}</td><td class="n">${remit?'':num('employer_amt',edE)}</td>
+      <td class="n"><b>${wf(cash)}</b></td>
+      <td class="c"><input type="date" class="fi d" style="width:132px" value="${esc(r.payment_date)}" onchange="editDate(${i},this.value)"></td>
+      <td class="c">${remit?`<span class="tag tag-n">${esc(r.est_status||'추정')}</span>`:`<select class="fi d" style="width:68px;text-align:center" onchange="editStatus(${i},this.value)"><option ${r.est_status!=='확정'?'selected':''}>추정</option><option ${r.est_status==='확정'?'selected':''}>확정</option></select>`}</td>
+      <td class="c">${(!lock&&orphan.has(r.payout_id))?`<button class="btn-icon" style="width:26px;height:26px" onclick="delRow(${i})">✕</button>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px">표시할 행이 없습니다</td></tr>';
+}
+function remitId(r,type){ return r.payout_id.replace('-'+PO_CODE[r.pay_type]+'-','-'+PO_CODE[type]+'-'); }
+function syncRemit(r){
+  const targets=r.pay_type==='급여'?[['원천세',poN(r.withheld_amt)],['4대보험',poN(r.ins_emp_amt)+poN(r.employer_amt)]]:(r.pay_type==='사업소득'?[['원천세',poN(r.withheld_amt)]]:[]);
+  targets.forEach(([type,amt])=>{
+    const id=remitId(r,type); const t=work.find(x=>x.payout_id===id);
+    if(t){ if(poLocked(t)) return; t.gross_amt=amt; t.net_amt=amt; t.est_status=r.est_status; if(t.date_edited!=='Y') t.payment_date=poRemitRow(r,type,amt,settings).payment_date; }
+    else if(amt>0) work.push(poRemitRow(r,type,amt,settings));
+  });
+}
+function editAmt(i,f,v){
+  const r=work[i]; r[f]=un(v);
+  if(r.pay_type==='사업소득'&&f==='gross_amt') r.withheld_amt=poBizTax(r.gross_amt).w;
+  if(r.pay_type==='급여') r.net_amt=poN(r.gross_amt)-poN(r.withheld_amt)-poN(r.ins_emp_amt);
+  else if(r.pay_type==='사업소득') r.net_amt=poN(r.gross_amt)-poN(r.withheld_amt);
+  else r.net_amt=poN(r.gross_amt);
+  if(r.memo&&r.memo.startsWith('기존 입력')&&r.pay_type==='사업소득') r.memo='';
+  syncRemit(r); dirty=true; renderSchedule();
+}
+function editDate(i,v){ const r=work[i]; r.payment_date=v; r.date_edited='Y'; syncRemit(r); dirty=true; renderSchedule(); }
+function editStatus(i,v){ const r=work[i]; r.est_status=v; syncRemit(r); work.forEach(t=>{ if(PO_REMIT.includes(t.pay_type)&&t.est_item===r.est_item&&t.year_month===r.year_month&&!poLocked(t)) t.est_status=v; }); dirty=true; renderSchedule(); }
+function delRow(i){ work.splice(i,1); dirty=true; renderSchedule(); }
+async function saveSchedule(){
+  if(!sel) return;
+  const btn=document.getElementById('btnSave'); btn.disabled=true;
+  try{
+    const mine=work.filter(r=>poN(r.gross_amt)||poN(r.net_amt)||poN(r.employer_amt)).map(r=>({...r,updated_at:nowStr()}));
+    const others=payouts.filter(r=>r.project_id!==sel.project_id);
+    const all=[...others,...mine];
+    if(!(await ensureSheet(R.S15[0],HEADERS.S15))) throw new Error('지급 스케줄 탭을 준비하지 못했습니다');
+    if(!(await clearAndWrite(...W.S15,[HEADERS.S15,...rowsFor(HEADERS.S15,all)]))) throw new Error('시트 저장 실패 — 로그인 상태와 권한을 확인해 주세요');
+    payouts=all; haveSheet=true; dirty=false; merged=null; work=mine.map(r=>({...r}));
+    toast(`✓ 저장 완료 (${mine.length}행)`); renderSelect(); document.getElementById('prjSel').value=sel.project_id; renderSchedule(); renderSummary();
+  }catch(e){ toast(e.message,true); }
+  btn.disabled=false;
+}
+function renderSummary(){
+  const byM={};
+  payouts.forEach(r=>{ const m=String(r.payment_date||r.year_month).slice(0,7); const o=byM[m]=byM[m]||{'급여':0,'사업소득':0,'기타경비':0,'원천세':0,'4대보험':0}; o[r.pay_type]=(o[r.pay_type]||0)+poCash(r); });
+  const ms=Object.keys(byM).sort();
+  document.getElementById('sumArea').innerHTML=ms.length?`<table class="po-sum"><thead><tr><th>지급월</th><th>급여</th><th>사업소득</th><th>기타경비</th><th>원천세 납부</th><th>4대보험 납부</th><th>합계</th></tr></thead><tbody>`+
+    ms.map(m=>{ const o=byM[m], t=Object.values(o).reduce((a,b)=>a+b,0); return `<tr><td>${m}</td><td>${wf(o['급여'])}</td><td>${wf(o['사업소득'])}</td><td>${wf(o['기타경비'])}</td><td>${wf(o['원천세'])}</td><td>${wf(o['4대보험'])}</td><td><b>${wf(t)}</b></td></tr>`; }).join('')+'</tbody></table>'
+    :'<div style="font-size:12px;color:var(--text3);padding:8px">저장된 지급 스케줄이 없습니다. 프로젝트를 선택해 저장하면 여기에 월별 합계가 나옵니다.</div>';
+}
+window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+window.addEventListener('load',loadAll);
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

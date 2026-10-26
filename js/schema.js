@@ -17,6 +17,7 @@ const R={ // 읽기 [시트명, 범위]
   S13:['S13_VAT','A1:N20'],
   S14:['S14_HISTORY','A1:H999'],
   S17:['S17_MILESTONE','A1:D300'],
+  S15:['S15_PAYOUT','A1:R3000'],   // v2.9.103 지급 스케줄(계산서 없는 지급: 사업소득·급여·기타경비·원천세·4대보험)
 };
 const W={ // 쓰기 [시트명, 범위]
   S01:['S01_PIPELINE','A:M'],
@@ -36,11 +37,14 @@ const W={ // 쓰기 [시트명, 범위]
   S13:['S13_VAT','A:N'],
   S14:['S14_HISTORY','A:H'],
   S17:['S17_MILESTONE','A:D'],
+  S15:['S15_PAYOUT','A:R'],
 };
 const HEADERS={
   // v2.9.12: 프로젝트별 마일스톤(회차) 설정 저장 — 1프로젝트=1행, rounds(회차 수)와 각 회차의 [항목명,비율,기준일]을
   // JSON 문자열로 압축 저장(회차 수가 프로젝트마다 달라 고정 컬럼으로는 표현이 어려움). project_id로 조회.
   S17:['project_id','rounds','items_json','updated_at'],
+  // v2.9.103 지급 스케줄 S15 — 계산서 없는 지급을 월·사람별 행으로 저장(지급 스케줄 설계서 v0.3 §3). 원천세·4대보험 납부도 별도 행.
+  S15:['payout_id','project_id','year_month','pay_type','person_name','est_item','gross_amt','withheld_amt','ins_emp_amt','employer_amt','net_amt','payment_date','est_status','date_edited','memo','matched_txn_id','pay_actual_date','updated_at'],
   S07:['profile_id','name','birth','gender','career_years','grade','military','address','phone','email','skills','buy_price','last_price','source','resume_link','status','avail_date','memo','updated_at'],
   S16:['item_id','profile_id','section','title','org','role','start','end','detail','lang','dbms','tool','sort'],
   S01:["pipeline_id", "opportunity", "client", "end_client", "probability", "contract_amount", "expected_start", "expected_end", "payment_cycle", "status", "memo", "created_at", "biz_type"],
@@ -74,6 +78,7 @@ const NUMERIC_COLS=new Set([
   'est_inflow','est_outflow','est_vat','est_balance','act_balance','act_inflow','act_outflow',
   'inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc',
   'inflow_amt','outflow_amt','balance','estimated_payment','actual_payment','sales_vat','purchase_vat','diff_amount',
+  'gross_amt','withheld_amt','ins_emp_amt','employer_amt','net_amt',
   // 수량·비율·순번류
   'probability','qty','mm','career_years','unclassified_cnt','accuracy_pct','sort','year',
 ]);
@@ -85,6 +90,7 @@ const ZERO_DEFAULT_COLS=new Set([
   'est_inflow','est_outflow','est_vat','est_balance','act_balance','act_inflow','act_outflow',
   'inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc',
   'inflow_amt','outflow_amt','balance','estimated_payment','actual_payment','sales_vat','purchase_vat','diff_amount',
+  'gross_amt','withheld_amt','ins_emp_amt','employer_amt','net_amt',
   'probability','unclassified_cnt','accuracy_pct',
 ]);
 // FREE_TEXT_DATE_COLS: 날짜처럼 보이지만 원본 표기를 보존해야 하는 컬럼(설계서 결정5) — 표준 날짜 변환 대상에서 제외.
@@ -232,4 +238,6 @@ const S10_CODE_USAGE={
 };
 const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유'};
 // 인력 설정값(S10 category=hr_setting) 중 파라미터 카드에서 편집하는 항목 [키, 기본값, 화면 라벨]
-const HR_SETTING_FIELDS=[['short_tenure_months',3,'단기 이력 기준'],['exit_alert_days',30,'철수 알림'],['reconfirm_days',90,'재확인'],['mm_round_digit',3,'일할 비율 자리'],['mm_mode','반올림','일할 비율 처리'],['cut_unit',10000,'입사·퇴사월 금액 단위'],['cut_mode','절사','입사·퇴사월 금액 처리']];
+const HR_SETTING_FIELDS=[['short_tenure_months',3,'단기 이력 기준'],['exit_alert_days',30,'철수 알림'],['reconfirm_days',90,'재확인'],['mm_round_digit',3,'일할 비율 자리'],['mm_mode','반올림','일할 비율 처리'],['cut_unit',10000,'입사·퇴사월 금액 단위'],['cut_mode','절사','입사·퇴사월 금액 처리'],
+  // v2.9.103 지급 스케줄 기본 지급일 — '월오프셋:일' (0=귀속월, 1=익월 / 일 1~28, 99=말일). 행마다 직접 고칠 수 있다.
+  ['payout_pay_salary','1:10','급여 지급일 기본'],['payout_pay_biz','1:10','사업소득 지급일 기본'],['payout_pay_etc','1:10','기타경비 지급일 기본'],['payout_remit_tax','1:10','원천세 납부일 기본(지급월 기준)'],['payout_remit_ins','1:10','4대보험 납부일 기본(지급월 기준)']];

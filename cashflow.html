@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.102">
+<link rel="stylesheet" href="css/common.css?v=2.9.103">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -205,7 +205,7 @@
     </div>
   </div>
 
-  <!-- v2.9.102: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
+  <!-- v2.9.103: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
        설정 ⑨(S10 category=balance_item)에 등록한 유형의 전체 기간 누적 지급·반환·잔액을 보여준다. -->
   <div class="card" id="balCard">
     <div class="card-title">유형별 누적 잔액 <select id="balYear" onchange="renderBalanceCard()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select> <span style="font-size:11px;color:var(--text3);font-weight:400">※ 잔액은 연도와 무관하게 처음부터 누적 · 항목은 설정 ⑨에서 추가/삭제</span></div>
@@ -374,10 +374,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.102"></script>
-<script src="js/common.js?v=2.9.102"></script>
-<script src="js/calc.js?v=2.9.102"></script>
-<script src="js/nav.js?v=2.9.102"></script>
+<script src="js/schema.js?v=2.9.103"></script>
+<script src="js/common.js?v=2.9.103"></script>
+<script src="js/calc.js?v=2.9.103"></script>
+<script src="js/payout.js?v=2.9.103"></script>
+<script src="js/nav.js?v=2.9.103"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1035,10 +1036,16 @@ async function updateDashboard(){
 }
 
 // ── Sheets 데이터 로드 ─────────────────────────────────────────
-let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],unmatchedFix=[],detailAll=[],s10All=[],estAll=[];
+function renderPoBanner(){
+  let el=document.getElementById('poBanner'); if(!el){ const m=document.querySelector('main'); if(!m) return; el=document.createElement('div'); el.id='poBanner'; m.insertBefore(el,m.firstChild); }
+  if(!poFallbackPrj.length){ el.innerHTML=''; return; }
+  const nm=poFallbackPrj.map(id=>{ const p=prjAll.find(x=>x.project_id===id); return (p&&p.project_name)||id; });
+  el.innerHTML=`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:12px;line-height:1.6">지급 스케줄 미생성 프로젝트 ${nm.length}건(${nm.map(n=>n.replace(/[&<>]/g,'')).join(', ')}) — 견적 계산(월별 합계, 익월 10일 지급)으로 보여 드립니다. <a href="payout.html" style="color:#B45309;font-weight:600">지급 스케줄에서 생성</a></div>`;
+}
+let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],unmatchedFix=[],detailAll=[],s10All=[],estAll=[],payoutAll=[],poFallbackPrj=[];
 async function loadSheets(){
   try{
-    const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR,esR]=await Promise.all([
+    const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR,esR,poR]=await Promise.all([
       fetchSheet(...R.S02),
       fetchSheet(...R.S09),
       fetchSheet(...R.S10),
@@ -1050,6 +1057,7 @@ async function loadSheets(){
       fetchSheet(...R.S13),
       fetchSheet(...R.S08_DETAIL).catch(()=>[]),
       fetchSheet(...R.S12).catch(()=>[]),
+      fetchSheetSafe(...R.S15).catch(()=>null),
     ]);
     estData=toObj(estRows);
     dashData=toObj(dashRows);
@@ -1068,34 +1076,15 @@ async function loadSheets(){
     // 청구 스케줄에 더 이상 만들어지지 않는다(사용자 확정 — 그 화면은 세금계산서 관리에만 집중해야
     // 함). 대신 자금수지가 견적(S12)에서 직접 월별로 계산해 지출 계획에 반영한다 — 견적을 저장하는
     // 즉시(청구 스케줄 재생성 없이도) 자금수지에 정확히 나타나는 장점도 있다.
-    const isInvoiceType=e=>{
-      if(e.comp_type==='인건비') return !e.memo||e.memo==='';
-      return !(e.memo||'').startsWith('_NOINVOICE_');
-    };
-    const noInvoiceCosts=[];
-    prjAll.filter(p=>okPrj.has(p.project_id)).forEach(prj=>{
-      const items=estAll.filter(e=>e.pipeline_id===prj.pipeline_id&&e.comp_type!=='_EMPTY'&&!isInvoiceType(e));
-      if(!items.length) return;
-      const byM=monthlyProfile(items,'buy_price',prj.start_date,prj.end_date);
-      // v2.9.46: 지급일 규칙 확정(사용자 확정, 2026-09-16) — 계산서없음 매입(급여형·사업소득형)은
-      // 세금계산서형처럼 명시적 청구 조건이 없으므로 지급 시점을 별도로 정해야 했다. "세금계산서
-      // 매출·매입은 수금일·지급일이 명시되어 논의 불필요, 세금계산서가 아닌 매입분만 지급 시기를
-      // 정하면 된다"는 것으로 논의 범위를 좁힌 뒤, "회사 급여일이 매월 10일이고 전월 근무 이력을
-      // 당월 10일에 지급한다"는 실제 운영 규칙에 따라 확정: 귀속월의 익월 10일 지급.
-      // (v2.9.36~45의 "익월말" 가정은 폐기 — 부산은행 프로젝트의 8월 선지급분이 9월로 밀려 8월
-      // 계획출금에서 누락되는 오류로 발견됨.)
-      Object.keys(byM).forEach(ym=>{
-        if(!byM[ym]) return;
-        const [yy,mm]=ym.split('-').map(Number);
-        const nextMonth=new Date(yy,mm,10); // Date의 month는 0-based라 mm(1-based)을 그대로 넣으면 다음달, day=10 → 익월 10일
-        const payDate=`${nextMonth.getFullYear()}-${String(nextMonth.getMonth()+1).padStart(2,'0')}-10`;
-        noInvoiceCosts.push({cost_id:`NOINV-${prj.project_id}-${ym}`,project_id:prj.project_id,year_month:ym,
-          cost_type:'인건비(계산서없음)',person_name:'',unit_price:'',mm:'',amount:Math.round(byM[ym]),
-          payment_date:payDate,memo:'견적 기준 자동계산(계산서없음, 전월 근무분 당월 10일 지급)',
-          vat_amt:0,invoice_plan_date:'',invoice_date:'',matched_txn_id:'',pay_actual_date:''});
-      });
-    });
-    planCost=[...s05All.filter(c=>okPrj.has(c.project_id)),...noInvoiceCosts];
+    // v2.9.103: 계산서 없는 지급의 출처를 지급 스케줄(S15)로 전환(설계서 지급 스케줄 v0.3 §6). S15가 없는 프로젝트는
+    // 전환 기간 안전장치로 견적 계산(v2.9.46 규칙: 귀속월 익월 10일)을 그대로 쓰고 「지급 스케줄 미생성」으로 알린다. 계산은 js/payout.js 하나가 맡는다.
+    payoutAll=poR?toObj(poR).filter(r=>r.payout_id):[];
+    const prjOk=prjAll.filter(p=>okPrj.has(p.project_id));
+    const poPlan=poBuildPlan(prjOk,estAll,payoutAll,okPrj);
+    poFallbackPrj=poPlan.fallbackProjects;
+    planCost=[...s05All.filter(c=>okPrj.has(c.project_id)),...poPlan.costs];
+    renderPoBanner();
+
     // v2.9.52: 근본 결함 수정(사용자 지적 — 실제 시트에는 "자본 납입"이 1건뿐인데 화면에는 7건,
     // 22,963,120원으로 부풀려져 보임) — s04All·s05All은 dedupe(...,'revenue_id'/'cost_id')로
     // 중복 제거를 하는데 detailAll만 이 처리가 빠져 있었다. 시트에 같은 txn_id가 중복 저장되는
@@ -1148,7 +1137,7 @@ function openPlanDetail(ym,dir){
   b.innerHTML=html||'<div style="color:var(--text3);padding:12px">해당 건 없음</div>';
   document.getElementById('planModal').classList.add('open');
 }
-// v2.9.102: 월별 계획 vs 실적 — 월 행을 누르면 그 달의 계획(입금·출금)과 실적(통장 거래)을 한 화면에 나란히 펼친다
+// v2.9.103: 월별 계획 vs 실적 — 월 행을 누르면 그 달의 계획(입금·출금)과 실적(통장 거래)을 한 화면에 나란히 펼친다
 // (이전에는 계획입금·계획출금 숫자를 각각 눌러 팝업을 두 번 열어야 했다).
 const paOpen=new Set();
 function planActItems(ym){
@@ -1160,7 +1149,7 @@ function planActItems(ym){
   planFix.filter(f=>f.year_month===ym).forEach(f=>items.push({src:'fix',cat:f.category||'미지정',dir:'out',date:f.payment_date||ym,label:'고정비 · '+(f.category||''),sub:f.memo||'',amt:num(f.amount)||0,st:f.pay_actual_date||f.matched_txn_id?'대사':''}));
   return items.sort((x,y)=>String(x.date).localeCompare(String(y.date)));
 }
-// v2.9.102: 상세를 항목 단위로 묶어 계획·실적을 한 줄로 비교(사용자 요청 2026-10-23).
+// v2.9.103: 상세를 항목 단위로 묶어 계획·실적을 한 줄로 비교(사용자 요청 2026-10-23).
 // 묶는 기준: 프로젝트 매출 계획=「매출입금」, 프로젝트 매입 계획=「매입지급」(통장 거래에는 프로젝트가 없어 합계로만 비교), 고정비 계획=항목명.
 // 실적은 거래의 유형이 매출입금·매입지급 버킷이면 각각 그 줄에 합치고, 나머지는 유형명 그대로(계획에 없으면 예산 외). 실적 금액은 순액(같은 유형의 반대 방향 거래 차감).
 const paGOpen=new Set();
@@ -1398,7 +1387,7 @@ function renderVatBanner(){
 // isCat()으로 두 함수 모두 bucketOf()를 거치도록 통일 — 코드관리에 등록이 없어 하드코딩 폴백이 그대로
 // canonical 문자열을 반환하는 기존 케이스(raw===canon)도 그대로 보존되어 회귀 없음.
 function isCat(raw,canon){ return raw===canon || bucketOf(raw)===canon; }
-// v2.9.102: 설정 ⑩ 「대사 제외 유형」(S10 category=recon_exclude) — 매입 건이 없는 지급(보증금 등)·계산서 없는 지급이 미매칭 목록에 영원히 남는 문제.
+// v2.9.103: 설정 ⑩ 「대사 제외 유형」(S10 category=recon_exclude) — 매입 건이 없는 지급(보증금 등)·계산서 없는 지급이 미매칭 목록에 영원히 남는 문제.
 // 대사(자동·수동) 대상에서만 빼며 월별 집계·버킷은 그대로다.
 function reconExcluded(cat){ const k=String(cat??'').replace(/\s+/g,''); return (s10All||[]).some(r=>r.category==='recon_exclude'&&String(r.setting_key||'').replace(/\s+/g,'')===k&&k); }
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}

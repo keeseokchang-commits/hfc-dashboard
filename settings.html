@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.102">
+<link rel="stylesheet" href="css/common.css?v=2.9.103">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -245,6 +245,26 @@
       <span class="param-label">일할 계산 — 금액 처리</span>
       <span><select class="param-input" id="param_cut_mode" style="width:230px"><option value="절사">절사 (버림)</option><option value="반올림">반올림</option><option value="올림">올림</option></select></span>
     </div>
+    <div class="param-row">
+      <span class="param-label">지급 스케줄 — 급여 지급일 기본 <small style="color:var(--text3)">(귀속월 기준. 행마다 직접 고칠 수 있음)</small></span>
+      <span><select class="param-input" id="param_payout_pay_salary" style="width:230px"><option value="0:1">당월 1일</option><option value="0:5">당월 5일</option><option value="0:10">당월 10일</option><option value="0:15">당월 15일</option><option value="0:20">당월 20일</option><option value="0:25">당월 25일</option><option value="0:99">당월 말일</option><option value="1:1">익월 1일</option><option value="1:5">익월 5일</option><option value="1:10">익월 10일</option><option value="1:15">익월 15일</option><option value="1:20">익월 20일</option><option value="1:25">익월 25일</option><option value="1:99">익월 말일</option></select></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">지급 스케줄 — 사업소득 지급일 기본 <small style="color:var(--text3)">(귀속월 기준. 행마다 직접 고칠 수 있음)</small></span>
+      <span><select class="param-input" id="param_payout_pay_biz" style="width:230px"><option value="0:1">당월 1일</option><option value="0:5">당월 5일</option><option value="0:10">당월 10일</option><option value="0:15">당월 15일</option><option value="0:20">당월 20일</option><option value="0:25">당월 25일</option><option value="0:99">당월 말일</option><option value="1:1">익월 1일</option><option value="1:5">익월 5일</option><option value="1:10">익월 10일</option><option value="1:15">익월 15일</option><option value="1:20">익월 20일</option><option value="1:25">익월 25일</option><option value="1:99">익월 말일</option></select></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">지급 스케줄 — 기타경비 지급일 기본 <small style="color:var(--text3)">(귀속월 기준. 행마다 직접 고칠 수 있음)</small></span>
+      <span><select class="param-input" id="param_payout_pay_etc" style="width:230px"><option value="0:1">당월 1일</option><option value="0:5">당월 5일</option><option value="0:10">당월 10일</option><option value="0:15">당월 15일</option><option value="0:20">당월 20일</option><option value="0:25">당월 25일</option><option value="0:99">당월 말일</option><option value="1:1">익월 1일</option><option value="1:5">익월 5일</option><option value="1:10">익월 10일</option><option value="1:15">익월 15일</option><option value="1:20">익월 20일</option><option value="1:25">익월 25일</option><option value="1:99">익월 말일</option></select></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">지급 스케줄 — 원천세 납부일 기본 <small style="color:var(--text3)">(지급한 달 기준. 행마다 직접 고칠 수 있음)</small></span>
+      <span><select class="param-input" id="param_payout_remit_tax" style="width:230px"><option value="0:1">당월 1일</option><option value="0:5">당월 5일</option><option value="0:10">당월 10일</option><option value="0:15">당월 15일</option><option value="0:20">당월 20일</option><option value="0:25">당월 25일</option><option value="0:99">당월 말일</option><option value="1:1">익월 1일</option><option value="1:5">익월 5일</option><option value="1:10">익월 10일</option><option value="1:15">익월 15일</option><option value="1:20">익월 20일</option><option value="1:25">익월 25일</option><option value="1:99">익월 말일</option></select></span>
+    </div>
+    <div class="param-row">
+      <span class="param-label">지급 스케줄 — 4대보험 납부일 기본 <small style="color:var(--text3)">(지급한 달 기준. 행마다 직접 고칠 수 있음)</small></span>
+      <span><select class="param-input" id="param_payout_remit_ins" style="width:230px"><option value="0:1">당월 1일</option><option value="0:5">당월 5일</option><option value="0:10">당월 10일</option><option value="0:15">당월 15일</option><option value="0:20">당월 20일</option><option value="0:25">당월 25일</option><option value="0:99">당월 말일</option><option value="1:1">익월 1일</option><option value="1:5">익월 5일</option><option value="1:10">익월 10일</option><option value="1:15">익월 15일</option><option value="1:20">익월 20일</option><option value="1:25">익월 25일</option><option value="1:99">익월 말일</option></select></span>
+    </div>
     <div style="margin-top:14px;display:flex;justify-content:flex-end">
       <button class="btn btn-primary" onclick="saveParams()">파라미터 저장</button>
     </div>
@@ -272,12 +292,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.102"></script>
-<script src="js/common.js?v=2.9.102"></script>
-<script src="js/cmn-sheet.js?v=2.9.102"></script>
-<script src="js/cmn-init.js?v=2.9.102"></script>
-<script src="js/calc.js?v=2.9.102"></script>
-<script src="js/nav.js?v=2.9.102"></script>
+<script src="js/schema.js?v=2.9.103"></script>
+<script src="js/common.js?v=2.9.103"></script>
+<script src="js/cmn-sheet.js?v=2.9.103"></script>
+<script src="js/cmn-init.js?v=2.9.103"></script>
+<script src="js/calc.js?v=2.9.103"></script>
+<script src="js/nav.js?v=2.9.103"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -530,6 +550,7 @@ async function saveParams(){
   for(const [k,,label] of HR_SETTING_FIELDS){
     const v=document.getElementById('param_'+k).value.trim();
     if(k==='cut_mode'||k==='mm_mode'){ hrUpd[k]=v; continue; }
+    if(k.startsWith('payout_')){ if(!/^[01]:(\d{1,2})$/.test(v)){ toast('지급일 기본값이 올바르지 않습니다. ('+label+')',true); return; } hrUpd[k]=v; continue; }
     if(!/^\d+$/.test(v)){ toast('숫자만 입력해 주세요. ('+label+')',true); return; }
     hrUpd[k]=parseInt(v,10);
   }

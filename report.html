@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 월마감 리포트</title>
+<link rel="stylesheet" href="css/common.css?v=2.9.103">
+<style>
+  :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .main{padding:14px 14px 80px}
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+  .q-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+  .q-card:hover{border-color:var(--blue)}
+  .q-card.sel{border-color:var(--blue);background:var(--blue-lt)}
+  .q-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .q-name{font-size:14px;font-weight:700}
+  .q-due{font-size:11px;color:var(--text3)}
+  .badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px}
+  .b-wait{background:var(--amber-lt);color:var(--amber)}
+  .b-done{background:var(--green-lt);color:var(--green)}
+  .b-calc{background:#F1F5F9;color:#64748B}
+  .q-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px}
+  .q-nums .lbl{color:var(--text3);margin-bottom:2px}
+  .q-nums .val{font-weight:700;font-size:13px}
+  .q-nums .val.pay{color:var(--red)}
+  .detail-table{width:100%;border-collapse:collapse;font-size:12px}
+  .detail-table th{font-size:11px;color:var(--text3);text-align:right;padding:6px;border-bottom:2px solid var(--border)}
+  .detail-table th:first-child,.detail-table td:first-child{text-align:left}
+  .detail-table td{padding:7px 6px;border-bottom:1px solid var(--border);text-align:right}
+  .detail-table tr.sum td{font-weight:700;color:var(--blue);border-bottom:none}
+  .fi{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+  .fi:focus{border-color:var(--blue)}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .fl{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+  .btn{padding:11px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;flex:1}
+  .btn-primary{background:var(--blue);color:#fff}.btn-primary:disabled{background:var(--text3)}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-row{display:flex;gap:8px;margin-top:12px}
+  .pay-formula{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:12px;font-size:13px;color:#92400E;margin-bottom:12px;line-height:1.6}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}.tab-item .tab-icon{font-size:20px}
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:760px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);outline:none}
+  .po-wrap{overflow-x:auto}
+  .po-t{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
+  .po-t th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;white-space:nowrap}
+  .po-t td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .po-t td.c{text-align:center;white-space:nowrap}.po-t td.n{text-align:right;white-space:nowrap}
+  .po-t input.fi{padding:5px 6px;font-size:12px;text-align:right}
+  .po-t input.fi.d{text-align:center}
+  .po-t tr.remit td{background:var(--surface2);color:var(--text2)}
+  .po-t tr.lock td{opacity:.75}
+  .tag{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap}
+  .tag-est{background:var(--amber-lt);color:var(--amber)}.tag-ok{background:var(--green-lt);color:var(--green)}.tag-old{background:var(--red-lt);color:var(--red)}.tag-n{background:var(--blue-lt);color:var(--blue)}
+  .po-note{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:10px;line-height:1.6}
+  .po-info{background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;font-size:12px;color:#1E40AF;margin-bottom:10px;line-height:1.6}
+  .po-sum{width:100%;border-collapse:collapse;font-size:12px}
+  .po-sum th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center}
+  .po-sum td{padding:6px 4px;border-bottom:1px solid var(--border);text-align:right}.po-sum td:first-child{text-align:center}
+
+
+  .btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .rp-ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+  .rp-ctl label{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+  .rp-opt{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text2);margin-top:10px;align-items:center}
+  #paper{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 18px 14px;color:#111;font-size:11px;line-height:1.45}
+  #paper h1{font-size:17px;text-align:center;margin-bottom:2px}
+  .rp-sub{text-align:center;font-size:11px;color:#555;margin-bottom:10px}
+  .rp-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+  .rp-box{border:1px solid #999;border-radius:4px;padding:6px 8px;text-align:center}
+  .rp-box .k{font-size:10px;color:#555}.rp-box .v{font-size:14px;font-weight:700}
+  .rp-warn{font-size:11px;margin:4px 0 8px;padding:4px 8px;border:1px solid #DC2626;color:#B91C1C;border-radius:4px}
+  .rp-h{font-size:12px;font-weight:700;margin:10px 0 3px;padding-bottom:2px;border-bottom:1.5px solid #333;display:flex;justify-content:space-between}
+  .rp-t{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:2px}
+  .rp-t th{background:#F1F3F5;border:1px solid #999;padding:2px 4px;text-align:center;font-weight:600}
+  .rp-t td{border:1px solid #bbb;padding:2px 4px}
+  .rp-t td.c{text-align:center;white-space:nowrap}.rp-t td.n{text-align:right;white-space:nowrap}.rp-t td.l{text-align:left}
+  .rp-t tr.g td{background:#EEF2F7;font-weight:700}
+  .rp-t tr.skip td{color:#999;text-decoration:line-through}
+  .rp-est{font-size:9px;border:1px solid #D97706;color:#B45309;border-radius:3px;padding:0 3px;margin-left:3px;white-space:nowrap}
+  .rp-memo{font-size:10px;color:#555;margin-top:8px;border-top:1px solid #bbb;padding-top:4px}
+  .scr-only{}
+  @media print{
+    @page{size:A4 portrait;margin:9mm}
+    body{display:block!important;background:#fff}
+    .app-header,.side-nav,.tab-bar,.toast,.scr-only,#ctlCard,.nov-print{display:none!important}
+    .main{max-width:none!important;padding:0!important}
+    #paper{border:none;padding:0;font-size:9.5px}
+    .rp-t{font-size:9px}
+    .rp-t td,.rp-t th{padding:1px 3px}
+    .sub-only .rp-t tr.d{display:none}
+    .rp-h{break-after:avoid}
+  }
+
+</style>
+</head>
+<body data-page="report">
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>월마감 리포트</span></div>
+  <button class="btn-icon" onclick="location.href='cashflow.html'">💵</button>
+  <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
+</header>
+<nav class="side-nav"></nav>
+
+<main class="main" style="max-width:900px">
+  <div class="card" id="ctlCard">
+    <div class="card-title">기준 잔액 <span style="font-size:11px;color:var(--text3);font-weight:400">통장 앱에서 본 현재 잔액을 넣으면 그날 이후의 입출금을 계산합니다</span></div>
+    <div class="rp-ctl">
+      <div><label>기준일</label><input class="fi" type="date" id="baseDate" onchange="recalc()"></div>
+      <div><label>기준 잔액 (원)</label><input class="fi" id="baseBal" inputmode="numeric" style="text-align:right" oninput="this.value=comma(this.value)" onchange="recalc()"></div>
+      <div><label>리포트 기간 끝</label><input class="fi" type="date" id="endDate" onchange="recalc()"></div>
+      <div><button class="btn btn-primary" style="width:100%" id="btnSaveBase" onclick="saveBase()">기준 잔액 저장</button></div>
+    </div>
+    <div class="rp-opt">
+      <label><input type="checkbox" id="optSub" onchange="applyOpt()"> 출금 예정은 소계만 출력 (한 장 맞춤)</label>
+      <button class="btn btn-secondary" style="flex:none;padding:6px 12px" onclick="skipAllOverdue()">기준일 이전 경과 미결 전체 처리됨</button>
+      <button class="btn btn-secondary" style="flex:none;padding:6px 12px" onclick="clearSkips()">처리됨 표시 모두 해제</button>
+      <button class="btn btn-green" style="flex:none;padding:6px 16px" onclick="window.print()">🖨 인쇄 / PDF 저장</button>
+    </div>
+    <div id="srcNote" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
+  </div>
+  <div id="paper"><div class="loading-wrap"><div class="spinner"></div></div></div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.9.103"></script>
+<script src="js/common.js?v=2.9.103"></script>
+<script src="js/calc.js?v=2.9.103"></script>
+<script src="js/payout.js?v=2.9.103"></script>
+<script src="js/nav.js?v=2.9.103"></script>
+<script>
+let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const todayStr=()=>new Date(Date.now()+9*3600*1000).toISOString().slice(0,10);
+const mEnd=ym=>{ const [y,m]=ym.split('-').map(Number); return `${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`; };
+const addDays=(d,n)=>{ const t=new Date(d+'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); };
+const won=n=>(n<0?'-':'')+comma(Math.abs(n));
+const P=id=>prjName[id]||id||'';
+async function loadAll(){
+  try{
+    const [plR,prR,rvR,csR,fxR,vtR,dtR,stR,esR,poR]=await Promise.all([fetchSheet(...R.S01),fetchSheet(...R.S03),fetchSheet(...R.S04),fetchSheet(...R.S05),fetchSheetSafe(...R.S06).catch(()=>null),fetchSheetSafe(...R.S13).catch(()=>null),fetchSheet(...R.S08_DETAIL).catch(()=>[]),fetchSheet(...R.S10),fetchSheet(...R.S12).catch(()=>[]),fetchSheetSafe(...R.S15).catch(()=>null)]);
+    const pls=toObj(plR), prs=toObj(prR); const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
+    const prjOk=prs.filter(p=>okPl.has(p.pipeline_id)); okPrj=new Set(prjOk.map(p=>p.project_id)); prs.forEach(p=>prjName[p.project_id]=p.project_name||'');
+    D.rev=dedupe(toObj(rvR).filter(r=>r.revenue_id),'revenue_id').filter(r=>okPrj.has(r.project_id));
+    D.cost=dedupe(toObj(csR).filter(c=>c.cost_id),'cost_id').filter(c=>okPrj.has(c.project_id));
+    D.fix=toObj(fxR||[]).filter(f=>f.fixed_id); D.vat=toObj(vtR||[]).filter(v=>v.vat_id);
+    D.detail=dedupe(toObj(dtR).filter(r=>r.txn_id),'txn_id');
+    s10=toObj(stR); const settings={}; s10.forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
+    D.settings=settings; skips={}; s10.filter(r=>r.category==='report_skip').forEach(r=>skips[r.setting_key.replace(/^rskip:/,'')]=r.setting_value);
+    const est=toObj(esR).filter(e=>e.estimate_id); D.po=poR?toObj(poR).filter(r=>r.payout_id):[];
+    const plan=poBuildPlan(prjOk,est,D.po,okPrj); D.poCosts=plan.costs; D.fallback=plan.fallbackProjects;
+    // 기준 잔액: 저장된 값 → 없으면 통장 CSV의 마지막 잔액
+    const b=(s10.find(r=>r.setting_key==='report_balance')||{}).setting_value||''; const [bd,ba]=b.split('|');
+    const last=D.detail.filter(t=>t.txn_date&&String(t.balance).trim()!=='').sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))).pop();
+    csvBal=last?{date:String(last.txn_date).slice(0,10),amt:num(last.balance)}:null;
+    let base=bd?{date:bd,amt:num(ba)}:null; usedCsv=false;
+    if(csvBal&&(!base||csvBal.date>base.date)){ base={...csvBal}; usedCsv=true; }
+    const bdv=base?base.date:todayStr();
+    document.getElementById('baseDate').value=bdv; document.getElementById('baseBal').value=base?comma(base.amt):'';
+    const [y,m]=bdv.slice(0,7).split('-').map(Number); const nm=new Date(y,m,1); document.getElementById('endDate').value=mEnd(`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`);
+    recalc();
+  }catch(e){ toast('로드 실패: '+e.message,true); document.getElementById('paper').innerHTML='<div style="padding:20px;color:#B91C1C">데이터를 불러오지 못했습니다: '+esc(e.message)+'</div>'; }
+}
+const num2=v=>parseInt(String(v??'').replace(/,/g,''),10)||0;
+function buildItems(){
+  const out=[]; const add=o=>out.push(o);
+  D.rev.forEach(r=>{ if(r.is_received==='Y'||r.matched_txn_id||r.recv_actual_date) return; const a=num2(r.cash_recv_amt); if(!a) return;
+    add({id:r.revenue_id,dir:'in',grp:'매출 입금',date:r.cash_recv_date||mEnd(r.year_month),label:P(r.project_id),sub:'발생 '+r.year_month,amt:a,est:false,inv:r.invoice_date?'발행':'미발행'}); });
+  D.cost.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=Math.round(num2(c.amount)*1.1); if(!a) return;
+    add({id:c.cost_id,dir:'out',grp:'매입 (세금계산서)',date:c.payment_date||mEnd(c.year_month),label:P(c.project_id)+(c.person_name?' · '+c.person_name:''),sub:'발생 '+c.year_month,amt:a,est:false}); });
+  D.poCosts.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=num2(c.amount); if(!a) return; const r=c._po;
+    const grp=r?({'사업소득':'사업소득 지급','급여':'급여 지급','기타경비':'기타경비 (계산서 없음)','원천세':'원천세 납부','4대보험':'4대보험 납부'}[r.pay_type]):'계산서 없는 지급 (견적 계산)';
+    add({id:c.cost_id,dir:'out',grp,date:c.payment_date||mEnd(c.year_month),label:P(c.project_id)+(c.person_name?' · '+c.person_name:''),sub:'귀속 '+c.year_month,amt:a,est:r?(r.est_status!=='확정'):true,po:r||null}); });
+  D.fix.forEach(f=>{ if(f.pay_actual_date||f.matched_txn_id) return; const a=num2(f.amount); if(!a) return;
+    add({id:f.fixed_id,dir:'out',grp:'고정비',date:f.payment_date||mEnd(f.year_month),label:f.category||'고정비',sub:f.memo||'',amt:a,est:false}); });
+  D.vat.forEach(v=>{ if(v.paid_date) return; const a=num2(v.actual_payment)||num2(v.estimated_payment); if(!a||!v.due_date) return;
+    add({id:v.vat_id,dir:'out',grp:'세금 (부가세)',date:v.due_date,label:`${v.year||''} ${v.quarter_code||''} 부가세`,sub:'납부기한',amt:a,est:!num2(v.actual_payment)}); });
+  return out;
+}
+function recalc(){
+  const base=document.getElementById('baseDate').value, end=document.getElementById('endDate').value;
+  const bal=un(document.getElementById('baseBal').value);
+  document.getElementById('srcNote').textContent=usedCsv?'통장 CSV의 마지막 잔액이 더 최신이라 그 값을 기준으로 씁니다 ('+csvBal.date+').':'';
+  if(!base||!end){ document.getElementById('paper').innerHTML=''; return; }
+  const all=buildItems().filter(x=>x.date<=end);
+  all.forEach(x=>{ x.over=x.date<=base; x.skip=!!skips[x.id]&&x.over; });
+  items=all;
+  const live=all.filter(x=>!x.skip);
+  const sum=dir=>live.filter(x=>x.dir===dir).reduce((s,x)=>s+x.amt,0);
+  const inc=sum('in'), outc=sum('out'), endBal=bal+inc-outc;
+  // 일자별 잔액 — 경과 미결은 기준일 다음 날에 한꺼번에 처리되는 것으로 본다
+  const days={}; live.forEach(x=>{ const d=x.over?addDays(base,1):x.date; days[d]=(days[d]||0)+(x.dir==='in'?x.amt:-x.amt); });
+  let run=bal,min={d:base,v:bal}; Object.keys(days).sort().forEach(d=>{ run+=days[d]; if(run<min.v) min={d,v:run}; });
+  render({base,end,bal,inc,outc,endBal,min});
+}
+const estTag=x=>x.est?'<span class="rp-est">추정</span>':'';
+function groupTable(list,cols,subOnly){
+  const G={}; list.forEach(x=>{ (G[x.grp]=G[x.grp]||[]).push(x); });
+  return Object.keys(G).map(g=>{ const rows=G[g].sort((a,b)=>a.date.localeCompare(b.date)); const t=rows.reduce((s,x)=>s+x.amt,0);
+    return `<tr class="g"><td colspan="${cols-1}" class="l">${esc(g)} <span style="font-weight:400">(${rows.length}건)</span></td><td class="n">${won(t)}</td></tr>`+
+      rows.map(x=>`<tr class="d"><td class="c">${x.date.slice(5)}</td><td class="l" colspan="${cols-3}">${esc(x.label)}${estTag(x)} <span style="color:#777">${esc(x.sub)}</span></td><td class="c">${x.over?'경과':'예정'}</td><td class="n">${won(x.amt)}</td></tr>`).join('');
+  }).join('');
+}
+function render(s){
+  const ups=items.filter(x=>!x.over), over=items.filter(x=>x.over);
+  const inUp=ups.filter(x=>x.dir==='in').sort((a,b)=>a.date.localeCompare(b.date)), outUp=ups.filter(x=>x.dir==='out');
+  const sumDir=(l)=>l.reduce((a,x)=>a+x.amt,0);
+  const overLive=over.filter(x=>!x.skip);
+  const oIn=sumDir(overLive.filter(x=>x.dir==='in')), oOut=sumDir(overLive.filter(x=>x.dir==='out'));
+  let h=`<h1>월마감 자금 입출 리포트</h1><div class="rp-sub">기준일 ${s.base} · 기간 ${addDays(s.base,1)} ~ ${s.end} · 출력일 ${todayStr()}</div>
+  <div class="rp-sum"><div class="rp-box"><div class="k">기준 잔액 (${s.base})</div><div class="v">${won(s.bal)}</div></div>
+   <div class="rp-box"><div class="k">입금 예정 합계</div><div class="v" style="color:#047857">+${won(s.inc)}</div></div>
+   <div class="rp-box"><div class="k">출금 예정 합계</div><div class="v" style="color:#B91C1C">-${won(s.outc)}</div></div>
+   <div class="rp-box" style="border-width:2px"><div class="k">예상 기말 잔액 (${s.end})</div><div class="v">${won(s.endBal)}</div></div></div>
+  <div style="font-size:10px;color:#555">경과 미결 포함: 입금 +${won(oIn)} / 출금 -${won(oOut)} · 잔액이 가장 낮은 날 ${s.min.d} <b>${won(s.min.v)}</b></div>`;
+  if(s.min.v<0) h+=`<div class="rp-warn">⚠ ${s.min.d}에 예상 잔액이 ${won(s.min.v)}원으로 부족합니다.</div>`;
+  if(D.fallback.length) h+=`<div class="rp-warn" style="border-color:#D97706;color:#92400E">지급 스케줄 미생성 프로젝트 ${D.fallback.length}건은 견적 계산(추정)으로 포함했습니다.</div>`;
+  h+=`<div class="rp-h"><span>입금 예정</span><span>${won(sumDir(inUp))}</span></div><table class="rp-t"><thead><tr><th style="width:44px">일자</th><th>프로젝트</th><th style="width:60px">계산서</th><th style="width:96px">금액</th></tr></thead><tbody>`+
+    (inUp.map(x=>`<tr><td class="c">${x.date.slice(5)}</td><td class="l">${esc(x.label)} <span style="color:#777">${esc(x.sub)}</span></td><td class="c">${esc(x.inv||'')}</td><td class="n">${won(x.amt)}</td></tr>`).join('')||'<tr><td colspan="4" class="c" style="color:#777">예정된 입금이 없습니다</td></tr>')+'</tbody></table>';
+  h+=`<div class="rp-h"><span>출금 예정</span><span>${won(sumDir(outUp))}</span></div><table class="rp-t"><thead><tr><th style="width:44px">일자</th><th>내용</th><th style="width:40px">구분</th><th style="width:96px">금액</th></tr></thead><tbody>`+
+    (groupTable(outUp,4)||'<tr><td colspan="4" class="c" style="color:#777">예정된 출금이 없습니다</td></tr>')+'</tbody></table>';
+  // 지급 내역(사람·프로젝트별)
+  const pay=D.po.filter(r=>(r.pay_type==='사업소득'||r.pay_type==='급여')&&!r.pay_actual_date&&!r.matched_txn_id&&r.payment_date&&r.payment_date<=s.end&&okPrj.has(r.project_id)&&poCash(r)).sort((a,b)=>a.payment_date.localeCompare(b.payment_date));
+  if(pay.length){
+    const tot=pay.reduce((a,r)=>({g:a.g+num2(r.gross_amt),d:a.d+num2(r.withheld_amt)+num2(r.ins_emp_amt),n:a.n+num2(r.net_amt),e:a.e+num2(r.employer_amt)}),{g:0,d:0,n:0,e:0});
+    h+=`<div class="rp-h"><span>지급 내역 (사업소득·급여)</span><span>실지급 ${won(tot.n)}</span></div><table class="rp-t"><thead><tr><th style="width:44px">지급일</th><th>대상 · 프로젝트</th><th style="width:42px">구분</th><th style="width:76px">세전</th><th style="width:72px">공제</th><th style="width:76px">실지급</th><th style="width:70px">회사부담</th></tr></thead><tbody>`+
+      pay.map(r=>`<tr><td class="c">${r.payment_date.slice(5)}</td><td class="l">${esc(r.person_name)} · ${esc(P(r.project_id))}${r.est_status!=='확정'?'<span class="rp-est">추정</span>':''} <span style="color:#777">귀속 ${esc(r.year_month)}</span></td><td class="c">${esc(r.pay_type)}</td><td class="n">${won(num2(r.gross_amt))}</td><td class="n">${won(num2(r.withheld_amt)+num2(r.ins_emp_amt))}</td><td class="n">${won(num2(r.net_amt))}</td><td class="n">${r.pay_type==='급여'?won(num2(r.employer_amt)):''}</td></tr>`).join('')+
+      `<tr class="g"><td colspan="3" class="c">합계</td><td class="n">${won(tot.g)}</td><td class="n">${won(tot.d)}</td><td class="n">${won(tot.n)}</td><td class="n">${won(tot.e)}</td></tr></tbody></table>`;
+  }
+  // 세금계산서
+  const inv1=D.rev.filter(r=>!r.invoice_date&&r.invoice_plan_date&&r.invoice_plan_date<=s.end&&num2(r.tax_invoice_amt)).sort((a,b)=>a.invoice_plan_date.localeCompare(b.invoice_plan_date));
+  const inv2=D.cost.filter(c=>!c.invoice_date&&c.invoice_plan_date&&c.invoice_plan_date<=s.end&&num2(c.amount)).sort((a,b)=>a.invoice_plan_date.localeCompare(b.invoice_plan_date));
+  const invT=(list,vatf,amtf)=>list.length?`<table class="rp-t"><thead><tr><th style="width:44px">예정일</th><th>프로젝트</th><th style="width:84px">공급가액</th><th style="width:76px">부가세</th></tr></thead><tbody>`+list.map(r=>`<tr><td class="c">${r.invoice_plan_date.slice(5)}</td><td class="l">${esc(P(r.project_id))}${r.person_name?' · '+esc(r.person_name):''}</td><td class="n">${won(amtf(r))}</td><td class="n">${won(vatf(r))}</td></tr>`).join('')+'</tbody></table>':'<div style="color:#777;font-size:10px">없음</div>';
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="rp-h"><span>발행할 매출 세금계산서 (${inv1.length}건)</span></div>${invT(inv1,r=>num2(r.vat_amt),r=>num2(r.tax_invoice_amt))}</div><div><div class="rp-h"><span>수취할 매입 세금계산서 (${inv2.length}건)</span></div>${invT(inv2,r=>num2(r.vat_amt)||Math.round(num2(r.amount)*0.1),r=>num2(r.amount))}</div></div>`;
+  // 경과 미결
+  h+=`<div class="rp-h"><span>경과 미결 (기준일 이전 예정일, 아직 입금·지급 처리가 안 된 건)</span><span>${over.length}건</span></div>`+
+    (over.length?`<table class="rp-t"><thead><tr><th style="width:44px">예정일</th><th>내용</th><th style="width:40px">구분</th><th style="width:96px">금액</th><th class="scr-only" style="width:70px">이미 처리됨</th></tr></thead><tbody>`+
+      over.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>`<tr class="${x.skip?'skip':''}${x.skip?' nov-print':''}"><td class="c">${x.date.slice(5)}</td><td class="l">${esc(x.grp)} · ${esc(x.label)}${estTag(x)}</td><td class="c">${x.dir==='in'?'입금':'출금'}</td><td class="n">${x.dir==='in'?'':'-'}${won(x.amt)}</td><td class="c scr-only"><input type="checkbox" ${x.skip?'checked':''} onchange="toggleSkip('${esc(x.id)}',this.checked)"></td></tr>`).join('')+'</tbody></table>'
+      :'<div style="color:#777;font-size:10px">없음</div>');
+  h+=`<div class="rp-memo">가정: 기준 잔액(${s.base}) 이후의 계획만 반영합니다. 경과 미결은 예상 잔액에 포함하고, 「이미 처리됨」으로 표시한 건은 제외했습니다. 「추정」은 금액이 아직 확정되지 않은 건입니다. 사업소득·급여의 원천세·4대보험은 지급 익월 10일 납부 기준입니다.</div>`;
+  document.getElementById('paper').innerHTML=h; applyOpt();
+}
+function applyOpt(){ document.getElementById('paper').classList.toggle('sub-only',document.getElementById('optSub').checked); }
+// ── S10 저장: category report_balance(기준 잔액 1건) · report_skip(처리됨 표시: 키 rskip:건ID, 값 표시일) — 원본 S04·S05·S15는 바꾸지 않는다
+async function writeS10(mut){
+  const fresh=toObj(await fetchSheet(...R.S10)); const rows=mut(fresh.filter(r=>r.setting_key));
+  const ok=await clearAndWrite(...W.S10,[HEADERS.S10,...rows.map(r=>HEADERS.S10.map(h=>r[h]??''))]);
+  if(ok) s10=rows; return ok;
+}
+async function saveBase(){
+  const d=document.getElementById('baseDate').value, a=un(document.getElementById('baseBal').value);
+  if(!d){ toast('기준일을 입력해 주세요',true); return; }
+  let reset=false; if(Object.keys(skips).length) reset=confirm('새 기준 잔액에는 그 이후 처리분이 이미 들어 있으므로, 이전에 「이미 처리됨」으로 표시한 건을 모두 해제할까요?\n(확인 = 해제, 취소 = 유지)');
+  const btn=document.getElementById('btnSaveBase'); btn.disabled=true;
+  const ok=await writeS10(rows=>{ rows=rows.filter(r=>r.setting_key!=='report_balance'&&!(reset&&r.category==='report_skip'));
+    rows.push({setting_key:'report_balance',setting_value:d+'|'+a,description:'월마감 리포트 기준 잔액(기준일|금액)',category:'report_balance',updated_at:todayStr()}); return rows; });
+  btn.disabled=false;
+  if(ok){ if(reset) skips={}; usedCsv=false; toast('✓ 기준 잔액을 저장했습니다'); recalc(); } else toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true);
+}
+async function setSkips(ids,on){
+  const ok=await writeS10(rows=>{ rows=rows.filter(r=>!(r.category==='report_skip'&&ids.includes(r.setting_key.replace(/^rskip:/,''))));
+    if(on) ids.forEach(id=>rows.push({setting_key:'rskip:'+id,setting_value:todayStr(),description:'월마감 리포트 처리됨 표시',category:'report_skip',updated_at:todayStr()})); return rows; });
+  if(ok){ ids.forEach(id=>{ if(on) skips[id]=todayStr(); else delete skips[id]; }); recalc(); } else { toast('저장 실패 — 로그인 상태와 권한을 확인해 주세요',true); recalc(); }
+}
+function toggleSkip(id,on){ setSkips([id],on); }
+function skipAllOverdue(){ const ids=items.filter(x=>x.over&&!x.skip).map(x=>x.id); if(!ids.length){ toast('처리됨으로 바꿀 경과 미결이 없습니다'); return; }
+  if(confirm(`기준일 이전 경과 미결 ${ids.length}건을 모두 「이미 처리됨」으로 표시할까요? (원본 데이터는 바뀌지 않습니다)`)) setSkips(ids,true); }
+function clearSkips(){ const ids=Object.keys(skips); if(!ids.length){ toast('해제할 표시가 없습니다'); return; } if(confirm(`처리됨 표시 ${ids.length}건을 모두 해제할까요?`)) setSkips(ids,false); }
+window.addEventListener('load',loadAll);
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>
