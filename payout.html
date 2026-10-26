@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 지급 스케줄</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.103">
+<link rel="stylesheet" href="css/common.css?v=2.9.105">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -68,11 +68,12 @@
   .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);outline:none}
   .po-wrap{overflow-x:auto}
-  .po-t{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
+  .po-t{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:1080px;table-layout:fixed}
   .po-t th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;white-space:nowrap}
-  .po-t td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .po-t td{padding:6px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .po-t td.l{text-align:left;padding-left:8px;line-height:1.4}
   .po-t td.c{text-align:center;white-space:nowrap}.po-t td.n{text-align:right;white-space:nowrap}
-  .po-t input.fi{padding:5px 6px;font-size:12px;text-align:right}
+  .po-t input.fi{padding:6px 8px;font-size:12px;text-align:right;min-width:0}
   .po-t input.fi.d{text-align:center}
   .po-t tr.remit td{background:var(--surface2);color:var(--text2)}
   .po-t tr.lock td{opacity:.75}
@@ -104,7 +105,7 @@
     <div class="card-title"><span id="schTitle"></span>
       <span style="display:flex;gap:6px"><button class="btn btn-primary" style="flex:none;padding:8px 14px" id="btnSave" onclick="saveSchedule()">저장</button></span></div>
     <div id="schInfo"></div>
-    <div class="po-wrap"><table class="po-t"><thead><tr><th>귀속월</th><th>구분</th><th style="text-align:left">대상</th><th>세전</th><th>원천세</th><th>근로자 4대보험</th><th>회사부담</th><th>실지급·납부액</th><th>지급일</th><th>상태</th><th></th></tr></thead><tbody id="schBody"></tbody></table></div>
+    <div class="po-wrap"><table class="po-t"><colgroup><col style="width:72px"><col style="width:70px"><col style="width:190px"><col style="width:112px"><col style="width:96px"><col style="width:104px"><col style="width:100px"><col style="width:112px"><col style="width:136px"><col style="width:76px"><col style="width:36px"></colgroup><thead><tr><th>귀속월</th><th>구분</th><th>대상</th><th>세전</th><th>원천세</th><th>근로자 4대보험</th><th>회사부담</th><th>실지급·납부액</th><th>지급일</th><th>상태</th><th></th></tr></thead><tbody id="schBody"></tbody></table></div>
     <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">지급일을 직접 바꾸면 그 행은 다시 생성해도 유지됩니다. 확정한 행은 견적을 바꿔도 덮어쓰지 않고 금액이 다르면 알려 드립니다. 기본 지급일은 설정 화면에서 정합니다.</div>
   </div>
 
@@ -117,11 +118,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.103"></script>
-<script src="js/common.js?v=2.9.103"></script>
-<script src="js/calc.js?v=2.9.103"></script>
-<script src="js/payout.js?v=2.9.103"></script>
-<script src="js/nav.js?v=2.9.103"></script>
+<script src="js/schema.js?v=2.9.105"></script>
+<script src="js/common.js?v=2.9.105"></script>
+<script src="js/calc.js?v=2.9.105"></script>
+<script src="js/payout.js?v=2.9.105"></script>
+<script src="js/nav.js?v=2.9.105"></script>
 <script>
 let prjs=[],ests=[],payouts=[],settings={},sel=null,work=[],dirty=false,merged=null,haveSheet=false;
 const TYPE_ORDER={'급여':1,'사업소득':2,'기타경비':3,'원천세':4,'4대보험':5};
@@ -141,11 +142,9 @@ async function loadAll(){
 }
 function renderSelect(){
   const has=new Set(payouts.map(r=>r.project_id));
-  const opt=prjs.map(p=>{
-    const hasItems=ests.some(e=>e.pipeline_id===p.pipeline_id&&poIsNonInvoice(e));
-    return `<option value="${esc(p.project_id)}">${esc(p.project_name||p.project_id)}${hasItems?(has.has(p.project_id)?'  ✓ 생성됨':'  · 지급 스케줄 미생성'):'  (계산서 없는 지급 없음)'}</option>`;
-  }).join('');
-  document.getElementById('prjSel').innerHTML='<option value="">프로젝트를 선택하세요</option>'+opt;
+  const opt=prjs.filter(p=>has.has(p.project_id)||ests.some(e=>e.pipeline_id===p.pipeline_id&&poIsNonInvoice(e))).map(p=>
+    `<option value="${esc(p.project_id)}">${esc(p.project_name||p.project_id)}${has.has(p.project_id)?'  ✓ 생성됨':'  · 지급 스케줄 미생성'}</option>`).join('');
+  document.getElementById('prjSel').innerHTML='<option value="">'+(opt?'프로젝트를 선택하세요':'계산서 없는 지급이 있는 프로젝트가 없습니다')+'</option>'+opt;
 }
 function selectProject(pid){
   if(dirty&&!confirm('저장하지 않은 변경이 있습니다. 다른 프로젝트로 이동할까요?')){ document.getElementById('prjSel').value=sel?sel.project_id:''; return; }
@@ -180,11 +179,11 @@ function renderSchedule(){
     const cash=poCash(r);
     const memoTag=r.memo?` <span class="tag tag-old">${esc(r.memo)}</span>`:'';
     return `<tr class="${remit?'remit':''}${lock?' lock':''}"><td class="c">${esc(r.year_month)}</td><td class="c">${esc(r.pay_type)}</td>
-      <td>${esc(r.person_name)}${memoTag}${orphan.has(r.payout_id)?' <span class="tag tag-old">견적에 없음</span>':''}</td>
+      <td class="l">${esc(r.person_name)}${memoTag}${orphan.has(r.payout_id)?' <span class="tag tag-old">견적에 없음</span>':''}</td>
       <td class="n">${remit?'':num('gross_amt',edG)}</td><td class="n">${remit?'':num('withheld_amt',edW)}</td><td class="n">${remit?'':num('ins_emp_amt',edI)}</td><td class="n">${remit?'':num('employer_amt',edE)}</td>
       <td class="n"><b>${wf(cash)}</b></td>
-      <td class="c"><input type="date" class="fi d" style="width:132px" value="${esc(r.payment_date)}" onchange="editDate(${i},this.value)"></td>
-      <td class="c">${remit?`<span class="tag tag-n">${esc(r.est_status||'추정')}</span>`:`<select class="fi d" style="width:68px;text-align:center" onchange="editStatus(${i},this.value)"><option ${r.est_status!=='확정'?'selected':''}>추정</option><option ${r.est_status==='확정'?'selected':''}>확정</option></select>`}</td>
+      <td class="c"><input type="date" class="fi d" style="width:100%" value="${esc(r.payment_date)}" onchange="editDate(${i},this.value)"></td>
+      <td class="c">${remit?`<span class="tag tag-n">${esc(r.est_status||'추정')}</span>`:`<select class="fi d" style="width:100%;text-align:center;padding:6px 20px 6px 8px" onchange="editStatus(${i},this.value)"><option ${r.est_status!=='확정'?'selected':''}>추정</option><option ${r.est_status==='확정'?'selected':''}>확정</option></select>`}</td>
       <td class="c">${(!lock&&orphan.has(r.payout_id))?`<button class="btn-icon" style="width:26px;height:26px" onclick="delRow(${i})">✕</button>`:''}</td></tr>`;
   }).join('')||'<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px">표시할 행이 없습니다</td></tr>';
 }

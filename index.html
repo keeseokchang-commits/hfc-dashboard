@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 경영관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.103">
+<link rel="stylesheet" href="css/common.css?v=2.9.105">
 <style>
   :root {
     --bg:        #F2F4F7;
@@ -271,10 +271,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.103"></script>
-<script src="js/common.js?v=2.9.103"></script>
-<script src="js/calc.js?v=2.9.103"></script>
-<script src="js/nav.js?v=2.9.103"></script>
+<script src="js/schema.js?v=2.9.105"></script>
+<script src="js/common.js?v=2.9.105"></script>
+<script src="js/calc.js?v=2.9.105"></script>
+<script src="js/nav.js?v=2.9.105"></script>
 <script>
 // ── 설정 ──────────────────────────────────────────────────────
 
@@ -388,7 +388,7 @@ async function render() {
     const yrCosts = costs.filter(c => (c.year_month||'').startsWith(yr));
     const yrFixed = fixed.filter(f => (f.year_month||'').startsWith(yr));
 
-    // v2.9.103: 이월 잔고 = 올해 12월을 넘어 내년 이후로 잡힌 매출(공급가액) 합 — 프로젝트 상태 필터는 연간 매출과 동일
+    // v2.9.105: 이월 잔고 = 올해 12월을 넘어 내년 이후로 잡힌 매출(공급가액) 합 — 프로젝트 상태 필터는 연간 매출과 동일
     const carryRevs = revenues.filter(r => (r.year_month||'').slice(0,4) > yr);
     const carryOver = carryRevs.reduce((s, r) => s + (num(r.tax_invoice_amt)||0), 0);
     const carryPrj  = new Set(carryRevs.map(r => r.project_id)).size;
@@ -495,7 +495,7 @@ async function render() {
     const carryR=invDue.filter(r=>r.invoice_plan_date.slice(0,7)<thisYmStr).length;
     const carryC=costDue.filter(c=>c.invoice_plan_date.slice(0,7)<thisYmStr).length;
     const dueLine=(o,su,tot,plan,carry)=>`<div style="font-size:11px;color:var(--text3);padding:2px 0 2px 22px">${carry?'<span style=\'color:var(--amber)\'>[이월]</span> ':''}${o} · 공급 ${wonFull(su)} + VAT = <b>${wonFull(tot)}</b> · 예정 ${plan}</div>`;
-    const pjLabel=id=>{ const p=allProjects.find(x=>x.project_id===id); return p&&p.project_name?`${id} ${p.project_name}`:id; }; // v2.9.103: 프로젝트명 함께 표시
+    const pjLabel=id=>{ const p=allProjects.find(x=>x.project_id===id); return p&&p.project_name?`${id} ${p.project_name}`:id; }; // v2.9.105: 프로젝트명 함께 표시
     const revDetail=invDue.map(r=>dueLine(`${r.year_month} ${pjLabel(r.project_id)}`,num(r.tax_invoice_amt)||0,revTot(r),r.invoice_plan_date,r.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
     const costDetail=costDue.map(c=>dueLine(`${c.year_month} ${pjLabel(c.project_id)}`,num(c.amount)||0,costTot(c),c.invoice_plan_date,c.invoice_plan_date.slice(0,7)<thisYmStr)).join('');
     const agingList=revenues.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<todayStr2);

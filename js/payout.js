@@ -1,4 +1,4 @@
-// HFC payout.js v2.9.103 — 지급 스케줄(S15) 도메인 계산(SSOT, DOM 무관 순수 함수)
+// HFC payout.js v2.9.105 — 지급 스케줄(S15) 도메인 계산(SSOT, DOM 무관 순수 함수)
 // 근거: 지급 스케줄 설계서 v0.3(2026-10-26 승인, Phase 1). 계산서 없는 지급(사업소득·급여·기타경비)을 월·사람별 행으로 저장하고,
 //       원천세·4대보험 납부도 별도 행으로 만든다. 자금수지·월마감 리포트·지급 스케줄 화면이 이 모듈 하나를 공유한다.
 // 의존: calc.js(monthlyAmounts·monthlyProfile·calcOpt·ymList·pad2·mmTotal)
@@ -15,7 +15,7 @@ const poPad=n=>String(n).padStart(2,'0');
 // 규칙 문자열 '월오프셋:일' → {off,day}. 값이 없거나 형식이 틀리면 기본(익월 10일)
 function poRule(settings,payType){
   const raw=String(((settings||{})[PO_RULE_KEYS[payType]])??'');
-  const m=/^([01]):(\d{1,2})$/.exec(raw)||/^([01]):(\d{1,2})$/.exec('1:10');
+  const m=/^([01]):(\d{1,2})$/.exec(raw)||/^([01]):(\d{1,2})$/.exec(PO_REMIT.includes(payType)?'0:10':'1:10');
   return {off:+m[1],day:+m[2]};
 }
 // 'YYYY-MM' + 규칙 → 'YYYY-MM-DD' (일이 그 달 말일보다 크면 말일, 99=말일)

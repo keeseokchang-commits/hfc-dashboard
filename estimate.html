@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.103">
+<link rel="stylesheet" href="css/common.css?v=2.9.105">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -27,8 +27,21 @@
   .comp-panel{display:none}.comp-panel.active{display:block}
   .item-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;position:relative}
   .item-del{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:4px}
-  .fr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-  .fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:end}
+  .fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;align-items:end}
+  .fr .hint{font-size:11px;color:var(--text3);line-height:1.5;padding-bottom:6px}
+  .sal-wrap{border:1px solid var(--border);border-radius:10px;padding:10px 10px 6px;margin-bottom:10px;background:var(--surface2,#F7F9FC);overflow-x:auto}
+  .sal-title{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px}
+  .sal{width:100%;min-width:760px;border-collapse:separate;border-spacing:0 4px;table-layout:fixed}
+  .sal th{font-size:11px;font-weight:600;color:var(--text3);text-align:center;padding:2px 4px}
+  .sal td{padding:0 3px;vertical-align:middle}
+  .sal td.m{text-align:center;font-size:12px;color:var(--text2);white-space:nowrap}
+  .sal td.m small{display:block;font-size:10px;color:var(--amber,#D97706)}
+  .sal td.net{text-align:right;font-size:12px;font-weight:600;white-space:nowrap;padding-right:8px}
+  .sal td.net small{display:block;font-size:10px;font-weight:400;color:var(--amber,#D97706)}
+  .sal input.fi{text-align:right;padding:7px 8px;font-size:12px}
+  .sal select.fi{padding:7px 22px 7px 8px;font-size:12px;text-align:center}
+  .biz-box{font-size:12px;padding:8px 10px;margin-bottom:8px;background:var(--surface2,#F7F9FC);border:1px solid var(--border);border-radius:8px;color:var(--text2);line-height:1.6}
   .calcopt{margin-bottom:8px}.calcopt-h{font-size:11px;font-weight:600;color:var(--text2);margin:2px 0 4px}
   .fr-opt{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .fr-opt select{width:100%;min-width:0;text-overflow:clip}
@@ -134,11 +147,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.103"></script>
-<script src="js/common.js?v=2.9.103"></script>
-<script src="js/calc.js?v=2.9.103"></script>
-<script src="js/payout.js?v=2.9.103"></script>
-<script src="js/nav.js?v=2.9.103"></script>
+<script src="js/schema.js?v=2.9.105"></script>
+<script src="js/common.js?v=2.9.105"></script>
+<script src="js/calc.js?v=2.9.105"></script>
+<script src="js/payout.js?v=2.9.105"></script>
+<script src="js/nav.js?v=2.9.105"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -222,10 +235,10 @@ function loadOpp(){
     // 대표 단가(화면 표시용)를 오버라이드 없는 달의 값이나 오버라이드된 값 중 하나로 복원.
     const ovVals=Object.values(monthlyOverride);
     const mmVal=numF(e.mm)||0;
-    const buyDisplay=isSalaried?(ovVals.length?ovVals[0]:0):(num(e.buy_price)||0);
+    const buyDisplay=isSalaried?0:(num(e.buy_price)||0);
     return {name:e.item_name,grade:e.grade,setId:e.grade_set_id,
       sell:num(e.unit_price)||0,buy:buyDisplay,
-      start:e.start_date,end:e.end_date,mm:mmVal,payType,monthlyOverride,salD,bizLegacy,mmRound:e.mm_round||'',cutUnit:e.cut_unit||'',cutMode:e.cut_mode||'',mmMode:e.mm_mode||'',bMmMode:e.buy_mm_mode||'',bMmRound:e.buy_mm_round||'',bCutUnit:e.buy_cut_unit||'',bCutMode:e.buy_cut_mode||''};
+      start:e.start_date,end:e.end_date,mm:(isSalaried&&e.start_date&&e.end_date)?(parseFloat(mmTotal(e.start_date,e.end_date))||0):mmVal,payType,monthlyOverride,salD,bizLegacy,mmRound:e.mm_round||'',cutUnit:e.cut_unit||'',cutMode:e.cut_mode||'',mmMode:e.mm_mode||'',bMmMode:e.buy_mm_mode||'',bMmRound:e.buy_mm_round||'',bCutUnit:e.buy_cut_unit||'',bCutMode:e.buy_cut_mode||''};
   });
   ['infra','sol','etc'].forEach(k=>{
     const ct={infra:'인프라',sol:'솔루션',etc:'기타'}[k];
@@ -279,7 +292,7 @@ function renderLabor(){
             <option value="사업소득형" ${p.payType==='사업소득형'?'selected':''}>사업소득형 (3.3% 원천징수, 계산서 없음)</option>
             <option value="급여형" ${p.payType==='급여형'?'selected':''}>급여형 (4대보험, 계산서 없음)</option>
           </select></div>
-        <div style="font-size:11px;color:var(--text3);align-self:flex-end;padding-bottom:8px">
+        <div class="hint">
           <!-- v2.9.29: v2.9.27에서 "매입 스케줄=지급형태 무관 전원 포함"으로 설계를 뒤집으면서
                이 안내 문구가 옛 설계(v2.9.24, 계산서 없는 매입은 스케줄에서 제외)를 그대로 남겨두고 있었음
                (사용자 신고) — 실제로는 세금계산서 화면의 매입 스케줄에 포함되는데 "포함되지 않음"이라고
@@ -297,12 +310,12 @@ function renderLabor(){
            급여형만 예외(월별로 이미 확정된 금액을 나열하는 구조 자체가 다름) — 월별 지급액 표에서 단가/총액 구분. -->
       <div class="fr">
         <div><label class="fl">매출 단가 (원/MM)</label><input class="fi" value="${comma(p.sell)}" oninput="this.value=comma(this.value);labor[${i}].sell=un(this.value);recalc()"></div>
-        <div><label class="fl">매입 단가 (원/MM)${p.payType==='사업소득형'?(p.bizLegacy?' — 공제 후 기준(기존 입력)':' — 계약금액(세전)'):p.payType==='급여형'?' — (월별 금액은 아래 표에 입력)':''}</label><input class="fi" value="${comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
+        <div><label class="fl">매입 단가 (원/MM)${p.payType==='사업소득형'?(p.bizLegacy?' — 공제 후 기준(기존 입력)':' — 계약금액(세전)'):p.payType==='급여형'?' — 아래 월별 표에 입력':''}</label><input class="fi" ${p.payType==='급여형'?'disabled placeholder="월별 표에 입력"':''} value="${p.payType==='급여형'?'':comma(p.buy)}" oninput="this.value=comma(this.value);labor[${i}].buy=un(this.value);recalc()"></div>
       </div>
       <div class="fr3">
         <div><label class="fl">시작예정일</label><input class="fi" type="date" value="${p.start}" onchange="labor[${i}].start=this.value;autoMM(${i})"></div>
         <div><label class="fl">종료예정일</label><input class="fi" type="date" value="${p.end}" onchange="labor[${i}].end=this.value;autoMM(${i})"></div>
-        <div><label class="fl">MM (소수점 2자리)${p.payType==='급여형'?' — 급여형은 월별 지급액 합계':''}</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" ${p.payType==='급여형'?'disabled':''} oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
+        <div><label class="fl">MM (소수점 2자리)</label><input class="fi" type="number" step="0.01" value="${p.mm}" id="mm_${i}" oninput="labor[${i}].mm=numF(this.value)||0;recalc()"></div>
       </div>
       ${calcOptHtml(p,i,'')}
       ${calcOptHtml(p,i,'b')}
@@ -319,35 +332,33 @@ function renderLabor(){
 // 달만 그 값을 사용. 청구 스케줄 생성(input.html)도 이 오버라이드를 그대로 반영해야 일할계산과 이중으로
 // 어긋나지 않는다 — genCtx가 이 값을 각 인건비 항목의 monthlyOverride로 넘겨받아 사용.
 function bizBoxHtml(p,i){
-  if(p.bizLegacy) return `<div style="font-size:12px;padding:6px 8px;margin-bottom:6px;border:1px solid var(--amber);border-radius:8px;color:var(--text2)">기존 입력(공제 후) — 입력 금액을 실지급액으로 봅니다.
+  if(p.bizLegacy) return `<div class="biz-box" style="border-color:var(--amber)">기존 입력(공제 후) — 입력 금액을 실지급액으로 봅니다.
     <button type="button" class="btn" style="margin-left:6px" onclick="bizToGross(${i})">세전으로 바꾸기 (제안: ${wf(poGrossFromNet(p.buy))}원)</button></div>`;
   if(!p.start||!p.end||!p.buy) return '';
   const rows=monthlyAmounts(un(p.buy),p.start,p.end,calcOpt(laborRow(p),'buy_price'));
   let g=0,w=0; rows.forEach(x=>{ g+=x.amount; w+=poBizTax(x.amount).w; });
   const m=rows.find(x=>x.w>=0.999)||rows[0], t=m?poBizTax(m.amount):{w:0,net:0};
-  return `<div style="font-size:12px;padding:6px 8px;margin-bottom:6px;background:var(--bg2,transparent);border:1px solid var(--border);border-radius:8px;color:var(--text2)">
+  return `<div class="biz-box">
     세전 계약금액 ${wf(g)} · 원천세(3.3%) ${wf(w)} · 실지급 ${wf(g-w)}${m?` <span style="color:var(--text3)">(1개월 예: 세전 ${wf(m.amount)} → 원천세 ${wf(t.w)} / 실지급 ${wf(t.net)})</span>`:''}</div>`;
 }
 function bizToGross(i){ const p=labor[i]; p.buy=poGrossFromNet(p.buy); p.bizLegacy=false; renderLabor(); recalc(); }
 function salSet(i,key,f,val){ const p=labor[i]; p.salD=p.salD||{}; const d=p.salD[key]=p.salD[key]||{g:0,w:0,i:0,e:0,s:'추정'};
   d[f]=(f==='s')?val:un(val); p.monthlyOverride=p.monthlyOverride||{}; p.monthlyOverride[key]=d.g+d.e; recalcLaborMM(i); recalc(); renderLabor(); }
 function monthlyOverrideHtml(p,i){
-  if(!p.start||!p.end) return '<div style="font-size:11px;color:var(--text3);padding:4px 0">시작·종료일을 입력하면 월별 지급액을 입력할 수 있습니다</div>';
+  if(!p.start||!p.end) return '<div class="hint" style="padding:6px 0">시작·종료일을 입력하면 월별 급여를 입력할 수 있습니다</div>';
   const months=ymList(p.start,p.end);
   if(!months.length) return '';
   p.monthlyOverride=p.monthlyOverride||{}; p.salD=p.salD||{};
-  const inp=(key,f,v)=>`<input class="fi" style="width:100%;text-align:right" value="${v?comma(v):''}" onchange="this.value=comma(this.value);salSet(${i},'${key}','${f}',this.value)">`;
-  return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;overflow-x:auto">
-    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">월별 급여 지급 (금액은 추후 결정되면 수정 — 비워 두면 0원)</div>
-    <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:var(--text3)">
-      <th style="text-align:center">월</th><th style="text-align:center">세전 급여</th><th style="text-align:center">원천세</th><th style="text-align:center">근로자 4대보험</th><th style="text-align:center">회사부담 4대보험</th><th style="text-align:center">실지급</th><th style="text-align:center">상태</th></tr></thead><tbody>
+  const inp=(key,f,v)=>`<input class="fi" inputmode="numeric" placeholder="0" value="${v?comma(v):''}" onchange="this.value=comma(this.value);salSet(${i},'${key}','${f}',this.value)">`;
+  return `<div class="sal-wrap"><div class="sal-title">월별 급여 지급 <span style="font-weight:400;color:var(--text3)">· 금액이 정해지지 않은 달은 비워 두면 0원입니다</span></div>
+    <table class="sal"><colgroup><col style="width:92px"><col><col><col><col><col style="width:116px"><col style="width:78px"></colgroup>
+    <thead><tr><th>월</th><th>세전 급여</th><th>원천세</th><th>근로자 4대보험</th><th>회사부담 4대보험</th><th>실지급</th><th>상태</th></tr></thead><tbody>
     ${months.map(m=>{
       const key=`${m.y}-${pad2(m.m)}`, d=p.salD[key], legacy=!d&&p.monthlyOverride[key]!==undefined;
-      const net=d?d.g-d.w-d.i:0;
-      return `<tr><td style="text-align:center;white-space:nowrap">${key}${m.w>=0.999?'':' (부분월)'}</td>
+      return `<tr><td class="m">${key}${m.w>=0.999?'':'<small>부분월</small>'}</td>
         <td>${inp(key,'g',d&&d.g)}</td><td>${inp(key,'w',d&&d.w)}</td><td>${inp(key,'i',d&&d.i)}</td><td>${inp(key,'e',d&&d.e)}</td>
-        <td style="text-align:right;white-space:nowrap">${d?wf(net):(legacy?'<span style="color:var(--amber)">기존 입력(회사 총액) '+wf(p.monthlyOverride[key])+'</span>':'')}</td>
-        <td style="text-align:center"><select class="fi" onchange="salSet(${i},'${key}','s',this.value)"><option ${!d||d.s!=='확정'?'selected':''}>추정</option><option ${d&&d.s==='확정'?'selected':''}>확정</option></select></td></tr>`;
+        <td class="net">${d?wf(d.g-d.w-d.i):(legacy?wf(p.monthlyOverride[key])+'<small>기존 입력(회사 총액)</small>':'<span style="color:var(--text3);font-weight:400">-</span>')}</td>
+        <td><select class="fi" onchange="salSet(${i},'${key}','s',this.value)"><option ${!d||d.s!=='확정'?'selected':''}>추정</option><option ${d&&d.s==='확정'?'selected':''}>확정</option></select></td></tr>`;
     }).join('')}
     </tbody></table></div>`;
 }
@@ -355,7 +366,7 @@ function monthlyOverrideHtml(p,i){
 // 나열되어야 한다. v2.9.26에서 사업소득형을 별도 필드(buyAmount, 총액 직접입력)로 분리한 것은
 // 이중계산은 막았지만 매출 칸과 비대칭인 UI를 만드는 설계 미스였다 — 되돌리고, 세금계산서형과 동일하게
 // p.buy(단가)×p.mm=총액 구조로 통일한다(이중계산 방지는 저장·로드 시점의 단가↔총액 변환 규율로 지킨다).
-// v2.9.103: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
+// v2.9.105: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
 function laborRow(p){ return {unit_price:p.sell,buy_price:p.buy,mm:p.mm,start_date:p.start,end_date:p.end,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',mm_mode:p.mmMode||'',buy_mm_mode:p.bMmMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||'',memo:p.payType==='급여형'?'급여형':''}; }
 function laborSellTotal(p){ return laborAmt(laborRow(p),'unit_price'); }
 // 월별 미리보기 — 입사월은 일수 비율로 계산해 절사, 마지막 달은 총액에서 앞 달을 뺀 잔액(급여형은 월별 지급액 표를 쓰므로 매출만)
@@ -384,7 +395,7 @@ function laborBuyTotal(p){
   return months.reduce((s,m)=>{const key=`${m.y}-${pad2(m.m)}`; const v=(p.monthlyOverride&&p.monthlyOverride[key]!==undefined)?p.monthlyOverride[key]:0; return s+v;},0);
 }
 // 급여형 MM 표시값을 "월별 지급액 합계 ÷ 단가"로 근사(견적 요약 화면의 대략적 개월수 표시용, 청구스케줄은 monthlyOverride를 직접 사용)
-function recalcLaborMM(i){const p=labor[i]; if(p.payType!=='급여형'||!p.buy) return; p.mm=Math.round((laborBuyTotal(p)/p.buy)*100)/100;}
+function recalcLaborMM(i){const p=labor[i]; if(p.payType!=='급여형'||!p.start||!p.end) return; p.mm=parseFloat(mmTotal(p.start,p.end))||0; const el=document.getElementById('mm_'+i); if(el) el.value=p.mm;}
 function pickGrade(i,grade){
   const setId=document.getElementById('rateSetSel').value;
   const g=gradesOf(setId).find(x=>x.grade===grade);
@@ -503,7 +514,7 @@ async function saveEstimate(){
   if(!cur){toast('사업기회를 먼저 선택하세요',true);return;}
   const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='저장 중…';
   const today=new Date().toISOString().slice(0,10);
-  // v2.9.103: 이 화면을 연 뒤 다른 곳(의뢰 상세의 '견적에 반영' 등)이 S12에 행을 추가했는데 그대로 전체를 덮어쓰면 그 행이 사라진다 — 저장 직전에 다시 읽어 확인한다.
+  // v2.9.105: 이 화면을 연 뒤 다른 곳(의뢰 상세의 '견적에 반영' 등)이 S12에 행을 추가했는데 그대로 전체를 덮어쓰면 그 행이 사라진다 — 저장 직전에 다시 읽어 확인한다.
   try{
     const fresh=toObj(await fetchSheet(...R.S12)).filter(e=>e.estimate_id);
     const known=new Set(estimates.map(e=>e.estimate_id));
