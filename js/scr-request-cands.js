@@ -5,7 +5,7 @@
 //   · 사람 자료 탭이 하나라도 읽히지 않으면 ⑤는 후보 번호만으로 단계 변경까지는 되게 두고 ⑥은 "읽지 못함"으로 막는다(다른 영역은 정상).
 //   · ⑤ 단계 변경은 CMN-05 를 그대로 부른다. 탈락=사유 필수, 인터뷰=유형·일시 입력. 같은 단계 저장은 "이미 같은 단계입니다."
 //   · 중복 추천 = 같은 의뢰 안에서 같은 사람이 둘 이상 경로로 들어온 경우. 경로·제시 단가를 나란히 보이고 "채택 경로"를 하나 고른다(S31.is_adopted, 나머지는 N).
-//   · 사업기회 승격·견적 반영은 scr-request-promote.js (v2.9.106).
+//   · 사업기회 승격·견적 반영은 scr-request-promote.js (v2.9.107).
 //   · ⑥ 문구는 어디에도 저장하지 않는다. 라인을 바꾸면 후보 선택은 초기화한다.
 let PV=null, PV_FAIL=false, PV_DATA={}, candLine='', askSel=new Set(), askKind=CMN_ASK_KINDS[0], askExtra='', askResult=null, PROMPT_TPL='';
 const CAND_KEYS=['S20','S21','S22','S23','S25','S26','S28','S29'];

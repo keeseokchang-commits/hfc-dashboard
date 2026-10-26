@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 견적·시뮬레이션</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.106">
+<link rel="stylesheet" href="css/common.css?v=2.9.107">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--purple:#7C3AED;--purple-lt:#F3EFFE;--teal:#0891B2;--teal-lt:#ECFEFF;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -147,11 +147,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.106"></script>
-<script src="js/common.js?v=2.9.106"></script>
-<script src="js/calc.js?v=2.9.106"></script>
-<script src="js/payout.js?v=2.9.106"></script>
-<script src="js/nav.js?v=2.9.106"></script>
+<script src="js/schema.js?v=2.9.107"></script>
+<script src="js/common.js?v=2.9.107"></script>
+<script src="js/calc.js?v=2.9.107"></script>
+<script src="js/payout.js?v=2.9.107"></script>
+<script src="js/nav.js?v=2.9.107"></script>
 <script>
 let opps=[],rates=[],estimates=[];
 // v2.9.13: 이번 세션에서 저장을 실행한 파이프라인 집합 — "저장 이력 없음(신규)"과 "저장했지만 항목을 전부 지움(의도적 삭제)"을
@@ -366,7 +366,7 @@ function monthlyOverrideHtml(p,i){
 // 나열되어야 한다. v2.9.26에서 사업소득형을 별도 필드(buyAmount, 총액 직접입력)로 분리한 것은
 // 이중계산은 막았지만 매출 칸과 비대칭인 UI를 만드는 설계 미스였다 — 되돌리고, 세금계산서형과 동일하게
 // p.buy(단가)×p.mm=총액 구조로 통일한다(이중계산 방지는 저장·로드 시점의 단가↔총액 변환 규율로 지킨다).
-// v2.9.106: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
+// v2.9.107: 인건비 한 행의 매출·매입 총액 — 일할(부분월 절사) 규칙을 저장·청구 스케줄과 같은 함수(calc.js laborAmt)로 계산
 function laborRow(p){ return {unit_price:p.sell,buy_price:p.buy,mm:p.mm,start_date:p.start,end_date:p.end,mm_round:p.mmRound||'',cut_unit:p.cutUnit||'',cut_mode:p.cutMode||'',mm_mode:p.mmMode||'',buy_mm_mode:p.bMmMode||'',buy_mm_round:p.bMmRound||'',buy_cut_unit:p.bCutUnit||'',buy_cut_mode:p.bCutMode||'',memo:p.payType==='급여형'?'급여형':''}; }
 function laborSellTotal(p){ return laborAmt(laborRow(p),'unit_price'); }
 // 월별 미리보기 — 입사월은 일수 비율로 계산해 절사, 마지막 달은 총액에서 앞 달을 뺀 잔액(급여형은 월별 지급액 표를 쓰므로 매출만)
@@ -514,7 +514,7 @@ async function saveEstimate(){
   if(!cur){toast('사업기회를 먼저 선택하세요',true);return;}
   const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='저장 중…';
   const today=new Date().toISOString().slice(0,10);
-  // v2.9.106: 이 화면을 연 뒤 다른 곳(의뢰 상세의 '견적에 반영' 등)이 S12에 행을 추가했는데 그대로 전체를 덮어쓰면 그 행이 사라진다 — 저장 직전에 다시 읽어 확인한다.
+  // v2.9.107: 이 화면을 연 뒤 다른 곳(의뢰 상세의 '견적에 반영' 등)이 S12에 행을 추가했는데 그대로 전체를 덮어쓰면 그 행이 사라진다 — 저장 직전에 다시 읽어 확인한다.
   try{
     const fresh=toObj(await fetchSheet(...R.S12)).filter(e=>e.estimate_id);
     const known=new Set(estimates.map(e=>e.estimate_id));
