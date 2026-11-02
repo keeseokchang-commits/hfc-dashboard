@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 월마감 리포트</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.109">
+<link rel="stylesheet" href="css/common.css?v=2.9.110">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -151,11 +151,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.109"></script>
-<script src="js/common.js?v=2.9.109"></script>
-<script src="js/calc.js?v=2.9.109"></script>
-<script src="js/payout.js?v=2.9.109"></script>
-<script src="js/nav.js?v=2.9.109"></script>
+<script src="js/schema.js?v=2.9.110"></script>
+<script src="js/common.js?v=2.9.110"></script>
+<script src="js/calc.js?v=2.9.110"></script>
+<script src="js/payout.js?v=2.9.110"></script>
+<script src="js/nav.js?v=2.9.110"></script>
 <script>
 let cutoff='',showDone=false;
 let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
@@ -200,7 +200,12 @@ function buildItems(){
   D.poCosts.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=num2(c.amount); if(!a) return; const r=c._po;
     const grp=r?({'사업소득':'사업소득 지급','급여':'급여 지급','기타경비':'기타경비 (계산서 없음)','원천세':'원천세 납부','4대보험':'4대보험 납부'}[r.pay_type]):'계산서 없는 지급 (견적 계산)';
     add({id:c.cost_id,dir:'out',grp,date:c.payment_date||mEnd(c.year_month),label:P(c.project_id)+(c.person_name?' · '+c.person_name:''),sub:'귀속 '+c.year_month,amt:a,est:r?(r.est_status!=='확정'):true,po:r||null}); });
-  D.fix.forEach(f=>{ if(f.pay_actual_date||f.matched_txn_id) return; const a=num2(f.amount); if(!a) return;
+  // v2.9.110: 법인카드는 월 예산 방식 — 줄 자체는 빼고, 그 달 말일에 「남은 사용 예상」 한 줄만 올린다(마지막 거래일이 말일 이전일 때만)
+  const lastTxn=D.detail.reduce((m,t)=>{ const d=String(t.txn_date||'').slice(0,10); return d>m?d:m; },'');
+  cardBudgetMonths(D.fix).forEach(ym=>{ const st=cardBudgetStatus(ym,D.fix,D.detail); const d=mEnd(ym);
+    if(!st.remain||(lastTxn&&lastTxn>=d)) return;
+    add({id:'CARD-'+ym,dir:'out',grp:'고정비',date:d,label:'법인카드 남은 사용 예상',sub:'월 예산 '+won(st.budget)+' · 사용 '+won(st.used)+' (말일)',amt:st.remain,est:true}); });
+  D.fix.forEach(f=>{ if(isCardBudget(f)) return; if(f.pay_actual_date||f.matched_txn_id) return; const a=num2(f.amount); if(!a) return;
     add({id:f.fixed_id,dir:'out',grp:'고정비',date:f.payment_date||mEnd(f.year_month),label:f.category||'고정비',sub:f.memo||'',amt:a,est:false}); });
   D.vat.forEach(v=>{ if(v.paid_date) return; const a=num2(v.actual_payment)||num2(v.estimated_payment); if(!a||!v.due_date) return;
     add({id:v.vat_id,dir:'out',grp:'세금 (부가세)',date:v.due_date,label:`${v.year||''} ${v.quarter_code||''} 부가세`,sub:'납부기한',amt:a,est:!num2(v.actual_payment)}); });
@@ -248,6 +253,10 @@ function render(s){
     (inUp.map(x=>`<tr><td class="c">${x.date.slice(5)}</td><td class="l">${esc(x.label)} <span style="color:#777">${esc(x.sub)}</span></td><td class="c">${esc(x.inv||'')}</td><td class="n">${won(x.amt)}</td></tr>`).join('')||'<tr><td colspan="4" class="c" style="color:#777">예정된 입금이 없습니다</td></tr>')+'</tbody></table>';
   h+=`<div class="rp-h"><span>출금 예정</span><span>${won(sumDir(outUp))}</span></div><table class="rp-t"><thead><tr><th style="width:44px">일자</th><th>내용</th><th style="width:40px">구분</th><th style="width:96px">금액</th></tr></thead><tbody>`+
     (groupTable(outUp,4)||'<tr><td colspan="4" class="c" style="color:#777">예정된 출금이 없습니다</td></tr>')+'</tbody></table>';
+  // 법인카드 월 예산 현황(기준일이 속한 달~기간 끝 달)
+  const cardMs=cardBudgetMonths(D.fix).filter(ym=>ym>=s.base.slice(0,7)&&ym<=s.end.slice(0,7));
+  if(cardMs.length) h+=`<div style="font-size:10px;margin:4px 0 8px">`+cardMs.map(ym=>{ const st=cardBudgetStatus(ym,D.fix,D.detail);
+    return `<div>법인카드 ${ym}: 월 예산 ${won(st.budget)} · 사용 ${won(st.used)} · `+(st.over?`<b style="color:#B91C1C">예산 초과 ${won(st.over)}</b>`:`남은 예상 ${won(st.remain)} (${mEnd(ym).slice(5)})`)+`</div>`; }).join('')+`</div>`;
   // 지급 내역(사람·프로젝트별)
   const pay=D.po.filter(r=>(r.pay_type==='사업소득'||r.pay_type==='급여')&&!r.pay_actual_date&&!r.matched_txn_id&&r.payment_date&&r.payment_date<=s.end&&okPrj.has(r.project_id)&&poCash(r)&&items.some(x=>x.id==='NOINV-'+r.payout_id&&!x.skip)).sort((a,b)=>a.payment_date.localeCompare(b.payment_date)); // 출금 예정·경과 미결과 같은 기준(처리됨 제외)
   if(pay.length){
