@@ -91,3 +91,20 @@
 .hr-pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:320px;overflow:auto;font-family:inherit}
 .hr-muted{color:var(--text3)}
 .hr-login{margin-left:auto}
+
+/* v2.10.0 이력서 등록 — 업무 순서 안내(프로세스 화면) */
+.proc-now{border:2px solid var(--amber);background:var(--amber-lt)}
+.proc-now.calm{border:1px solid var(--border);background:var(--surface)}
+.proc-big{font-size:16px;font-weight:700;margin-top:8px;line-height:1.4}
+.proc-sec{margin-top:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:0 12px}
+.proc-sec>summary{cursor:pointer;font-size:13px;font-weight:600;padding:10px 0}
+.proc-sec[open]>summary{border-bottom:1px solid var(--border);margin-bottom:10px}
+.proc-sec>*:last-child{margin-bottom:12px}
+.proc-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.proc-st{border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--surface2);min-height:92px}
+.proc-st .n{font-size:11px;color:var(--text3)} .proc-st .t{font-weight:700;margin:2px 0;font-size:13px} .proc-st .w{font-size:12px;color:var(--text2);line-height:1.45}
+.proc-st.done{background:var(--green-lt);border-color:var(--green)}
+.proc-st.cur{background:var(--amber-lt);border:2px solid var(--amber)}
+.proc-who{font-size:10px;border:1px solid var(--border);border-radius:6px;padding:0 5px;color:var(--text2);white-space:nowrap}
+@media(max-width:640px){.proc-steps{grid-template-columns:1fr 1fr}}
+.proc-now .hr-sub{color:var(--text2)}

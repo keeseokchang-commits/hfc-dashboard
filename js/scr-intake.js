@@ -40,21 +40,52 @@ function renderFolder(){
   const a=([n,d,id])=>`<a href="https://drive.google.com/drive/folders/${id}" target="_blank" rel="noopener"><b>${n}</b></a> ${d}`;
   hrQ('folderPath').innerHTML='읽는 폴더: 내 드라이브 › HFC_human_resource › '+a(DRIVE_DIR[0])+'<br><span class="hr-muted">같은 상위 폴더 안: '+DRIVE_DIR.slice(1).map(a).join(' · ')+'</span>';
 }
-function render(){ renderFolder(); renderStatus(); renderNeed(); renderRuns(); }
+function render(){ renderFolder(); renderProc(); renderNeed(); renderRuns(); }
 
 // ── 에이전트 상태 · 최근 결과 ──────────────────────────────────────────────────
 const runsSorted=()=>D.S37.slice().sort((a,b)=>String(b.requested_at||'').localeCompare(String(a.requested_at||''))||String(b.run_id).localeCompare(String(a.run_id)));
 const cnt=r=>`신규 ${parseInt(r.cnt_new)||0} · 갱신 ${parseInt(r.cnt_updated)||0} · 검토 ${parseInt(r.cnt_review)||0} · 실패 ${parseInt(r.cnt_fail)||0}`;
 const stCls={요청됨:'amber','실행 중':'blue',완료:'green',실패:'red'};
-function renderStatus(){
-  const last=runsSorted()[0];
-  hrQ('agentStatus').innerHTML=last
-    ?`<div id="lastRun">마지막 요청 ${hrEsc(last.requested_at)} · ${hrEsc(last.trigger)} · <span class="hr-badge ${stCls[last.state]||'gray'}">${hrEsc(last.state)}</span>${last.state==='완료'?` · ${hrEsc(cnt(last))}`:''}${last.state==='실패'&&last.error?` · ${hrEsc(last.error)}`:''}</div>`
-    :'<div class="hr-muted" id="lastRun">아직 실행 기록이 없습니다.</div>';
-  const st=D.S37.filter(stale);
-  if(st.length) hrQ('agentStatus').insertAdjacentHTML('beforeend',`<div class="hr-sub" id="staleNote">중간에 끊긴 실행이 ${st.length}건 남아 있습니다(${hrEsc(st.map(r=>r.requested_at).join(', '))}). 새 요청에는 영향이 없습니다. <button class="btn btn-secondary btn-sm" data-act="clearStale">끊긴 실행 정리</button></div>`);
-  const run=running(); hrQ('btnFolder').disabled=false; hrQ('btnFile').disabled=false;
-  if(run) hrQ('agentStatus').insertAdjacentHTML('beforeend','<div class="hr-sub" id="runningNote">실행 요청이 처리되는 중입니다. 완료되면 아래 결과에 나타납니다.</div>');
+// ── 프로세스 화면: 지금 할 일 + 단계 카드 (설계서 resume-intake-process-design-v0.2 Phase 1) ──
+// 단계 판정은 시트 기록에서 계산한다(저장값 없음): 요청됨이 있으면 ③ 결과 가져오기 차례, 없고 확인 필요가 있으면 ④, 둘 다 없으면 ② 읽기 맡기기.
+const dayDiff=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/864e5);
+const pendingReq=()=>D.S37.filter(r=>String(r.state||'').trim()==='요청됨').sort((a,b)=>String(a.requested_at||'').localeCompare(String(b.requested_at||''))||String(a.run_id).localeCompare(String(b.run_id)));
+function procMode(){ return pendingReq().length?'import':(needRows().length?'need':'ask'); }
+let lastMode='';
+function renderProc(){
+  const mode=procMode(), pend=pendingReq(), need=needRows(), sd=D.S37.filter(stale);
+  const age=pend.length?Math.max(0,dayDiff(String(pend[0].requested_at||'').slice(0,10)||hrToday(),hrToday())):0;
+  hrQ('procAge').textContent=pend.length?(age===0?'오늘 요청함':`요청한 지 ${age}일째`):'';
+  hrQ('procNow').classList.toggle('calm',mode==='ask');
+  const bd=hrQ('procBadge'); bd.className='hr-badge '+(mode==='ask'?'gray':'amber'); bd.textContent=mode==='ask'?'새 이력서가 있을 때':'지금 할 일 · 내 차례';
+  const by=k=>need.filter(f=>f.parse_status===k).length;
+  const T={ask:['② Claude 에게 읽기를 맡기세요','먼저 이력서를 드라이브 New 폴더에 넣어 두세요. 처리할 이력서가 없으면 지금 할 일은 없습니다.'],
+    import:['③ Claude 가 만들어 준 결과 파일을 올리세요','Claude 가 아직 결과를 주지 않았다면 아래 ② 에서 같은 문구를 다시 복사해 보내세요. 요청을 없애려면 ③ 아래 「이 요청 취소」를 누르세요.'],
+    need:[`④ 확인이 필요한 ${need.length}건을 처리하세요`,NEED.map(k=>by(k)?`${NEED_LABEL[k]} ${by(k)}건`:'').filter(Boolean).join(' · ')+' — 아래 「④ 확인 필요 처리」 목록에서 처리합니다.']}[mode];
+  hrQ('procTitle').textContent=T[0]; hrQ('procSub').textContent=T[1]+(D.S37.some(r=>String(r.state||'').trim()==='실행 중'&&!stale(r))?' (가져오기가 진행 중입니다.)':'');
+  hrQ('staleBox').innerHTML=sd.length?`<div class="hr-sub" id="staleNote" style="margin-top:8px">중간에 끊긴 실행이 ${sd.length}건 남아 있습니다(${hrEsc(sd.map(r=>r.requested_at).join(', '))}). 새 요청에는 영향이 없습니다. <button class="btn btn-secondary btn-sm" data-act="clearStale">끊긴 실행 정리</button></div>`:'';
+  if(mode!==lastMode){ hrQ('secAsk').open=(mode==='ask'); hrQ('secImport').open=(mode==='import'); lastMode=mode; }
+  hrQ('reqTools').innerHTML=pend.length?`<span class="hr-sub">읽기 요청 ${pend.length}건 대기 중 (${hrEsc(String(pend[0].requested_at||'').slice(0,10))} 요청)</span><button class="btn btn-secondary btn-sm" data-act="cancelReq">이 요청 취소</button>`:'';
+  const cls={ask:['done','cur','wait','wait'],import:['done','done','cur','wait'],need:['done','done','done','cur']}[mode];
+  const lab={done:'완료',cur:'지금 할 차례',wait:'대기'};
+  const who=w=>`<span class="proc-who">${w}</span>`;
+  const info=[
+    `드라이브 New 폴더에 이력서 저장 ${who('나')}<br>${DRIVE_DIR[0]?`<a href="https://drive.google.com/drive/folders/${DRIVE_DIR[0][2]}" target="_blank" rel="noopener">New 폴더 열기</a>`:''}`,
+    mode==='ask'?`Claude 에게 문구와 이력서 전달 ${who('나 → Claude')}`:(pend.length?`${hrEsc(String(pend[0].requested_at||'').slice(0,10))} 요청 ${who('나 → Claude')}`:`읽기 요청 완료 ${who('나 → Claude')}`),
+    mode==='need'?`가져오기 완료 ${who('나')}`:`Claude 가 준 결과 파일 올리기 ${who('나')}`,
+    need.length?`${need.length}건 남음 ${who('나')}`:`가져온 뒤 생김 ${who('나')}`];
+  const name=['① 이력서 넣기','② 읽기 맡기기','③ 결과 가져오기','④ 확인 필요 처리'];
+  const first=['완료로 간주',lab[cls[1]],lab[cls[2]],lab[cls[3]]];
+  hrQ('procSteps').innerHTML=name.map((n,i)=>`<div class="proc-st ${cls[i]}" data-step="${i+1}"><div class="n">${n}</div><div class="t">${first[i]}</div><div class="w">${info[i]}</div></div>`).join('');
+}
+async function cancelReq(btn){
+  if(!confirm('읽기 요청 기록을 취소합니다. 이미 받은 결과 파일에는 영향이 없습니다. 계속할까요?')) return;
+  await hrBusy(btn,async()=>{
+    const r0=await hrReadMany(['S37']); if(r0.failed.length){ toast(HR_MSG.read(HR_TABS.S37.tab),true); return; }
+    D.S37=dedupe(r0.tabs.S37.rows,HEADERS.S37[0]); let fail=0; const list=pendingReq();
+    for(const r of list){ const u=await hrUpdate('S37',r.run_id,{state:'실패',finished_at:hrNow(),error:'사용자가 취소'},{readUpdatedAt:r.updated_at}); if(!u.ok) fail++; }
+    toast(fail?`${fail}건은 취소하지 못했습니다. 다시 눌러 주세요.`:`읽기 요청 ${list.length}건을 취소했습니다.`,!!fail); await loadAll();
+  });
 }
 function renderRuns(){
   const rs=runsSorted().slice(0,10);
@@ -223,6 +254,17 @@ function refreshPrompt(){ hrQ('pText').value=promptText(); hrQ('pMsg').textConte
 function copyPrompt(btn){
   const t=hrQ('pText').value; const done=()=>{ hrQ('pMsg').textContent='복사했습니다.'; }; const fail=()=>{ const e=hrQ('pText'); e.focus(); e.select(); hrQ('pMsg').textContent='자동 복사가 안 됩니다. 선택된 문구를 직접 복사해 주세요.'; };
   try{ navigator.clipboard.writeText(t).then(done,fail); }catch(_){ fail(); }
+  recordAsk(btn);   // 읽기를 맡겼다는 기록(요청됨) — 이미 대기 중인 요청이 있으면 새로 만들지 않는다
+}
+async function recordAsk(btn){
+  if(running()){ toast('같은 문구를 다시 복사했습니다. 이미 읽기를 맡긴 상태로 기록되어 있습니다.'); return; }
+  await hrBusy(btn,async()=>{
+    const r0=await hrReadMany(['S37']); if(r0.failed.length){ toast('복사는 했지만 읽기 요청 기록을 저장하지 못했습니다. 새로고침 후 다시 눌러 주세요.',true); return; }
+    D.S37=dedupe(r0.tabs.S37.rows,HEADERS.S37[0]); if(running()){ render(); return; }
+    const a=await hrAppend('S37',{trigger:'수동 폴더',target_ref:'',requested_at:hrNow(),state:'요청됨'});
+    if(!a.ok){ toast('복사는 했지만 읽기 요청 기록을 저장하지 못했습니다. '+hrSaveFailText(a),true); return; }
+    toast('복사했습니다. 읽기를 맡긴 것으로 기록했습니다. Claude 대화에 붙여 넣고 이력서를 첨부하세요.'); await loadAll();
+  });
 }
 let impPayload=null;
 function impReset(){ impPayload=null; hrQ('btnImport').disabled=true; hrQ('impResult').innerHTML=''; hrQ('impErr').textContent=''; }
@@ -243,11 +285,11 @@ async function impRun(btn){
   await hrBusy(btn,async()=>{ const p=impPayload; const r=await cmnImportRun(p,{dry:false}); impPayload=null; hrQ('btnImport').disabled=true;
     if(!r.ok&&!r.results){ hrQ('impErr').textContent=r.message||'가져오지 못했습니다.'; return; }
     toast(r.ok?'가져왔습니다.':'가져오기가 중간에 멈췄습니다.',!r.ok); const html=(r.stopped?`<div class="hr-notice err">${hrEsc(r.stopped)} 이미 저장된 것은 그대로이며, 같은 결과를 다시 가져오면 이어서 처리합니다.</div>`:'')+impTable(r);
-    await loadAll(); hrQ('impResult').innerHTML=html; });
+    await loadAll(); hrQ('secImport').open=true; hrQ('impResult').innerHTML=html; });
 }
 document.addEventListener('click',ev=>{
   const c=ev.target.closest('[data-filter]'); if(c&&c.closest('#needChips')){ filter=c.dataset.filter; panel=null; renderNeed(); return; }
-  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={clearStale,runFolder,runFile,reread,closeFile,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
+  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={cancelReq,clearStale,runFolder,runFile,reread,closeFile,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
 });
 document.addEventListener('change',ev=>{ if(ev.target.id==='impFile'){ const f=ev.target.files&&ev.target.files[0]; if(f){ const rd=new FileReader(); rd.onload=()=>{ hrQ('impText').value=String(rd.result||''); impReset(); }; rd.readAsText(f); } return; }
    if(ev.target.id==='mKeep'&&panel&&panel.type==='merge'){ panel.keep=ev.target.value; panel.drop=ev.target.value===panel.a?panel.b:panel.a; panel.pv=null; renderPanel(); loadPreview(); } });
