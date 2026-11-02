@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.108">
+<link rel="stylesheet" href="css/common.css?v=2.9.109">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -124,7 +124,7 @@
 <main class="main">
   <div style="margin-bottom:10px;display:flex;gap:14px"><a href="input.html" style="font-size:12px;color:var(--blue);text-decoration:none">🧾 세금계산서 관리 →</a><a href="settings.html" style="font-size:12px;color:var(--blue);text-decoration:none">⚙️ 고정비 항목 관리(설정) →</a></div>
   <div class="list-card"><div class="card-title"><span>월별 고정비 계획 <span id="fxCnt" style="font-size:11px;color:var(--text3)"></span></span>
-    <span style="display:flex;gap:6px"><select id="fxYear" onchange="fxYearChanged()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 연도</option></select><select id="fxMonth" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 월</option></select>
+    <span style="display:flex;gap:6px"><select id="fxYear" onchange="fxYearChanged()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 연도</option></select><select id="fxMonth" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 월</option></select><select id="fxCatSel" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 항목</option></select>
     <button onclick="openFxModal()" style="font-size:12px;padding:6px 12px;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer">+ 고정비 추가</button></span></div>
     <!-- v2.9.50: 체크박스 다중 선택 → 일괄 삭제/수정(사용자 요청). 선택된 건이 1건 이상일 때만
          이 액션 바가 나타난다 — "선택 삭제"는 선택된 건 전부, "선택 수정"은 첫 번째로 선택된
@@ -151,7 +151,8 @@
   <div class="form-row"><label class="form-label">항목 <small style="color:var(--text3)">(설정에서 관리)</small></label>
     <input class="form-input" id="fx_cat" list="fxCatDL" placeholder="예: 임차료"><datalist id="fxCatDL"></datalist></div>
   <div class="form-row"><label class="form-label">월 금액 (원)</label><input class="form-input" id="fx_amt" oninput="this.value=fcv(this.value)" style="text-align:right"></div>
-  <div class="form-row"><label class="form-label">지급일 (매월 n일)</label><input class="form-input" type="number" id="fx_day" min="1" max="31" value="25"></div>
+  <div class="form-row"><label class="form-label">지급일 <small style="color:var(--text3)">(아래 적용 기간의 각 월 안에서, 그 월의 n일)</small></label>
+    <div style="display:flex;gap:10px;align-items:center"><input class="form-input" type="number" id="fx_day" min="1" max="31" value="25" style="flex:1"><label style="display:flex;align-items:center;gap:5px;font-size:13px;white-space:nowrap"><input type="checkbox" id="fx_eom" onchange="fxEomToggle()"> 말일</label></div></div>
   <!-- v2.9.50: 근본 결함 수정(사용자 지적: "수정 팝업에서 기간의 From은 수정이 되지만 TO는
        수정이 안 되고 있음") — editFx()가 단건 수정 시 TO를 disabled로 막아 사용자가 아예 바꿀 수
        없었다. 단건 수정에서 TO는 애초에 저장 로직(saveFx의 editingFxId 분기)이 쓰지 않으므로
@@ -159,6 +160,7 @@
        모드에서는 TO 필드 자체를 숨기고 라벨을 "해당 월"로 바꿔 단건 수정임을 명확히 한다
        (신규 추가 모드에서는 그대로 시작월~종료월 반복 생성 UI 유지). -->
   <div class="form-row"><label class="form-label" id="fx_period_label">적용 기간 <small style="color:var(--text3)">(반복: 시작월~종료월, 단건은 동일 월)</small></label>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:6px">※ 여기서 월은 <b>돈이 실제로 나가는 달</b>입니다. 익월에 지급하는 항목(예: 전월 급여를 당월 10일 지급)은 지급하는 달로 입력하세요.</div>
     <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm" style="flex:1" oninput="syncFxEm()"><input class="form-input" type="month" id="fx_em" style="flex:1"></div></div>
   <!-- v2.9.22: 기타경비(고정비) 세금계산서 수취 여부·부가세 — 프로젝트 매입에 안 걸리는 임대료·통신비 등의
        매입세액공제를 부가세 계산에 반영하기 위함(비정기 발생이라 등록 시 기본은 미수취, 실제 계산서를 받으면 단건 수정으로 체크). -->
@@ -170,10 +172,10 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.108"></script>
-<script src="js/common.js?v=2.9.108"></script>
-<script src="js/calc.js?v=2.9.108"></script>
-<script src="js/nav.js?v=2.9.108"></script>
+<script src="js/schema.js?v=2.9.109"></script>
+<script src="js/common.js?v=2.9.109"></script>
+<script src="js/calc.js?v=2.9.109"></script>
+<script src="js/nav.js?v=2.9.109"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -206,7 +208,8 @@ async function loadAll(){
 function fxList(){
   const y=(document.getElementById('fxYear')||{}).value||'';
   const m=(document.getElementById('fxMonth')||{}).value||'';
-  return fixedAll.filter(x=>(!y||(x.year_month||'').startsWith(y))&&(!m||(x.year_month||'').slice(5,7)===m))
+  const c=(document.getElementById('fxCatSel')||{}).value||'';
+  return fixedAll.filter(x=>(!y||(x.year_month||'').startsWith(y))&&(!m||(x.year_month||'').slice(5,7)===m)&&(!c||x.category===c))
     .sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
 }
 function fxBuildMonths(){
@@ -215,11 +218,20 @@ function fxBuildMonths(){
   sel.innerHTML='<option value="">전체 월</option>'+Array.from({length:12},(_,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}">${i+1}월</option>`;}).join('');
 }
 function fxYearChanged(){ renderFx(); }
+// v2.9.109: 항목 필터 — 등록된 고정비의 항목명을 모아 드롭다운으로 제공(선택값이 사라지면 전체로 복귀)
+function fxBuildCats(){
+  const sel=document.getElementById('fxCatSel'); if(!sel) return;
+  const cur=sel.value;
+  const cats=[...new Set(fixedAll.map(x=>x.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  sel.innerHTML='<option value="">전체 항목</option>'+cats.map(k=>`<option value="${k}">${k}</option>`).join('');
+  sel.value=cats.includes(cur)?cur:'';
+}
 // v2.9.50: 체크박스 다중 선택 상태(사용자 요청 — 여러 건을 한 번에 삭제·첫 건 수정). 필터를
 // 바꾸거나 다시 그릴 때 화면에 없는 항목의 선택은 자연히 무의미해지므로, renderFx가 항상 현재
 // 화면에 보이는 fixed_id 집합으로 좁혀 정합성을 유지한다.
 let fxSelected=new Set();
 function renderFx(){
+  fxBuildCats();
   fxBuildMonths(); // 추가·수정으로 새 월이 생겨도 드롭다운에 반영
   const list=fxList();
   document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(num(x.amount)),0))}원)`;
@@ -323,6 +335,10 @@ let editingFxId=null;
 // 반영 안 됨"이라는 혼란을 준다. 편집 모드에서는 FROM을 바꿀 때마다 TO를 자동으로 같은 값으로
 // 맞춰, 두 필드가 항상 같은 하나의 달을 가리키게 한다(신규 추가 모드에서는 FROM~TO로 여러 달을
 // 반복 생성하는 것이 정상 동작이므로 이 자동 동기화를 적용하지 않는다).
+function fxEomToggle(){
+  const e=document.getElementById('fx_eom').checked, d=document.getElementById('fx_day');
+  d.disabled=e; if(e) d.value=31;
+}
 function syncFxEm(){
   if(!editingFxId) return;
   document.getElementById('fx_em').value=document.getElementById('fx_sm').value;
@@ -333,7 +349,10 @@ function editFx(id){
   editingFxId=id;
   document.getElementById('fx_cat').value=x.category||'';
   document.getElementById('fx_amt').value=fcv(x.amount||'');
-  document.getElementById('fx_day').value=parseInt((x.payment_date||'').slice(8,10))||25;
+  const pd=parseInt((x.payment_date||'').slice(8,10))||25;
+  const ymp=x.year_month||''; const dimE=ymp?new Date(parseInt(ymp.slice(0,4)),parseInt(ymp.slice(5,7)),0).getDate():0;
+  const dayEl=document.getElementById('fx_day'), eomEl=document.getElementById('fx_eom');
+  eomEl.checked=!!dimE&&pd===dimE; dayEl.value=pd; dayEl.disabled=eomEl.checked;
   document.getElementById('fx_sm').value=x.year_month||'';
   // v2.9.50: 근본 결함 수정(사용자 지적: "수정 팝업에서 기간의 From은 수정이 되지만 TO는 수정이
   // 안 되고 있음") — 이전에는 em.disabled=true로 TO 입력 자체를 막고 있었다. 이제 TO를 실제로
@@ -350,7 +369,7 @@ function editFx(id){
 }
 async function saveFx(){
   const cat=document.getElementById('fx_cat').value.trim(), amt=unv(document.getElementById('fx_amt').value);
-  const day=parseInt(document.getElementById('fx_day').value)||25;
+  const day=document.getElementById('fx_eom').checked?31:(parseInt(document.getElementById('fx_day').value)||25);
   const sm=document.getElementById('fx_sm').value, em=document.getElementById('fx_em').value||sm;
   if(!cat||!amt||!sm){toast('항목·금액·기간을 입력하세요',true);return;}
   const hasTax=document.getElementById('fx_has_tax').checked;
@@ -394,7 +413,8 @@ function resetFxEdit(){
   editingFxId=null;
   const cat=document.getElementById('fx_cat'); if(cat) cat.value='';
   const amt=document.getElementById('fx_amt'); if(amt) amt.value='';
-  const day=document.getElementById('fx_day'); if(day) day.value='25';
+  const day=document.getElementById('fx_day'); if(day){ day.value='25'; day.disabled=false; }
+  const eom=document.getElementById('fx_eom'); if(eom) eom.checked=false;
   const memo=document.getElementById('fx_memo'); if(memo) memo.value='';
   const em=document.getElementById('fx_em'); if(em) em.disabled=false;
   const btn=document.getElementById('fxSaveBtn'); if(btn) btn.textContent='저장';
