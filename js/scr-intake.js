@@ -146,12 +146,15 @@ function renderFail(){
     return `<tr data-fail="${hrEsc(f.id)}"><td><a href="${hrEsc(f.webViewLink||'#')}" target="_blank" rel="noopener">${hrEsc(f.name)}</a></td><td style="text-align:center">${pt?hrEsc(hrPartyLabel(PM,pt)):'-'}</td><td style="text-align:center">${hrEsc(drvDay(f.createdTime)||'-')}</td><td>${hrEsc((row&&row.parse_error)||'-')}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" data-act="rereadFail" data-id="${hrEsc(f.id)}" title="New 폴더로 되돌려 다시 읽게 합니다">다시 읽기</button></td></tr>`; }).join('')}</tbody></table></div>
     <div class="hr-sub" style="margin-top:6px">서치업체에서 다시 받아야 하는 파일이면 서치업체에 다시 요청하세요. 「다시 읽기」는 파일을 New 폴더로 되돌립니다.</div>`;
 }
+// 오래 걸리는 작업의 진행 표시(맨 위 안내 아래 한 줄). 끝나면 setProg('')
+function setProg(t){ const e=hrQ('drvProg'); if(!e) return; e.style.display=t?'':'none'; hrQ('drvProgTxt').textContent=t||''; }
 async function grantDrive(btn){ await hrBusy(btn,async()=>{ const ok=await authGrantDrive(); if(!ok){ toast('드라이브 권한을 받지 못했습니다. 동의 창에서 드라이브 항목을 선택해 주세요.',true); return; } toast('드라이브 권한을 받았습니다.'); await loadAll(); }); }
 async function reloadDrive(btn){ await hrBusy(btn,async()=>{ await loadAll(); }); }
 async function moveStuck(btn){
   await hrBusy(btn,async()=>{
     await loadDrive(); const st=DR.ok?drvC().stuck:[]; let ok=0,bad=0;
-    for(const x of st){ try{ const r=await driveMove(x.file.id,'NEW',x.to,{reread:null}); if(!r.skipped) ok++; }catch(e){ bad++; } }
+    let i=0; for(const x of st){ setProg(`파일을 옮기는 중… ${++i} / ${st.length}`); try{ const r=await driveMove(x.file.id,'NEW',x.to,{reread:null}); if(!r.skipped) ok++; }catch(e){ bad++; } }
+    setProg('');
     toast(bad?`${ok}건을 옮기고 ${bad}건은 옮기지 못했습니다. 다시 눌러 주세요.`:`${ok}건을 옮겼습니다.`,!!bad); await loadAll();
   });
 }
@@ -172,7 +175,8 @@ async function doUpload(btn){
     await loadDrive(); if(!DR.ok){ hrQ('uResult').innerHTML=`<div class="hr-err">${hrEsc(DR.err||DRV_MSG.scope)}</div>`; return; }
     const props={}; const party=hrQ('uParty').value, day=hrQ('uDate').value; if(party) props.party=party; if(day) props.received=day; props.via='hfc-screen';
     const rows=[]; const seen=new Set(); let up=0;
-    for(const f of files){
+    let k=0; for(const f of files){
+      setProg(`이력서를 올리는 중… ${++k} / ${files.length} (${f.name})`);
       if(!drvExtOk(f.name)){ rows.push([f.name,'올리지 않음',DRV_MSG.ext]); continue; }
       let h; try{ h=await drvSha16(f); }catch(e){ rows.push([f.name,'올리지 않음','파일을 읽지 못했습니다.']); continue; }
       if(seen.has(h)){ rows.push([f.name,'올리지 않음','이번에 고른 파일 중 같은 내용이 있습니다.']); continue; } seen.add(h);
@@ -180,7 +184,7 @@ async function doUpload(btn){
       try{ const o=await driveUpload(f,props); DR.newFiles.push(o); up++; rows.push([f.name,'올림','New 폴더']); }
       catch(e){ rows.push([f.name,'실패',e.message||DRV_MSG.api]); }
     }
-    inp.value=''; await loadAll();
+    setProg(''); inp.value=''; await loadAll();
     hrQ('uResult').innerHTML=`<div id="uCounts" style="margin:8px 0">올림 <b>${up}</b> · 올리지 않음 <b>${rows.filter(r=>r[1]==='올리지 않음').length}</b> · 실패 <b>${rows.filter(r=>r[1]==='실패').length}</b></div><div class="hr-scroll"><table class="hr-table auto"><thead><tr><th>파일</th><th>결과</th><th>사유</th></tr></thead><tbody>${rows.map(r=>`<tr data-up="1"><td>${hrEsc(r[0])}</td><td style="text-align:center">${hrEsc(r[1])}</td><td>${hrEsc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
     toast(up?`${up}건을 New 폴더에 올렸습니다.`:'올린 파일이 없습니다.',!up);
   });
@@ -190,22 +194,22 @@ async function drvLoadResult(btn){
   await hrBusy(btn,async()=>{
     await loadDrive(); if(!DR.ok||!DR.resultFiles.length){ render(); toast('도착한 결과가 없습니다.',true); return; }
     const merged={schema:'hfc-resume-import/1',resumes:[]}; const used=[], bad=[];
-    for(const f of DR.resultFiles){ try{ const j=JSON.parse(await driveReadText(f.id)); if(j&&Array.isArray(j.resumes)){ merged.resumes.push(...j.resumes); used.push(f.id); } else bad.push(f.name); }catch(e){ bad.push(f.name); } }
+    setProg('Result 폴더의 결과를 읽는 중…'); for(const f of DR.resultFiles){ try{ const j=JSON.parse(await driveReadText(f.id)); if(j&&Array.isArray(j.resumes)){ merged.resumes.push(...j.resumes); used.push(f.id); } else bad.push(f.name); }catch(e){ bad.push(f.name); } }
     if(!used.length){ hrQ('impErr').textContent=`결과 파일을 읽지 못했습니다: ${bad.join(', ')}`; return; }
-    hrQ('impText').value=JSON.stringify(merged); impReset(); impSrc=used;
+    setProg(''); hrQ('impText').value=JSON.stringify(merged); impReset(); impSrc=used;
     await impPreview(hrQ('btnPreview'));
     if(bad.length) hrQ('impErr').textContent=`읽지 못한 결과 파일이 있어 건너뛰었습니다(폴더에 그대로 둡니다): ${bad.join(', ')}`;
   });
 }
 // 가져오기 뒤 파일 정리: 이력서는 New → Done/Fail, 다 처리된 결과 파일은 Done 아래 「결과 보관」으로
 async function drvAfter(r,matches,src){
-  const o={done:0,fail:0,err:0};
-  for(let i=0;i<(r.results||[]).length;i++){
-    const m=matches[i], to=drvDest(r.results[i]); if(!m||!to) continue;
+  const o={done:0,fail:0,err:0}; const total=(r.results||[]).length;
+  for(let i=0;i<total;i++){
+    const m=matches[i], to=drvDest(r.results[i]); if(!m||!to) continue; setProg(`이력서 파일을 Done/Fail 폴더로 옮기는 중… ${i+1} / ${total}`);
     try{ const x=await driveMove(m.id,'NEW',to,{reread:null}); if(!x.skipped) o[to==='FAIL'?'fail':'done']++; }catch(e){ o.err++; }
   }
-  if(!r.stopped&&r.ok!==false&&o.err===0){ for(const id of src){ try{ await driveMove(id,'RESULT','ARCHIVE'); }catch(e){ o.err++; } } }
-  return o;
+  if(!r.stopped&&r.ok!==false&&o.err===0){ setProg('결과 파일을 보관 폴더로 옮기는 중…'); for(const id of src){ try{ await driveMove(id,'RESULT','ARCHIVE'); }catch(e){ o.err++; } } }
+  setProg(''); return o;
 }
 async function cancelReq(btn){
   if(!confirm('읽기 요청 기록을 취소합니다. 이미 받은 결과 파일에는 영향이 없습니다. 계속할까요?')) return;
@@ -422,9 +426,9 @@ async function impPreview(btn){
 async function impRun(btn){
   if(!impPayload) return;
   if(!confirm('읽은 결과를 시트에 저장합니다. 계속할까요?')) return;
-  await hrBusy(btn,async()=>{ const p=impPayload; const r=await cmnImportRun(p,{dry:false}); impPayload=null; hrQ('btnImport').disabled=true;
+  await hrBusy(btn,async()=>{ const p=impPayload; setProg('읽은 결과를 시트에 저장하는 중… (이력서 수에 따라 1~2분 걸릴 수 있습니다)'); const r=await cmnImportRun(p,{dry:false}); setProg(''); impPayload=null; hrQ('btnImport').disabled=true;
     if(!r.ok&&!r.results){ hrQ('impErr').textContent=r.message||'가져오지 못했습니다.'; return; }
-    let mv=null; if(DR.ok&&r.results){ try{ mv=await drvAfter(r,impMatches,impSrc); }catch(e){ mv={done:0,fail:0,err:1}; } }
+    let mv=null; if(DR.ok&&r.results){ setProg('시트에 저장했습니다. 파일을 정리하는 중…'); try{ mv=await drvAfter(r,impMatches,impSrc); }catch(e){ mv={done:0,fail:0,err:1}; } } setProg('');
     impMatches=[]; impSrc=[];
     toast(r.ok?'가져왔습니다.':'가져오기가 중간에 멈췄습니다.',!r.ok); const mvHtml=mv?`<div class="hr-notice${mv.err?' err':''}" id="mvNote" style="margin-bottom:8px">파일 정리: Done 으로 ${mv.done}건 · Fail 로 ${mv.fail}건 옮김${mv.err?` · 옮기지 못한 것 ${mv.err}건(저장된 내용에는 영향 없음 — 위쪽 안내의 「지금 옮기기」로 다시 시도)`:''}</div>`:'';
     const html=mvHtml+(r.stopped?`<div class="hr-notice err">${hrEsc(r.stopped)} 이미 저장된 것은 그대로이며, 같은 결과를 다시 가져오면 이어서 처리합니다.</div>`:'')+impTable(r);

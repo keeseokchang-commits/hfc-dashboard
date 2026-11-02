@@ -40,7 +40,8 @@ function hrShowLoadProblem(el,state,message){
 }
 async function hrRelogin(){ accessToken=null; await signIn(); if(typeof loadAll==='function') loadAll(); }
 // 버튼 중복 클릭 방지
-async function hrBusy(btn,fn){ if(btn.disabled) return; btn.disabled=true; try{ return await fn(); } finally{ btn.disabled=false; } }
+// v2.11.2: 처리 중에는 버튼 안에 돌아가는 표시와 「처리 중…」을 보여 준다(끝나면 원래 글자로 복원)
+async function hrBusy(btn,fn){ if(btn.disabled) return; const html=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="spinner btn-spin"></span> 처리 중…'; try{ return await fn(); } finally{ btn.disabled=false; if(btn.isConnected) btn.innerHTML=html; } }
 const hrYes=v=>String(v??'').trim().toUpperCase()==='Y';
 // 쉼표 목록 ↔ 배열
 const hrSplit=s=>String(s??'').split(',').map(x=>x.trim()).filter(Boolean);

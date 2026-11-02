@@ -108,3 +108,8 @@
 .proc-who{font-size:10px;border:1px solid var(--border);border-radius:6px;padding:0 5px;color:var(--text2);white-space:nowrap}
 @media(max-width:640px){.proc-steps{grid-template-columns:1fr 1fr}}
 .proc-now .hr-sub{color:var(--text2)}
+
+/* v2.11.2 처리 중 표시 */
+.btn-spin{width:12px;height:12px;border-width:2px;vertical-align:-2px}
+.prog{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--blue-lt,#EFF6FF);color:var(--blue,#2563EB);font-size:12px}
+.prog .spinner{width:14px;height:14px;border-width:2px}
