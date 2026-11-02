@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 월마감 리포트</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.107">
+<link rel="stylesheet" href="css/common.css?v=2.9.108">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -151,11 +151,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.107"></script>
-<script src="js/common.js?v=2.9.107"></script>
-<script src="js/calc.js?v=2.9.107"></script>
-<script src="js/payout.js?v=2.9.107"></script>
-<script src="js/nav.js?v=2.9.107"></script>
+<script src="js/schema.js?v=2.9.108"></script>
+<script src="js/common.js?v=2.9.108"></script>
+<script src="js/calc.js?v=2.9.108"></script>
+<script src="js/payout.js?v=2.9.108"></script>
+<script src="js/nav.js?v=2.9.108"></script>
 <script>
 let cutoff='',showDone=false;
 let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
@@ -209,7 +209,7 @@ function buildItems(){
 function recalc(){
   const base=document.getElementById('baseDate').value, end=document.getElementById('endDate').value;
   const bal=un(document.getElementById('baseBal').value);
-  document.getElementById('srcNote').textContent=usedCsv?'통장 CSV의 마지막 잔액이 더 최신이라 그 값을 기준으로 씁니다 ('+csvBal.date+').':'';
+  document.getElementById('srcNote').textContent=(csvBal?'실적 반영 기준일(통장 CSV 마지막 거래일): '+csvBal.date+'. ':'')+(usedCsv?'통장 CSV의 마지막 잔액이 더 최신이라 그 값을 기준으로 씁니다.':'');
   if(!base||!end){ document.getElementById('paper').innerHTML=''; return; }
   const all=buildItems().filter(x=>x.date<=end);
   all.forEach(x=>{ x.over=x.date<=base; x.byCut=!!cutoff&&x.date<=cutoff; x.skip=x.over&&(x.byCut||!!skips[x.id]); });

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.9.107">
+<link rel="stylesheet" href="css/common.css?v=2.9.108">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -205,7 +205,7 @@
     </div>
   </div>
 
-  <!-- v2.9.107: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
+  <!-- v2.9.108: 유형별 누적 잔액 — 나갔다가 나중에 돌아오는 돈(보증금·적금·가지급금 등)은 월별로 보면 상계가 안 되므로
        설정 ⑨(S10 category=balance_item)에 등록한 유형의 전체 기간 누적 지급·반환·잔액을 보여준다. -->
   <div class="card" id="balCard">
     <div class="card-title">유형별 누적 잔액 <select id="balYear" onchange="renderBalanceCard()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-left:8px"></select> <span style="font-size:11px;color:var(--text3);font-weight:400">※ 잔액은 연도와 무관하게 처음부터 누적 · 항목은 설정 ⑨에서 추가/삭제</span></div>
@@ -246,6 +246,8 @@
     <div class="card-title">
       하나은행 거래내역 업로드
       <span id="lastUpload" style="font-size:11px;color:var(--text3)"></span>
+      <span id="asOfBadge" style="font-size:11px;color:var(--text3);margin-left:6px"></span>
+      <div id="uploadPreview" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
     </div>
     <div class="upload-zone" id="uploadZone" onclick="document.getElementById('csvFile').click()"
          ondragover="e=>{e.preventDefault();this.classList.add('drag')}"
@@ -374,11 +376,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.107"></script>
-<script src="js/common.js?v=2.9.107"></script>
-<script src="js/calc.js?v=2.9.107"></script>
-<script src="js/payout.js?v=2.9.107"></script>
-<script src="js/nav.js?v=2.9.107"></script>
+<script src="js/schema.js?v=2.9.108"></script>
+<script src="js/common.js?v=2.9.108"></script>
+<script src="js/calc.js?v=2.9.108"></script>
+<script src="js/payout.js?v=2.9.108"></script>
+<script src="js/nav.js?v=2.9.108"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -978,8 +980,20 @@ function saveUnclassified(){
 }
 
 // ── Google Sheets 저장 ─────────────────────────────────────────
+// v2.9.108: 업로드 미리보기 — 올린 파일에서 새 거래와 이미 저장된 거래를 가른다(지문: 일시·입금·출금·잔액). 새 거래만 저장에 더해진다.
+function uploadDiff(){
+  const fpOf=d=>String(d.txn_date)+'|'+(num(d.inflow_amt)||0)+'|'+(num(d.outflow_amt)||0)+'|'+(num(d.balance)||0);
+  const old=new Set(); detailAll.forEach(d=>{ old.add(fpOf(d)); old.add(String(d.txn_date).slice(0,10)+'|'+(num(d.inflow_amt)||0)+'|'+(num(d.outflow_amt)||0)+'|'+(num(d.balance)||0)); });
+  let nw=0,ex=0; parsedTxns.forEach(t=>{ if(old.has(t.fp)||old.has(t.date+'|'+t.inAmt+'|'+t.outAmt+'|'+t.bal)) ex++; else nw++; });
+  const ds=parsedTxns.map(t=>t.date).sort();
+  return {nw,ex,from:ds[0]||'',to:ds[ds.length-1]||''};
+}
 function promptSaveToSheets(){
-  if(!confirm(`파싱 완료! Google Sheets에 저장하시겠습니까?\n(기존 월 데이터와 병합하여 S08_CASHFLOW_ACT, S08_DETAIL에 기록됩니다)`)) return;
+  const u=uploadDiff();
+  const el=document.getElementById('uploadPreview');
+  if(el) el.innerHTML=`이번 파일: ${u.from} ~ ${u.to} · <b>새 거래 ${u.nw}건</b> · 이미 있는 거래 ${u.ex}건`;
+  if(u.nw===0){ alert(`이미 모두 반영된 파일입니다.\n(기간 ${u.from} ~ ${u.to}, ${u.ex}건 모두 저장된 거래입니다. 저장할 내용이 없습니다)`); return; }
+  if(!confirm(`파싱 완료!\n기간 ${u.from} ~ ${u.to}\n새 거래 ${u.nw}건 · 이미 있는 거래 ${u.ex}건\n\nGoogle Sheets에 저장하시겠습니까? 새 거래만 더해지고, 이미 있는 거래는 그대로(대사 연결 유지) 둡니다.`)) return;
   saveToSheets();
 }
 
@@ -992,9 +1006,12 @@ async function saveToSheets(){
   // v2.5.2: 지문(fp)으로 기존 거래 식별 — 기존 txn_id 유지(대사 링크 보존), 신규만 새 ID. 일시는 txn_date에 시분초로 저장
   const _fpOf=d=>String(d.txn_date)+'|'+(num(d.inflow_amt)||0)+'|'+(num(d.outflow_amt)||0)+'|'+(num(d.balance)||0);
   const _oldByFp=new Map(detailAll.map(d=>[_fpOf(d),d]));
+  // v2.9.108: 지문이 다른데 새 ID가 기존 거래의 ID와 겹치면(같은 날 일부만 먼저 올라간 경우) 덮어쓰지 않도록 그 날의 다음 번호를 쓴다
+  const _usedIds=new Set(detailAll.map(d=>d.txn_id));
+  const _freeId=t=>{ if(!_usedIds.has(t.txnId)){ _usedIds.add(t.txnId); return t.txnId; } let n=1; const base='TXN-'+t.date.replace(/-/g,'')+'-'; while(_usedIds.has(base+String(n).padStart(3,'0'))) n++; const id=base+String(n).padStart(3,'0'); _usedIds.add(id); return id; };
   const _newD=parsedTxns.map(t=>{
     const ex=_oldByFp.get(t.fp)||_oldByFp.get(t.date+'|'+t.inAmt+'|'+t.outAmt+'|'+t.bal); // 구(날짜만) 데이터 호환
-    return {txn_id:ex?ex.txn_id:t.txnId,txn_date:t.dt,description:t.desc,inflow_amt:t.inAmt,outflow_amt:t.outAmt,balance:t.bal,recv:t.recv,branch:t.branch,category:ex&&ex.category&&t.cat.startsWith('기타')?ex.category:t.cat,year_month:t.ym};
+    return {txn_id:ex?ex.txn_id:_freeId(t),txn_date:t.dt,description:t.desc,inflow_amt:t.inAmt,outflow_amt:t.outAmt,balance:t.bal,recv:t.recv,branch:t.branch,category:ex&&ex.category&&t.cat.startsWith('기타')?ex.category:t.cat,year_month:t.ym};
   });
   const _mergedD=dedupe([...detailAll,..._newD],'txn_id')
     .sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
@@ -1076,7 +1093,7 @@ async function loadSheets(){
     // 청구 스케줄에 더 이상 만들어지지 않는다(사용자 확정 — 그 화면은 세금계산서 관리에만 집중해야
     // 함). 대신 자금수지가 견적(S12)에서 직접 월별로 계산해 지출 계획에 반영한다 — 견적을 저장하는
     // 즉시(청구 스케줄 재생성 없이도) 자금수지에 정확히 나타나는 장점도 있다.
-    // v2.9.107: 계산서 없는 지급의 출처를 지급 스케줄(S15)로 전환(설계서 지급 스케줄 v0.3 §6). S15가 없는 프로젝트는
+    // v2.9.108: 계산서 없는 지급의 출처를 지급 스케줄(S15)로 전환(설계서 지급 스케줄 v0.3 §6). S15가 없는 프로젝트는
     // 전환 기간 안전장치로 견적 계산(v2.9.46 규칙: 귀속월 익월 10일)을 그대로 쓰고 「지급 스케줄 미생성」으로 알린다. 계산은 js/payout.js 하나가 맡는다.
     payoutAll=poR?toObj(poR).filter(r=>r.payout_id):[];
     const prjOk=prjAll.filter(p=>okPrj.has(p.project_id));
@@ -1137,7 +1154,7 @@ function openPlanDetail(ym,dir){
   b.innerHTML=html||'<div style="color:var(--text3);padding:12px">해당 건 없음</div>';
   document.getElementById('planModal').classList.add('open');
 }
-// v2.9.107: 월별 계획 vs 실적 — 월 행을 누르면 그 달의 계획(입금·출금)과 실적(통장 거래)을 한 화면에 나란히 펼친다
+// v2.9.108: 월별 계획 vs 실적 — 월 행을 누르면 그 달의 계획(입금·출금)과 실적(통장 거래)을 한 화면에 나란히 펼친다
 // (이전에는 계획입금·계획출금 숫자를 각각 눌러 팝업을 두 번 열어야 했다).
 const paOpen=new Set();
 function planActItems(ym){
@@ -1149,7 +1166,7 @@ function planActItems(ym){
   planFix.filter(f=>f.year_month===ym).forEach(f=>items.push({src:'fix',cat:f.category||'미지정',dir:'out',date:f.payment_date||ym,label:'고정비 · '+(f.category||''),sub:f.memo||'',amt:num(f.amount)||0,st:f.pay_actual_date||f.matched_txn_id?'대사':''}));
   return items.sort((x,y)=>String(x.date).localeCompare(String(y.date)));
 }
-// v2.9.107: 상세를 항목 단위로 묶어 계획·실적을 한 줄로 비교(사용자 요청 2026-10-23).
+// v2.9.108: 상세를 항목 단위로 묶어 계획·실적을 한 줄로 비교(사용자 요청 2026-10-23).
 // 묶는 기준: 프로젝트 매출 계획=「매출입금」, 프로젝트 매입 계획=「매입지급」(통장 거래에는 프로젝트가 없어 합계로만 비교), 고정비 계획=항목명.
 // 실적은 거래의 유형이 매출입금·매입지급 버킷이면 각각 그 줄에 합치고, 나머지는 유형명 그대로(계획에 없으면 예산 외). 실적 금액은 순액(같은 유형의 반대 방향 거래 차감).
 const paGOpen=new Set();
@@ -1195,27 +1212,37 @@ document.addEventListener('click',e=>{
   const tr=e.target.closest&&e.target.closest('#planActBody tr.pa-row'); if(!tr) return;
   const k=tr.dataset.ym; if(paOpen.has(k)) paOpen.delete(k); else paOpen.add(k); renderPlanAct();
 });
+// v2.9.108: 실적 반영 기준일 = 저장된 통장 거래 중 가장 늦은 거래일(자금 입출 리듬 설계서 v0.1 §5). 그 달이 아직 끝나지 않았으면 계획도 기준일까지만 비교한다.
+function asOfDate(){ let m=''; detailAll.forEach(t=>{ const d=String(t.txn_date||'').slice(0,10); if(d>m) m=d; }); return m; }
+function monthEndOf(ym){ const [y,m]=ym.split('-').map(Number); return `${ym}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`; }
+function inCut(ym,date){ const a=asOfDate(); if(!a||ym!==a.slice(0,7)||a>=monthEndOf(ym)) return true; return (date?String(date).slice(0,10):monthEndOf(ym))<=a; }
+function refreshAsOf(){ const el=document.getElementById('asOfBadge'); if(!el) return; const a=asOfDate(); el.textContent=a?`실적 반영 기준일(통장 CSV 마지막 거래일): ${a}`:''; }
 function renderPlanAct(){
+  refreshAsOf();
   const yr=document.getElementById('yearSel').value;
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
   document.getElementById('planActBody').innerHTML=months.map(m=>{
     const ym=`${yr}-${m}`;
-    const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+    const cutOn=!inCut(ym,'9999-12-31'); // 기준일이 이 달 중간이면 계획도 기준일까지만 비교
+    const pInAll=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym).reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
+    const pIn=planRev.filter(r=>(((r.cash_recv_date||'').slice(0,7))||r.year_month)===ym&&inCut(ym,r.cash_recv_date)).reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
     // v2.9.43: planCost의 계산서없음 매입(cost_id가 "NOINV-"로 시작)은 이미 VAT 없는 금액이라 ×1.1을 곱하지 않는다.
-    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym)
-      .reduce((s,c)=>s+(String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1)),0);
-    const pOutF=planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0);
+    const costAmt=c=>String(c.cost_id||'').startsWith('NOINV-')?(num(c.amount)||0):Math.round((num(c.amount)||0)*1.1);
+    const pOutC=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym&&inCut(ym,c.payment_date)).reduce((s,c)=>s+costAmt(c),0);
+    const pOutF=planFix.filter(f=>f.year_month===ym&&inCut(ym,f.payment_date)).reduce((s,f)=>s+(num(f.amount)||0),0);
     const pOut=pOutC+pOutF;
+    const pOutAll=planCost.filter(c=>(((c.payment_date||'').slice(0,7))||c.year_month)===ym).reduce((s,c)=>s+costAmt(c),0)+planFix.filter(f=>f.year_month===ym).reduce((s,f)=>s+(num(f.amount)||0),0);
+    const later=(all,cut)=>cutOn&&all>cut?`<br><span style="font-size:10px;color:var(--text3)">이후 예정 ${won(all-cut,false)}</span>`:'';
     const act=actData.find(a=>a.year_month===ym);
     const aIn=act?num(act.act_inflow)||0:null;
     const aOut=act?num(act.act_outflow)||0:null;
     if(!pIn&&!pOut&&aIn===null) return '';
     const dIn=aIn!==null?aIn-pIn:null, dOut=aOut!==null?aOut-pOut:null;
     const open=paOpen.has(ym);
-    return `<tr class="pa-row" data-ym="${ym}" style="cursor:pointer" title="클릭하면 계획·실적 상세를 함께 보여줍니다"><td><span style="color:var(--text3);font-size:10px;margin-right:4px">${open?'▼':'▶'}</span>${parseInt(m)}월</td>
-      <td>${pIn?won(pIn,false):'─'}</td>
+    return `<tr class="pa-row" data-ym="${ym}" style="cursor:pointer" title="클릭하면 계획·실적 상세를 함께 보여줍니다"><td><span style="color:var(--text3);font-size:10px;margin-right:4px">${open?'▼':'▶'}</span>${parseInt(m)}월${cutOn?`<br><span style="font-size:10px;color:var(--amber)">${asOfDate().slice(5).replace('-','/')}까지</span>`:''}</td>
+      <td>${pIn?won(pIn,false):'─'}${later(pInAll,pIn)}</td>
       <td>${aIn!==null?`${won(aIn,false)}<br><span style="font-size:10px" class="${dIn>=0?'pos':'neg'}">${dIn>=0?'+':''}${won(dIn,false)}</span>`:'─'}</td>
-      <td>${pOut?won(pOut,false):'─'}</td>
+      <td>${pOut?won(pOut,false):'─'}${later(pOutAll,pOut)}</td>
       <td>${aOut!==null?`${won(aOut,false)}<br><span style="font-size:10px" class="${dOut<=0?'pos':'neg'}">${dOut>=0?'+':''}${won(dOut,false)}</span>`:'─'}</td></tr>${open?planActDetailRow(ym):''}`;
   }).join('')||'<tr><td colspan="5"><div class="empty-state">데이터 없음</div></td></tr>';
 }
@@ -1387,7 +1414,7 @@ function renderVatBanner(){
 // isCat()으로 두 함수 모두 bucketOf()를 거치도록 통일 — 코드관리에 등록이 없어 하드코딩 폴백이 그대로
 // canonical 문자열을 반환하는 기존 케이스(raw===canon)도 그대로 보존되어 회귀 없음.
 function isCat(raw,canon){ return raw===canon || bucketOf(raw)===canon; }
-// v2.9.107: 설정 ⑩ 「대사 제외 유형」(S10 category=recon_exclude) — 매입 건이 없는 지급(보증금 등)·계산서 없는 지급이 미매칭 목록에 영원히 남는 문제.
+// v2.9.108: 설정 ⑩ 「대사 제외 유형」(S10 category=recon_exclude) — 매입 건이 없는 지급(보증금 등)·계산서 없는 지급이 미매칭 목록에 영원히 남는 문제.
 // 대사(자동·수동) 대상에서만 빼며 월별 집계·버킷은 그대로다.
 function reconExcluded(cat){ const k=String(cat??'').replace(/\s+/g,''); return (s10All||[]).some(r=>r.category==='recon_exclude'&&String(r.setting_key||'').replace(/\s+/g,'')===k&&k); }
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}

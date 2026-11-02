@@ -31,7 +31,7 @@ function addMonthsKeepDay(d,k){
 // 일수를 다음 앵커 구간의 일수로 나누는" 방식이라 이런 왜곡이 생기지 않는다.
 // 검증(사용자 확정 사례): 3/12~9/11=6.00, 3/12~11/11=8.00(v2.9.19 도입 전 원래 값),
 // 10/26~2/25=4.00(2026-09-27 이번 사례로 재확인).
-// v2.9.107~92: 일할 계산 옵션(사용자 승인 2026-10-21, KB증권 계약서 사례) — 계약마다 다르고, 매출과 매입을 따로 지정할 수 있다.
+// v2.9.108~92: 일할 계산 옵션(사용자 승인 2026-10-21, KB증권 계약서 사례) — 계약마다 다르고, 매출과 매입을 따로 지정할 수 있다.
 //  · mmRound: 일할 비율을 소수 몇째 자리에서 반올림할지(2→0.4, 3→0.42, 4→0.419). 이 반올림한 비율을 단가에 곱한다. M/M 표시도 같은 자리.
 //  · cutUnit: 곱한 입사월 금액을 처리할 단위(1=원, 1000=천원, 10000=만원). 만근월은 단가 그대로, 종료월은 총액에서 앞 달을 뺀 잔액.
 //  · cutMode: 위 단위로 '절사' 또는 '반올림'.
@@ -151,7 +151,7 @@ function monthlyProfile(items,priceField,defStart,defEnd){
     // 분기를 유지했다면 이제 "단가"를 "총액"으로 오인해 이중으로 나누는 반대 방향의 결함이 재발했을 것).
     const p=_n(e[priceField]); if(!p)return;
     if(e.comp_type==='인건비'){
-      // v2.9.107: 금액은 M/M 표시값(반올림)이 아니라 정확한 일수 비율로 계산하고 절사 단위를 적용한다(행의 mm_round·cut_unit, 없으면 설정 기본값)
+      // v2.9.108: 금액은 M/M 표시값(반올림)이 아니라 정확한 일수 비율로 계산하고 절사 단위를 적용한다(행의 mm_round·cut_unit, 없으면 설정 기본값)
       monthlyAmounts(p,e.start_date||defStart,e.end_date||defEnd,calcOpt(e,priceField)).forEach(x=>{
         const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+x.amount;});
     } else {
@@ -167,4 +167,19 @@ function monthlyProfile(items,priceField,defStart,defEnd){
     }
   });
   return byM;
+}
+
+// v2.9.108: 통장 CSV 운영 리듬(자금 입출 리듬 설계서 v0.1 §6) — 오늘(today)과 저장된 마지막 거래일(last)로 알림을 정한다. 순수 함수.
+// 규칙: 1일=전월 말일까지 CSV 신청 안내 / 2일부터 전월 말일 데이터 없으면 지연 / 13~15일 12일까지 데이터 없으면 업로드 안내 / 16일부터 없으면 지연.
+function csvRhythm(today,last){
+  const out=[]; if(!today) return out;
+  const [y,m,d]=today.split('-').map(Number); const pe=new Date(y,m-1,0); // 전월 말일
+  const prevEnd=`${pe.getFullYear()}-${String(pe.getMonth()+1).padStart(2,'0')}-${String(pe.getDate()).padStart(2,'0')}`;
+  const ym=today.slice(0,7), c12=ym+'-12', L=last||'';
+  const tail=L?` (마지막 거래일 ${L})`:' (저장된 거래가 없습니다)';
+  if(d>=2&&L<prevEnd) out.push({level:'late',msg:`전월 마감용 CSV(전월 말일까지)가 아직 올라오지 않았습니다${tail}`});
+  if(d===1&&L<prevEnd) out.push({level:'info',msg:'은행에 전월 말일까지 거래내역 CSV를 신청하세요(수령은 2일)'});
+  if(d>=13&&d<=15&&L<c12) out.push({level:'info',msg:`오늘~15일 사이에 CSV를 올려 주세요. 10~12일 지급분이 아직 반영되지 않았습니다${tail}`});
+  if(d>=16&&L<c12) out.push({level:'late',msg:`당월 10~12일 지급분이 아직 반영되지 않았습니다${tail}`});
+  return out;
 }
