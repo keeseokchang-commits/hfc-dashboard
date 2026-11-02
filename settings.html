@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.110">
+<link rel="stylesheet" href="css/common.css?v=2.9.111">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -270,6 +270,24 @@
     </div>
   </div>
 
+  <!-- ── 보안 (v2.9.111: 로그인·자동 잠금·화면 잠금 번호, 설계서 security-login-design v0.1) ── -->
+  <div class="card">
+    <div class="card-title">🔒 보안</div>
+    <div class="info-row"><span class="info-label">로그인 계정</span><span class="info-val hfc-who"></span></div>
+    <div class="form-row" style="display:flex;gap:8px;align-items:flex-end;margin:12px 0;flex-wrap:wrap">
+      <div><label class="form-label">자동 잠금 시간 (분, 1~120)</label><input class="form-input" type="number" id="secMin" min="1" max="120" style="width:120px"></div>
+      <button class="btn btn-primary" onclick="saveSecMin()">저장</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:6px" id="secPinState"></div>
+    <div class="form-row" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div id="secOldWrap"><label class="form-label">현재 번호</label><input class="form-input" type="password" inputmode="numeric" maxlength="4" id="secOld" style="width:100px"></div>
+      <div><label class="form-label">새 번호 (숫자 4자리)</label><input class="form-input" type="password" inputmode="numeric" maxlength="4" id="secNew" style="width:120px"></div>
+      <div><label class="form-label">새 번호 확인</label><input class="form-input" type="password" inputmode="numeric" maxlength="4" id="secNew2" style="width:120px"></div>
+      <button class="btn btn-primary" onclick="saveSecPin()">번호 변경</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:10px">번호를 잊었다면 구글 시트 S10_SETTINGS에서 lock_pin 행을 지우고 다시 로그인하면 새로 만들 수 있습니다.</div>
+  </div>
+
   <!-- ── 시스템 정보 ── -->
   <div class="card">
     <div class="card-title">ℹ️ 시스템 정보</div>
@@ -292,12 +310,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.110"></script>
-<script src="js/common.js?v=2.9.110"></script>
-<script src="js/cmn-sheet.js?v=2.9.110"></script>
-<script src="js/cmn-init.js?v=2.9.110"></script>
-<script src="js/calc.js?v=2.9.110"></script>
-<script src="js/nav.js?v=2.9.110"></script>
+<script src="js/schema.js?v=2.9.111"></script>
+<script src="js/common.js?v=2.9.111"></script>
+<script src="js/auth.js?v=2.9.111"></script>
+<script src="js/cmn-sheet.js?v=2.9.111"></script>
+<script src="js/cmn-init.js?v=2.9.111"></script>
+<script src="js/calc.js?v=2.9.111"></script>
+<script src="js/nav.js?v=2.9.111"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -715,6 +734,23 @@ async function runSheetPrep(){
   await loadCodes(); await loadSettings();
 }
 window.addEventListener('load',loadCodes);
+
+// v2.9.111 보안 카드 — 자동 잠금 시간·잠금 번호 (실제 처리는 js/auth.js)
+async function loadSec(){
+  const st=await secStatus(); if(!st.ok){ document.getElementById('secPinState').textContent='보안 설정을 읽지 못했습니다.'; return; }
+  document.getElementById('secMin').value=st.minutes;
+  document.getElementById('secPinState').textContent=st.hasPin?'잠금 번호가 지정되어 있습니다.':'아직 잠금 번호가 없습니다. 아래에서 새로 만드세요.';
+  document.getElementById('secOldWrap').style.display=st.hasPin?'':'none';
+}
+async function saveSecMin(){ const r=await secSetIdle(document.getElementById('secMin').value); toast(r.msg,!r.ok); }
+async function saveSecPin(){
+  const a=document.getElementById('secNew').value, b=document.getElementById('secNew2').value;
+  if(a!==b){ toast('새 번호 두 개가 같지 않습니다',true); return; }
+  const r=await secChangePin(document.getElementById('secOld').value,a);
+  toast(r.msg,!r.ok);
+  if(r.ok){ ['secOld','secNew','secNew2'].forEach(i=>document.getElementById(i).value=''); loadSec(); }
+}
+window.addEventListener('load',loadSec);
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>

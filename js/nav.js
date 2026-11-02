@@ -1,7 +1,7 @@
 // HFC nav.js v2.0 — 사이드바·탭바 단일 렌더(메뉴 변경은 이 파일만 수정)
 // v2.9.28: 배포 버전 표시 — 실제 실행 중인 배포가 어느 버전인지 화면에서 바로 구분할 수 있게(사용자 요청).
 // 새 버전 배포 시 이 상수 하나만 갱신하면 전 화면(사이드바+모바일 탭바)에 자동 반영된다.
-const HFC_VERSION='v2.9.110';
+const HFC_VERSION='v2.9.111';
 const NAV_ITEMS=[
   ['dash','🏠','대시보드','index.html',true],
   ['pipeline','📋','사업기회','pipeline.html',true],
@@ -31,7 +31,7 @@ function renderNav(active){
     ?'<div style="height:1px;background:var(--border,#E2E8F0);margin:6px 8px"></div>'
     :(group?`<div style="padding:4px 14px 2px;font-size:11px;color:var(--text3,#94A3B8)">${group}</div>`:'')
       +`<button class="side-nav-item${k===active?' active':''}" ${k===active?'':`onclick="location.href='${href}'"`}><span class="sn-icon">${ic}</span>${label}</button>`).join('\n')
-    +`<div style="margin-top:auto;padding:10px 14px;font-size:11px;color:var(--text3,#94A3B8);border-top:1px solid var(--border,#E2E8F0)">HFC 경영관리 ${HFC_VERSION}</div>`;
+    +`<div style="margin-top:auto;padding:10px 14px;font-size:11px;color:var(--text3,#94A3B8);border-top:1px solid var(--border,#E2E8F0)"><div class="hfc-who" style="word-break:break-all;margin-bottom:6px">${typeof authEmail==='function'?authEmail():''}</div><div style="display:flex;gap:6px;margin-bottom:8px"><button onclick="authLockNow()" style="flex:1;font-size:11px;padding:5px 0;border:1px solid var(--border,#E2E8F0);border-radius:7px;background:var(--surface,#fff);cursor:pointer">🔒 잠금</button><button onclick="authLogout()" style="flex:1;font-size:11px;padding:5px 0;border:1px solid var(--border,#E2E8F0);border-radius:7px;background:var(--surface,#fff);cursor:pointer">로그아웃</button></div>HFC 경영관리 ${HFC_VERSION}</div>`;
   const tb=document.querySelector('nav.tab-bar');
   if(tb){
     const moreKeys=navItemsOnly().filter(x=>!x[4]).map(x=>x[0]);
@@ -66,7 +66,8 @@ function toggleMoreNav(){
   m=document.createElement('div'); m.id='moreNav';
   m.style.cssText='position:fixed;right:10px;bottom:64px;z-index:250;background:var(--surface,#fff);border:1px solid var(--border,#E2E8F0);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:8px;min-width:150px';
   m.innerHTML=navItemsOnly().filter(x=>!x[4]).map(([k,ic,label,href])=>
-    `<button style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:none;background:${k===active?'var(--blue-lt,#EFF6FF)':'none'};border-radius:9px;font-size:13px;cursor:pointer;color:${k===active?'var(--blue,#2563EB)':'inherit'};font-weight:${k===active?'700':'500'}" onclick="location.href='${href}'">${ic} ${label}</button>`).join('');
+    `<button style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:none;background:${k===active?'var(--blue-lt,#EFF6FF)':'none'};border-radius:9px;font-size:13px;cursor:pointer;color:${k===active?'var(--blue,#2563EB)':'inherit'};font-weight:${k===active?'700':'500'}" onclick="location.href='${href}'">${ic} ${label}</button>`).join('')
+    +`<div style="height:1px;background:var(--border,#E2E8F0);margin:6px 4px"></div><button style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:none;background:none;border-radius:9px;font-size:13px;cursor:pointer" onclick="authLockNow()">🔒 지금 잠금</button><button style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:none;background:none;border-radius:9px;font-size:13px;cursor:pointer" onclick="authLogout()">↩ 로그아웃</button>`;
   document.body.appendChild(m);
   setTimeout(()=>document.addEventListener('click',function h(e){ if(!m.contains(e.target)&&!e.target.closest('.tab-item')){m.remove();document.removeEventListener('click',h);} }),50);
 }

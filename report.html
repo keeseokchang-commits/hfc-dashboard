@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 월마감 리포트</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.110">
+<link rel="stylesheet" href="css/common.css?v=2.9.111">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -151,11 +151,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.110"></script>
-<script src="js/common.js?v=2.9.110"></script>
-<script src="js/calc.js?v=2.9.110"></script>
-<script src="js/payout.js?v=2.9.110"></script>
-<script src="js/nav.js?v=2.9.110"></script>
+<script src="js/schema.js?v=2.9.111"></script>
+<script src="js/common.js?v=2.9.111"></script>
+<script src="js/auth.js?v=2.9.111"></script>
+<script src="js/calc.js?v=2.9.111"></script>
+<script src="js/payout.js?v=2.9.111"></script>
+<script src="js/nav.js?v=2.9.111"></script>
 <script>
 let cutoff='',showDone=false;
 let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
@@ -200,7 +201,7 @@ function buildItems(){
   D.poCosts.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=num2(c.amount); if(!a) return; const r=c._po;
     const grp=r?({'사업소득':'사업소득 지급','급여':'급여 지급','기타경비':'기타경비 (계산서 없음)','원천세':'원천세 납부','4대보험':'4대보험 납부'}[r.pay_type]):'계산서 없는 지급 (견적 계산)';
     add({id:c.cost_id,dir:'out',grp,date:c.payment_date||mEnd(c.year_month),label:P(c.project_id)+(c.person_name?' · '+c.person_name:''),sub:'귀속 '+c.year_month,amt:a,est:r?(r.est_status!=='확정'):true,po:r||null}); });
-  // v2.9.110: 법인카드는 월 예산 방식 — 줄 자체는 빼고, 그 달 말일에 「남은 사용 예상」 한 줄만 올린다(마지막 거래일이 말일 이전일 때만)
+  // v2.9.111: 법인카드는 월 예산 방식 — 줄 자체는 빼고, 그 달 말일에 「남은 사용 예상」 한 줄만 올린다(마지막 거래일이 말일 이전일 때만)
   const lastTxn=D.detail.reduce((m,t)=>{ const d=String(t.txn_date||'').slice(0,10); return d>m?d:m; },'');
   cardBudgetMonths(D.fix).forEach(ym=>{ const st=cardBudgetStatus(ym,D.fix,D.detail); const d=mEnd(ym);
     if(!st.remain||(lastTxn&&lastTxn>=d)) return;

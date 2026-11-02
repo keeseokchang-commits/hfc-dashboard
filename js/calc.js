@@ -31,7 +31,7 @@ function addMonthsKeepDay(d,k){
 // 일수를 다음 앵커 구간의 일수로 나누는" 방식이라 이런 왜곡이 생기지 않는다.
 // 검증(사용자 확정 사례): 3/12~9/11=6.00, 3/12~11/11=8.00(v2.9.19 도입 전 원래 값),
 // 10/26~2/25=4.00(2026-09-27 이번 사례로 재확인).
-// v2.9.110~92: 일할 계산 옵션(사용자 승인 2026-10-21, KB증권 계약서 사례) — 계약마다 다르고, 매출과 매입을 따로 지정할 수 있다.
+// v2.9.111~92: 일할 계산 옵션(사용자 승인 2026-10-21, KB증권 계약서 사례) — 계약마다 다르고, 매출과 매입을 따로 지정할 수 있다.
 //  · mmRound: 일할 비율을 소수 몇째 자리에서 반올림할지(2→0.4, 3→0.42, 4→0.419). 이 반올림한 비율을 단가에 곱한다. M/M 표시도 같은 자리.
 //  · cutUnit: 곱한 입사월 금액을 처리할 단위(1=원, 1000=천원, 10000=만원). 만근월은 단가 그대로, 종료월은 총액에서 앞 달을 뺀 잔액.
 //  · cutMode: 위 단위로 '절사' 또는 '반올림'.
@@ -151,7 +151,7 @@ function monthlyProfile(items,priceField,defStart,defEnd){
     // 분기를 유지했다면 이제 "단가"를 "총액"으로 오인해 이중으로 나누는 반대 방향의 결함이 재발했을 것).
     const p=_n(e[priceField]); if(!p)return;
     if(e.comp_type==='인건비'){
-      // v2.9.110: 금액은 M/M 표시값(반올림)이 아니라 정확한 일수 비율로 계산하고 절사 단위를 적용한다(행의 mm_round·cut_unit, 없으면 설정 기본값)
+      // v2.9.111: 금액은 M/M 표시값(반올림)이 아니라 정확한 일수 비율로 계산하고 절사 단위를 적용한다(행의 mm_round·cut_unit, 없으면 설정 기본값)
       monthlyAmounts(p,e.start_date||defStart,e.end_date||defEnd,calcOpt(e,priceField)).forEach(x=>{
         const k=`${x.y}-${pad2(x.m)}`; byM[k]=(byM[k]||0)+x.amount;});
     } else {
@@ -169,7 +169,7 @@ function monthlyProfile(items,priceField,defStart,defEnd){
   return byM;
 }
 
-// v2.9.110: 통장 CSV 운영 리듬(자금 입출 리듬 설계서 v0.1 §6) — 오늘(today)과 저장된 마지막 거래일(last)로 알림을 정한다. 순수 함수.
+// v2.9.111: 통장 CSV 운영 리듬(자금 입출 리듬 설계서 v0.1 §6) — 오늘(today)과 저장된 마지막 거래일(last)로 알림을 정한다. 순수 함수.
 // 규칙: 1일=전월 말일까지 CSV 신청 안내 / 2일부터 전월 말일 데이터 없으면 지연 / 13~15일 12일까지 데이터 없으면 업로드 안내 / 16일부터 없으면 지연.
 function csvRhythm(today,last){
   const out=[]; if(!today) return out;
@@ -184,7 +184,7 @@ function csvRhythm(today,last){
   return out;
 }
 
-// ── v2.9.110: 법인카드 월 예산 방식(설계서 cash-rhythm v0.2, 사용자 승인) ──
+// ── v2.9.111: 법인카드 월 예산 방식(설계서 cash-rhythm v0.2, 사용자 승인) ──
 // 고정비 항목명이 「법인카드」인 줄은 그 달 월 예산으로 본다. 체크카드라 쓴 날 통장에서 빠지므로
 // 사용액 = 그 달 통장 거래 중 유형(category)이 법인카드인 건의 순액(출금-입금). 남은 사용 예상 = max(0, 예산-사용).
 const CARD_BUDGET_ITEM='법인카드';

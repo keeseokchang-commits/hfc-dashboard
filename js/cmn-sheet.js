@@ -28,7 +28,7 @@ let hrSheetIdCache=null;  // {탭이름:sheetId}
 async function hrGet(url){
   for(let i=0;i<4;i++){
     let res;
-    try{ res=await fetch(url); }catch(e){ if(i<3){ await hrSleep(HR_RETRY_MS*Math.pow(2,i)); continue; } return {ok:false,status:0,json:null}; }
+    try{ res=await authFetch(url); }catch(e){ if(i<3){ await hrSleep(HR_RETRY_MS*Math.pow(2,i)); continue; } return {ok:false,status:0,json:null}; }
     if(res.ok) return {ok:true,status:res.status,json:await res.json()};
     if((res.status===429||res.status>=500)&&i<3){ await hrSleep(HR_RETRY_MS*Math.pow(2,i)); continue; }
     return {ok:false,status:res.status,json:null};
