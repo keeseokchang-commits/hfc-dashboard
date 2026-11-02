@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.10.1">
+<link rel="stylesheet" href="css/common.css?v=2.11.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -285,6 +285,7 @@
       <div><label class="form-label">새 번호 확인</label><input class="form-input" type="password" inputmode="numeric" maxlength="4" id="secNew2" style="width:120px"></div>
       <button class="btn btn-primary" onclick="saveSecPin()">번호 변경</button>
     </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:10px" id="secDriveNote">🗂 드라이브 권한(v2.11.0): 로그인할 때 구글 드라이브 권한도 함께 받습니다. 이력서 등록 화면에서 파일을 올리고, 읽기가 끝난 이력서를 Done·Fail 폴더로 옮기는 데만 씁니다. HFC_human_resource 폴더 밖의 파일은 읽거나 바꾸지 않고, 삭제 기능은 없습니다. 권한은 이 탭에만 두고 자동 잠금·로그아웃 때 폐기됩니다.</div>
     <div style="font-size:11px;color:var(--text3);margin-top:10px">번호를 잊었다면 구글 시트 S10_SETTINGS에서 lock_pin 행을 지우고 다시 로그인하면 새로 만들 수 있습니다.</div>
   </div>
 
@@ -310,13 +311,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.10.1"></script>
-<script src="js/common.js?v=2.10.1"></script>
-<script src="js/auth.js?v=2.10.1"></script>
-<script src="js/cmn-sheet.js?v=2.10.1"></script>
-<script src="js/cmn-init.js?v=2.10.1"></script>
-<script src="js/calc.js?v=2.10.1"></script>
-<script src="js/nav.js?v=2.10.1"></script>
+<script src="js/schema.js?v=2.11.0"></script>
+<script src="js/common.js?v=2.11.0"></script>
+<script src="js/auth.js?v=2.11.0"></script>
+<script src="js/cmn-sheet.js?v=2.11.0"></script>
+<script src="js/cmn-init.js?v=2.11.0"></script>
+<script src="js/calc.js?v=2.11.0"></script>
+<script src="js/nav.js?v=2.11.0"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 경영관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.10.1">
+<link rel="stylesheet" href="css/common.css?v=2.11.0">
 <style>
   :root {
     --bg:        #F2F4F7;
@@ -271,11 +271,12 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.10.1"></script>
-<script src="js/common.js?v=2.10.1"></script>
-<script src="js/auth.js?v=2.10.1"></script>
-<script src="js/calc.js?v=2.10.1"></script>
-<script src="js/nav.js?v=2.10.1"></script>
+<script src="js/schema.js?v=2.11.0"></script>
+<script src="js/common.js?v=2.11.0"></script>
+<script src="js/auth.js?v=2.11.0"></script>
+<script src="js/cmn-drive.js?v=2.11.0"></script>
+<script src="js/calc.js?v=2.11.0"></script>
+<script src="js/nav.js?v=2.11.0"></script>
 <script>
 // ── 설정 ──────────────────────────────────────────────────────
 
@@ -376,13 +377,28 @@ async function render() {
     const csvHtml=(lastTxn||csvAl.length)?`<div id="csvAlert" style="margin-bottom:12px">${csvAl.map(a=>`<div style="padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;margin-bottom:6px;${a.level==='late'?'background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C':'background:#FFFBEB;border:1px solid #FDE68A;color:#92400E'}">${a.level==='late'?'⚠ ':'🔔 '}${a.msg} · <a href="cashflow.html" style="color:inherit;font-weight:600">자금수지에서 업로드</a></div>`).join('')}<div style="font-size:11px;color:var(--text3)">통장 CSV 마지막 거래일 ${lastTxn||'없음'}</div></div>`:'';
 
     // v2.10.0: 이력서 처리 현황 한 줄 — 읽기를 맡긴 채 기다리는 요청과 확인 필요 건수(없으면 표시하지 않는다)
+    // v2.11.0: 드라이브 권한이 있으면 드라이브 상태로 센다 — New 폴더의 읽을 이력서, Result 폴더에 도착한 결과, 확인 필요 건수
     let resumeHtml='';
     try{
-      const [r37,r28]=await Promise.all([fetchSheetSafe('S37_AGENT_RUN','A1:G4000'),fetchSheetSafe('S28_PERSON_FILE','J1:J3000')]);
-      const pend=(r37||[]).slice(1).filter(r=>String(r[6]||'').trim()==='요청됨').map(r=>String(r[3]||'').slice(0,10)).filter(Boolean).sort();
-      const needN=(r28||[]).slice(1).filter(r=>['읽기실패','검토필요','동일인확인'].includes(String(r[0]||'').trim())).length;
+      const [r37,r28]=await Promise.all([fetchSheetSafe('S37_AGENT_RUN','A1:G4000'),fetchSheetSafe('S28_PERSON_FILE','A1:J3000')]);
+      const s28=(r28||[]).slice(1).map(r=>({drive_file_id:String(r[2]||''),file_hash:String(r[5]||''),parse_status:String(r[9]||'').trim()}));
+      const needN=s28.filter(r=>['읽기실패','검토필요','동일인확인'].includes(r.parse_status)).length;
       const parts=[];
-      if(pend.length){ const d=Math.max(0,Math.round((Date.parse(kstToday+'T00:00:00Z')-Date.parse(pend[0]+'T00:00:00Z'))/864e5)); parts.push(`읽기를 맡긴 이력서 결과 대기 ${d===0?'(오늘 요청)':d+'일째'}`); }
+      let drv=null;
+      if(typeof driveHas==='function'&&driveHas()){
+        try{
+          const lim=p=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),8000))]);
+          const nf=await lim(driveList(DRV.NEW)); const rid=await lim(driveFindResult()); const rs=rid?(await lim(driveList(rid))).filter(f=>/\.json$/i.test(f.name||'')):[];
+          drv={pending:drvClassify(nf,s28).pending.length,results:rs.length};
+        }catch(e){ drv=null; }
+      }
+      if(drv){
+        if(drv.results) parts.push(`Claude 가 읽은 결과 ${drv.results}개 도착`);
+        if(drv.pending) parts.push(`읽을 이력서 ${drv.pending}건`);
+      } else {
+        const pend=(r37||[]).slice(1).filter(r=>String(r[6]||'').trim()==='요청됨').map(r=>String(r[3]||'').slice(0,10)).filter(Boolean).sort();
+        if(pend.length){ const d=Math.max(0,Math.round((Date.parse(kstToday+'T00:00:00Z')-Date.parse(pend[0]+'T00:00:00Z'))/864e5)); parts.push(`읽기를 맡긴 이력서 결과 대기 ${d===0?'(오늘 요청)':d+'일째'}`); }
+      }
       if(needN) parts.push(`확인 필요 ${needN}건`);
       if(parts.length) resumeHtml=`<div id="resumeAlert" style="padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;margin-bottom:12px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E">🔔 이력서 처리: ${parts.join(' · ')} · <a href="intake.html" style="color:inherit;font-weight:600">이력서 등록에서 처리</a></div>`;
     }catch(e){ resumeHtml=''; }

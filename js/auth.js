@@ -1,12 +1,14 @@
-// HFC auth.js v2.9.111 — 로그인 게이트 · 세션 · 자동 잠금 · 화면 잠금 비밀번호 (설계서 security-login-design v0.1, 사용자 승인 2026-11-02)
+// HFC auth.js v2.11.0 — 로그인 게이트 · 세션 · 자동 잠금 · 화면 잠금 비밀번호 (설계서 security-login-design v0.1, 사용자 승인 2026-11-02)
 // 원칙: ① 구글 로그인 후에만 시트를 읽고 쓴다(읽기용 키 제거). ② 접속 열쇠는 이 탭(sessionStorage)에만 둔다.
 //       ③ 마지막 입력 후 N분(기본 10)이 지나면 화면을 가리고 열쇠를 폐기한다. ④ 잠금 해제 = 구글 로그인 + 4자리 번호.
 // 의존: common.js(SHEETS_ID·CLIENT_ID·clearAndWrite), schema.js(W·HEADERS) — 모두 호출 시점에만 사용한다.
 const API_KEY='';   // 과거 호환용 빈 값 — 읽기용 키는 더 이상 쓰지 않는다(authFetch가 URL의 key= 를 제거)
-const SCOPES='https://www.googleapis.com/auth/spreadsheets openid email';
+// v2.11.0: 이력서 드라이브 연동(설계서 resume-intake-process-design v0.2 Phase 2, 사용자 승인 2026-11-02)을 위해 드라이브 권한 추가. 코드는 HFC_human_resource 폴더 안에서만 읽고 올리고 옮기며 삭제 기능은 없다(cmn-drive.js).
+const DRIVE_SCOPE='https://www.googleapis.com/auth/drive';
+const SCOPES='https://www.googleapis.com/auth/spreadsheets '+DRIVE_SCOPE+' openid email';
 const SHEETS_BASE=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}`;
 let accessToken=null,tokenClient=null;
-const AUTH={exp:0,email:'',waiters:[],idleMin:10,warned:false,locked:false,lastAct:Date.now(),timer:null,refreshing:false,silentCb:null,triedSilent:false,pinVal:'',stage:'',busy:false};
+const AUTH={scope:'',grantCb:null,exp:0,email:'',waiters:[],idleMin:10,warned:false,locked:false,lastAct:Date.now(),timer:null,refreshing:false,silentCb:null,triedSilent:false,pinVal:'',stage:'',busy:false};
 const _ss=(k,v)=>{ try{ if(v===undefined) return sessionStorage.getItem(k); if(v===null) sessionStorage.removeItem(k); else sessionStorage.setItem(k,v); }catch(e){} return null; };
 const _ls=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem(k); if(v===null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} return null; };
 
@@ -14,11 +16,19 @@ const _ls=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem(k); if(v==
 function authRestore(){
   if(_ls('hfc_lock')){ _ss('hfc_tok',null); _ss('hfc_pinok',null); return; }   // 어느 탭에서든 잠겼으면 이 탭도 잠금
   const raw=_ss('hfc_tok'); if(!raw) return;
-  try{ const o=JSON.parse(raw); if(o.t&&o.exp>Date.now()+60000){ accessToken=o.t; AUTH.exp=o.exp; AUTH.email=o.email||''; } }catch(e){}
+  try{ const o=JSON.parse(raw); if(o.t&&o.exp>Date.now()+60000){ accessToken=o.t; AUTH.exp=o.exp; AUTH.email=o.email||''; AUTH.scope=o.sc||''; } }catch(e){}
 }
 function authOk(){ return !!accessToken&&AUTH.exp>Date.now()+30000&&_ss('hfc_pinok')==='1'; }
 function authEmail(){ return AUTH.email||_ls('hfc_email')||''; }
-function authSaveTok(){ _ss('hfc_tok',JSON.stringify({t:accessToken,exp:AUTH.exp,email:AUTH.email})); }
+function authSaveTok(){ _ss('hfc_tok',JSON.stringify({t:accessToken,exp:AUTH.exp,email:AUTH.email,sc:AUTH.scope})); }
+// 이 열쇠에 드라이브 권한이 들어 있는가(과거 열쇠·권한을 거절한 로그인은 false)
+function authHasDrive(){ return !!accessToken&&String(AUTH.scope||'').split(' ').includes(DRIVE_SCOPE); }
+// 드라이브 권한만 다시 허용받는다(동의 창이 열린다). 끝나면 true/false 로 알려 준다.
+async function authGrantDrive(){
+  try{ await gsiReady(); authMkClient(); }catch(e){ return false; }
+  return new Promise(res=>{ AUTH.grantCb=res; setTimeout(()=>{ if(AUTH.grantCb===res){ AUTH.grantCb=null; res(false); } },120000);
+    try{ tokenClient.requestAccessToken({prompt:'consent',hint:_ls('hfc_email')||undefined}); }catch(e){ AUTH.grantCb=null; res(false); } });
+}
 
 // ── 외부에서 쓰는 관문 ───────────────────────────────────────
 function authReady(){
@@ -50,7 +60,7 @@ function gsiReady(){
 function authMkClient(){
   if(tokenClient||!(window.google&&google.accounts&&google.accounts.oauth2)) return;
   tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:authOnToken,
-    error_callback:()=>{ if(AUTH.silentCb){ const f=AUTH.silentCb; AUTH.silentCb=null; f(false); } else authMsg('로그인 창이 열리지 못했거나 닫혔습니다. 팝업 차단을 확인해 주세요.'); }});
+    error_callback:()=>{ if(AUTH.grantCb){ const g=AUTH.grantCb; AUTH.grantCb=null; g(false); return; } if(AUTH.silentCb){ const f=AUTH.silentCb; AUTH.silentCb=null; f(false); } else authMsg('로그인 창이 열리지 못했거나 닫혔습니다. 팝업 차단을 확인해 주세요.'); }});
 }
 async function authLogin(selectAccount){
   try{ await gsiReady(); authMkClient(); }catch(e){ authMsg('구글 로그인 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'); return; }
@@ -68,11 +78,12 @@ function authSilent(){
   });
 }
 async function authOnToken(resp){
-  if(!resp||resp.error||!resp.access_token){ if(AUTH.silentCb){ const f=AUTH.silentCb; AUTH.silentCb=null; f(false); } else authMsg('로그인에 실패했습니다. 다시 시도해 주세요.'); return; }
-  accessToken=resp.access_token; AUTH.exp=Date.now()+(parseInt(resp.expires_in,10)||3600)*1000;
+  if(!resp||resp.error||!resp.access_token){ if(AUTH.grantCb){ const g=AUTH.grantCb; AUTH.grantCb=null; g(false); return; } if(AUTH.silentCb){ const f=AUTH.silentCb; AUTH.silentCb=null; f(false); } else authMsg('로그인에 실패했습니다. 다시 시도해 주세요.'); return; }
+  accessToken=resp.access_token; AUTH.exp=Date.now()+(parseInt(resp.expires_in,10)||3600)*1000; AUTH.scope=String(resp.scope||'');
   if(!AUTH.email){ try{ const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+accessToken}}); if(r.ok) AUTH.email=(await r.json()).email||''; }catch(e){} }
   if(AUTH.email) _ls('hfc_email',AUTH.email);
   authSaveTok();
+  if(AUTH.grantCb){ const g=AUTH.grantCb; AUTH.grantCb=null; g(authHasDrive()); }
   const cb=AUTH.silentCb; AUTH.silentCb=null;
   if(_ss('hfc_pinok')==='1'){ authDone(); if(cb) cb(true); return; }   // 같은 세션의 열쇠 갱신 — 번호는 다시 묻지 않는다
   if(cb) cb(true);
