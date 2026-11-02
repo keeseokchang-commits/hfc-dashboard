@@ -16,7 +16,10 @@ const DRIVE=[/^https:\/\/drive\.google\.com\/file\/d\/[\w-]{10,}/,/^https:\/\/dr
 let D={}, filter='', panel=null, PM=new Map(), PERS=new Map();
 
 const isDriveLink=s=>DRIVE.some(r=>r.test(String(s||'').trim()));
-const running=()=>D.S37.some(r=>['요청됨','실행 중'].includes(String(r.state||'').trim()));
+// 「실행 중」으로 30분 넘게 남은 줄은 중간에 끊긴 것으로 보고 새 요청을 막지 않는다(화면을 닫거나 통신이 끊기면 완료 표시가 안 남는다)
+const STALE_MIN=30;
+const stale=r=>{ if(String(r.state||'').trim()!=='실행 중') return false; const t=Date.parse(String(r.started_at||r.requested_at||'').replace(' ','T')+'+09:00'); return !isNaN(t)&&(Date.now()-t)>STALE_MIN*60000; };
+const running=()=>D.S37.some(r=>{ const s=String(r.state||'').trim(); return s==='요청됨'||(s==='실행 중'&&!stale(r)); });
 const pname=id=>{ const p=PERS.get(id); return p?(p.name||id):(id||'-'); };
 
 async function loadAll(){
@@ -42,6 +45,8 @@ function renderStatus(){
   hrQ('agentStatus').innerHTML=last
     ?`<div id="lastRun">마지막 요청 ${hrEsc(last.requested_at)} · ${hrEsc(last.trigger)} · <span class="hr-badge ${stCls[last.state]||'gray'}">${hrEsc(last.state)}</span>${last.state==='완료'?` · ${hrEsc(cnt(last))}`:''}${last.state==='실패'&&last.error?` · ${hrEsc(last.error)}`:''}</div>`
     :'<div class="hr-muted" id="lastRun">아직 실행 기록이 없습니다.</div>';
+  const st=D.S37.filter(stale);
+  if(st.length) hrQ('agentStatus').insertAdjacentHTML('beforeend',`<div class="hr-sub" id="staleNote">중간에 끊긴 실행이 ${st.length}건 남아 있습니다(${hrEsc(st.map(r=>r.requested_at).join(', '))}). 새 요청에는 영향이 없습니다. <button class="btn btn-secondary btn-sm" data-act="clearStale">끊긴 실행 정리</button></div>`);
   const run=running(); hrQ('btnFolder').disabled=false; hrQ('btnFile').disabled=false;
   if(run) hrQ('agentStatus').insertAdjacentHTML('beforeend','<div class="hr-sub" id="runningNote">실행 요청이 처리되는 중입니다. 완료되면 아래 결과에 나타납니다.</div>');
 }
@@ -60,6 +65,14 @@ async function request(btn,trigger,ref){
     const a=await hrAppend('S37',{trigger,target_ref:ref,requested_at:hrNow(),state:'요청됨'});
     if(!a.ok){ toast(hrSaveFailText(a),true); return; }
     toast('읽기를 요청했습니다.'); await loadAll();
+  });
+}
+async function clearStale(btn){
+  await hrBusy(btn,async()=>{
+    const r0=await hrReadMany(['S37']); if(r0.failed.length){ toast(HR_MSG.read(HR_TABS.S37.tab),true); return; }
+    D.S37=dedupe(r0.tabs.S37.rows,HEADERS.S37[0]); const list=D.S37.filter(stale); let fail=0;
+    for(const r of list){ const u=await hrUpdate('S37',r.run_id,{state:'실패',finished_at:hrNow(),error:'중간에 끊겨 화면에서 정리함'},{readUpdatedAt:r.updated_at}); if(!u.ok) fail++; }
+    toast(fail?`${fail}건은 정리하지 못했습니다. 다시 눌러 주세요.`:`끊긴 실행 ${list.length}건을 정리했습니다.`,!!fail); await loadAll();
   });
 }
 function runFolder(btn){ return request(btn,'수동 폴더',''); }
@@ -228,7 +241,7 @@ async function impRun(btn){
 }
 document.addEventListener('click',ev=>{
   const c=ev.target.closest('[data-filter]'); if(c&&c.closest('#needChips')){ filter=c.dataset.filter; panel=null; renderNeed(); return; }
-  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={runFolder,runFile,reread,closeFile,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
+  const a=ev.target.closest('[data-act]'); if(!a) return; const fn={clearStale,runFolder,runFile,reread,closeFile,notSame,openReview,openMerge,doMerge,closePanel,rvApply,rvDismiss,finishFile,impPreview,impRun,copyPrompt}[a.dataset.act]; if(fn) fn(a);
 });
 document.addEventListener('change',ev=>{ if(ev.target.id==='impFile'){ const f=ev.target.files&&ev.target.files[0]; if(f){ const rd=new FileReader(); rd.onload=()=>{ hrQ('impText').value=String(rd.result||''); impReset(); }; rd.readAsText(f); } return; }
    if(ev.target.id==='mKeep'&&panel&&panel.type==='merge'){ panel.keep=ev.target.value; panel.drop=ev.target.value===panel.a?panel.b:panel.a; panel.pv=null; renderPanel(); loadPreview(); } });
