@@ -57,25 +57,25 @@ function renderProc(){
   const age=pend.length?Math.max(0,dayDiff(String(pend[0].requested_at||'').slice(0,10)||hrToday(),hrToday())):0;
   hrQ('procAge').textContent=pend.length?(age===0?'오늘 요청함':`요청한 지 ${age}일째`):'';
   hrQ('procNow').classList.toggle('calm',mode==='ask');
-  const bd=hrQ('procBadge'); bd.className='hr-badge '+(mode==='ask'?'gray':'amber'); bd.textContent=mode==='ask'?'새 이력서가 있을 때':'지금 할 일 · 내 차례';
+  const bd=hrQ('procBadge'); bd.className='hr-badge '+(mode==='ask'?'gray':(mode==='import'?'blue':'amber')); bd.textContent=mode==='ask'?'새 이력서가 있을 때':(mode==='import'?'진행 중 · Claude 와 함께':'지금 할 일 · 내 차례');
   const by=k=>need.filter(f=>f.parse_status===k).length;
   const T={ask:['② Claude 에게 읽기를 맡기세요','먼저 이력서를 드라이브 New 폴더에 넣어 두세요. 처리할 이력서가 없으면 지금 할 일은 없습니다.'],
-    import:['③ Claude 가 만들어 준 결과 파일을 올리세요','Claude 가 아직 결과를 주지 않았다면 아래 ② 에서 같은 문구를 다시 복사해 보내세요. 요청을 없애려면 ③ 아래 「이 요청 취소」를 누르세요.'],
+    import:['Claude 에게 문구를 보내 읽기를 맡기고, 받은 결과 파일을 ③에서 올리세요',(age>=1?'결과를 아직 받지 못했다면 ② 의 문구를 다시 복사해 보내세요. ':'')+'결과 파일을 받으면 아래 ③에서 올려 가져옵니다. 요청을 없애려면 ③ 아래 「이 요청 취소」를 누르세요.'],
     need:[`④ 확인이 필요한 ${need.length}건을 처리하세요`,NEED.map(k=>by(k)?`${NEED_LABEL[k]} ${by(k)}건`:'').filter(Boolean).join(' · ')+' — 아래 「④ 확인 필요 처리」 목록에서 처리합니다.']}[mode];
   hrQ('procTitle').textContent=T[0]; hrQ('procSub').textContent=T[1]+(D.S37.some(r=>String(r.state||'').trim()==='실행 중'&&!stale(r))?' (가져오기가 진행 중입니다.)':'');
   hrQ('staleBox').innerHTML=sd.length?`<div class="hr-sub" id="staleNote" style="margin-top:8px">중간에 끊긴 실행이 ${sd.length}건 남아 있습니다(${hrEsc(sd.map(r=>r.requested_at).join(', '))}). 새 요청에는 영향이 없습니다. <button class="btn btn-secondary btn-sm" data-act="clearStale">끊긴 실행 정리</button></div>`:'';
-  if(mode!==lastMode){ hrQ('secAsk').open=(mode==='ask'); hrQ('secImport').open=(mode==='import'); lastMode=mode; }
+  if(mode!==lastMode){ hrQ('secAsk').open=(mode!=='need'); hrQ('secImport').open=(mode==='import'); lastMode=mode; }
   hrQ('reqTools').innerHTML=pend.length?`<span class="hr-sub">읽기 요청 ${pend.length}건 대기 중 (${hrEsc(String(pend[0].requested_at||'').slice(0,10))} 요청)</span><button class="btn btn-secondary btn-sm" data-act="cancelReq">이 요청 취소</button>`:'';
-  const cls={ask:['done','cur','wait','wait'],import:['done','done','cur','wait'],need:['done','done','done','cur']}[mode];
-  const lab={done:'완료',cur:'지금 할 차례',wait:'대기'};
+  const cls={ask:['','cur','wait','wait'],import:['done','cur','wait','wait'],need:['done','done','done','cur']}[mode];
+  const lab={done:'완료',cur:'지금 할 차례',wait:'대기'}; const labI={cur:'진행 중',wait:'결과가 오면'};
   const who=w=>`<span class="proc-who">${w}</span>`;
   const info=[
     `드라이브 New 폴더에 이력서 저장 ${who('나')}<br>${DRIVE_DIR[0]?`<a href="https://drive.google.com/drive/folders/${DRIVE_DIR[0][2]}" target="_blank" rel="noopener">New 폴더 열기</a>`:''}`,
-    mode==='ask'?`Claude 에게 문구와 이력서 전달 ${who('나 → Claude')}`:(pend.length?`${hrEsc(String(pend[0].requested_at||'').slice(0,10))} 요청 ${who('나 → Claude')}`:`읽기 요청 완료 ${who('나 → Claude')}`),
+    mode==='ask'?`Claude 에게 문구와 이력서 전달 ${who('나 → Claude')}`:(pend.length?`${hrEsc(String(pend[0].requested_at||'').slice(0,10))} 요청 · Claude 가 읽는 중 ${who('나 → Claude')}`:`읽기 요청 완료 ${who('나 → Claude')}`),
     mode==='need'?`가져오기 완료 ${who('나')}`:`Claude 가 준 결과 파일 올리기 ${who('나')}`,
     need.length?`${need.length}건 남음 ${who('나')}`:`가져온 뒤 생김 ${who('나')}`];
   const name=['① 이력서 넣기','② 읽기 맡기기','③ 결과 가져오기','④ 확인 필요 처리'];
-  const first=['완료로 간주',lab[cls[1]],lab[cls[2]],lab[cls[3]]];
+  const first=[mode==='ask'?'먼저 넣어 두기':'완료',mode==='import'?labI.cur:lab[cls[1]],mode==='import'?labI.wait:lab[cls[2]],lab[cls[3]]];
   hrQ('procSteps').innerHTML=name.map((n,i)=>`<div class="proc-st ${cls[i]}" data-step="${i+1}"><div class="n">${n}</div><div class="t">${first[i]}</div><div class="w">${info[i]}</div></div>`).join('');
 }
 async function cancelReq(btn){
