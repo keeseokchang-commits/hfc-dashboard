@@ -10,14 +10,19 @@ const DRV_EXT=['pdf','docx','doc','pptx'];                 // 0단계 시험에�
 const DRV_FIELDS='id,name,mimeType,size,createdTime,parents,appProperties,sha256Checksum,webViewLink';
 const DRV_MOVES={NEW:['DONE','FAIL'],FAIL:['NEW'],RESULT:['ARCHIVE']};   // 옮길 수 있는 (출발→도착) 조합 전부
 const DRV_MSG={scope:'드라이브 권한이 없습니다. 「드라이브 권한 허용」을 눌러 주세요.',api:'드라이브를 읽지 못했습니다. 잠시 후 다시 시도해 주세요.',noResult:'드라이브 HFC_human_resource 아래에 Result 폴더가 없습니다. 폴더를 만들면 Claude 가 읽은 결과를 여기서 바로 받을 수 있습니다.',
-  ext:'받을 수 있는 형식이 아닙니다(pdf, docx, doc, pptx).'};
+  ext:'받을 수 있는 형식이 아닙니다(pdf, docx, doc, pptx).',
+  apiOff:'구글 클라우드에서 Google Drive API 가 꺼져 있습니다. 클라우드 콘솔 › API 및 서비스 › 라이브러리에서 「Google Drive API」를 「사용」으로 켜 주세요.'};
 
-class DriveError extends Error{ constructor(msg,status){ super(msg); this.status=status||0; } }
+class DriveError extends Error{ constructor(msg,status,reason){ super(msg); this.status=status||0; this.reason=reason||''; } }
 const driveHas=()=>typeof authHasDrive==='function'&&authHasDrive();
 const drvQ=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 async function drvJson(url,opts){
   let res; try{ res=await authFetch(url,opts); }catch(e){ throw new DriveError(DRV_MSG.api,0); }
-  if(!res||!res.ok) throw new DriveError(res&&res.status===403?DRV_MSG.scope:DRV_MSG.api,res?res.status:0);
+  if(!res||!res.ok){
+    const st=res?res.status:0; let reason='', msg=''; try{ const e=((await res.json())||{}).error||{}; msg=String(e.message||''); reason=String(((e.errors||[])[0]||{}).reason||((e.details||[]).find(d=>d.reason)||{}).reason||''); }catch(_){}
+    const off=st===403&&/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(reason+' '+msg);
+    throw new DriveError(off?DRV_MSG.apiOff:(st===401||st===403?DRV_MSG.scope:DRV_MSG.api),st,off?'apiOff':reason);
+  }
   return res;
 }
 // 폴더 안의 파일(폴더 제외) 전부

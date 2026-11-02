@@ -37,7 +37,7 @@ async function loadAll(){
 async function loadDrive(){
   if(!driveHas()){ DR={...DR0}; return; }
   try{ DR={...DR0,ok:true,reason:'',...await driveSnapshot()}; }
-  catch(e){ DR={...DR0,reason:'api',err:e.message||DRV_MSG.api,status:e.status||0}; }
+  catch(e){ DR={...DR0,reason:'api',err:e.message||DRV_MSG.api,status:e.status||0,why:e.reason||''}; }
 }
 const drvC=()=>drvClassify(DR.newFiles,D.S28);
 function fillParties(){
@@ -131,7 +131,7 @@ function renderProcDrive(){
 function renderNotice(){
   const el=hrQ('drvNotice'); let h=''; const box=(t,err)=>`<div class="hr-notice${err?' err':''}" style="margin-top:8px">${t}</div>`;
   if(!DR.ok&&DR.reason==='scope') h=box('드라이브 권한이 아직 없습니다. 허용하면 이력서를 이 화면에서 올리고, 처리가 끝난 파일이 자동으로 Done/Fail 폴더로 옮겨집니다. 허용하기 전에는 예전 방식(문구 복사 → 결과 파일 올리기)으로 쓸 수 있습니다. <button class="btn btn-primary btn-sm" data-act="grantDrive">드라이브 권한 허용</button>');
-  else if(!DR.ok) h=box(`${hrEsc(DR.err||DRV_MSG.api)} 예전 방식(문구 복사 → 결과 파일 올리기)으로 쓸 수 있습니다. <button class="btn btn-secondary btn-sm" data-act="reloadDrive">다시 시도</button>${DR.status===403?' <button class="btn btn-primary btn-sm" data-act="grantDrive">드라이브 권한 허용</button>':''}`,true);
+  else if(!DR.ok) h=box(`${hrEsc(DR.err||DRV_MSG.api)} <span class="hr-sub">(오류 ${DR.status||'통신'}${DR.why&&DR.why!=='apiOff'?' · '+hrEsc(DR.why):''})</span> 예전 방식(문구 복사 → 결과 파일 올리기)으로 쓸 수 있습니다. <button class="btn btn-secondary btn-sm" data-act="reloadDrive">다시 시도</button>${DR.status===403&&DR.why!=='apiOff'?' <button class="btn btn-primary btn-sm" data-act="grantDrive">드라이브 권한 허용</button>':''}`,true);
   else {
     if(!DR.resultFolder) h+=box(DRV_MSG.noResult+' 만들기 전에는 Claude 가 준 결과 파일을 ③에서 직접 올려 가져옵니다.');
     const st=drvC().stuck; if(st.length){ const d=st.filter(x=>x.to==='DONE').length, f=st.length-d; h+=box(`처리가 끝났지만 아직 옮기지 못한 이력서 ${st.length}건이 New 폴더에 남아 있습니다 (Done 으로 ${d}건 · Fail 로 ${f}건). <button class="btn btn-primary btn-sm" data-act="moveStuck">지금 옮기기</button>`); }
