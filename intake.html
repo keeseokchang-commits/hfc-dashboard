@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 이력서 등록</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.112">
-<link rel="stylesheet" href="css/hr.css?v=2.9.112">
+<link rel="stylesheet" href="css/common.css?v=2.9.113">
+<link rel="stylesheet" href="css/hr.css?v=2.9.113">
 </head>
 <body data-page="stf_intake">
 
@@ -30,6 +30,7 @@
       <div class="card-title">이력서 읽기 에이전트</div>
       <div id="agentStatus"></div>
       <div class="hr-row" style="margin-top:12px"><button class="btn btn-primary" id="btnFolder" data-act="runFolder">신규 이력서 폴더 지금 읽기</button></div>
+      <div class="hr-sub" id="folderPath" style="margin-top:8px"></div>
       <div class="hr-row" style="margin-top:14px">
         <div class="hr-field"><label for="fLink">Drive 파일 링크</label><input class="hr-input" id="fLink" placeholder="https://drive.google.com/file/d/…"><div class="hr-err" id="fLinkErr"></div></div>
         <div class="hr-field fixed" style="min-width:180px"><label for="fParty">경로 (보낸 곳)</label><select class="hr-select" id="fParty"></select></div>
@@ -77,19 +78,19 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.112"></script>
-<script src="js/common.js?v=2.9.112"></script>
-<script src="js/auth.js?v=2.9.112"></script>
-<script src="js/cmn-sheet.js?v=2.9.112"></script>
-<script src="js/cmn-derive.js?v=2.9.112"></script>
-<script src="js/cmn-alert.js?v=2.9.112"></script>
-<script src="js/cmn-person.js?v=2.9.112"></script>
-<script src="js/cmn-review.js?v=2.9.112"></script>
-<script src="js/cmn-merge.js?v=2.9.112"></script>
-<script src="js/cmn-resume.js?v=2.9.112"></script>
-<script src="js/hr-ui.js?v=2.9.112"></script>
-<script src="js/scr-intake.js?v=2.9.112"></script>
-<script src="js/nav.js?v=2.9.112"></script>
+<script src="js/schema.js?v=2.9.113"></script>
+<script src="js/common.js?v=2.9.113"></script>
+<script src="js/auth.js?v=2.9.113"></script>
+<script src="js/cmn-sheet.js?v=2.9.113"></script>
+<script src="js/cmn-derive.js?v=2.9.113"></script>
+<script src="js/cmn-alert.js?v=2.9.113"></script>
+<script src="js/cmn-person.js?v=2.9.113"></script>
+<script src="js/cmn-review.js?v=2.9.113"></script>
+<script src="js/cmn-merge.js?v=2.9.113"></script>
+<script src="js/cmn-resume.js?v=2.9.113"></script>
+<script src="js/hr-ui.js?v=2.9.113"></script>
+<script src="js/scr-intake.js?v=2.9.113"></script>
+<script src="js/nav.js?v=2.9.113"></script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
 </body>
 </html>

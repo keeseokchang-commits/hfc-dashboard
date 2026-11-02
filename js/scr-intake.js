@@ -34,7 +34,13 @@ function fillParties(){
   const pc=hrQ('pParty').value; hrQ('pParty').innerHTML='<option value="">선택 안 함</option>'+ps.map(p=>`<option value="${hrEsc(p.party_id)}">${hrEsc(p.name)} (${hrEsc(p.party_id)})</option>`).join(''); hrQ('pParty').value=pc; if(!hrQ('pDate').value) hrQ('pDate').value=hrToday(); refreshPrompt();
   hrQ('fParty').innerHTML='<option value="">선택 안 함</option>'+ps.map(p=>`<option value="${hrEsc(p.party_id)}">${hrEsc(p.name)} (${hrEsc(p.party_id)})</option>`).join(''); hrQ('fParty').value=cur;
 }
-function render(){ renderStatus(); renderNeed(); renderRuns(); }
+// 이력서 Drive 폴더(프로젝트 문서 drive-folders-v0.1, 2026-10-10 생성). 폴더를 바꾸면 이 값과 문서를 함께 고친다.
+const DRIVE_DIR=[['New','신규 이력서(읽을 대상)','1vqCHjkuroS_ra477ZHOFwWE2TuHr5YhA'],['Done','처리 완료','1NdeNccd-rzu8gOYCpy6qj76HXaCEsZ_e'],['Fail','읽기 실패','14kxW4rIb6QCB12uwvXYsmHxrvE6cvcDh']];
+function renderFolder(){
+  const a=([n,d,id])=>`<a href="https://drive.google.com/drive/folders/${id}" target="_blank" rel="noopener"><b>${n}</b></a> ${d}`;
+  hrQ('folderPath').innerHTML='읽는 폴더: 내 드라이브 › HFC_human_resource › '+a(DRIVE_DIR[0])+'<br><span class="hr-muted">같은 상위 폴더 안: '+DRIVE_DIR.slice(1).map(a).join(' · ')+'</span>';
+}
+function render(){ renderFolder(); renderStatus(); renderNeed(); renderRuns(); }
 
 // ── 에이전트 상태 · 최근 결과 ──────────────────────────────────────────────────
 const runsSorted=()=>D.S37.slice().sort((a,b)=>String(b.requested_at||'').localeCompare(String(a.requested_at||''))||String(b.run_id).localeCompare(String(a.run_id)));

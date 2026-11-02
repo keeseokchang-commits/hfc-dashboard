@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.112">
+<link rel="stylesheet" href="css/common.css?v=2.9.113">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -270,7 +270,7 @@
     </div>
   </div>
 
-  <!-- ── 보안 (v2.9.112: 로그인·자동 잠금·화면 잠금 번호, 설계서 security-login-design v0.1) ── -->
+  <!-- ── 보안 (v2.9.113: 로그인·자동 잠금·화면 잠금 번호, 설계서 security-login-design v0.1) ── -->
   <div class="card">
     <div class="card-title">🔒 보안</div>
     <div class="info-row"><span class="info-label">로그인 계정</span><span class="info-val hfc-who"></span></div>
@@ -310,13 +310,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.9.112"></script>
-<script src="js/common.js?v=2.9.112"></script>
-<script src="js/auth.js?v=2.9.112"></script>
-<script src="js/cmn-sheet.js?v=2.9.112"></script>
-<script src="js/cmn-init.js?v=2.9.112"></script>
-<script src="js/calc.js?v=2.9.112"></script>
-<script src="js/nav.js?v=2.9.112"></script>
+<script src="js/schema.js?v=2.9.113"></script>
+<script src="js/common.js?v=2.9.113"></script>
+<script src="js/auth.js?v=2.9.113"></script>
+<script src="js/cmn-sheet.js?v=2.9.113"></script>
+<script src="js/cmn-init.js?v=2.9.113"></script>
+<script src="js/calc.js?v=2.9.113"></script>
+<script src="js/nav.js?v=2.9.113"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -735,7 +735,7 @@ async function runSheetPrep(){
 }
 window.addEventListener('load',loadCodes);
 
-// v2.9.112 보안 카드 — 자동 잠금 시간·잠금 번호 (실제 처리는 js/auth.js)
+// v2.9.113 보안 카드 — 자동 잠금 시간·잠금 번호 (실제 처리는 js/auth.js)
 async function loadSec(){
   const st=await secStatus(); if(!st.ok){ document.getElementById('secPinState').textContent='보안 설정을 읽지 못했습니다.'; return; }
   document.getElementById('secMin').value=st.minutes;
