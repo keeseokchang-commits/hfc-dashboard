@@ -32,6 +32,7 @@ function rsStatus(o){
 function rsBlock(o){
   const st=rsStatus(o); const pm=hrMap(D.S27,'party_id'); const can=RS.drive&&RS.hasOrderCol&&!(DER&&DER.closed);
   const line=rsLine(o);
+  const why=can?'':(!RS.drive?'드라이브 권한이 없어 쓸 수 없습니다(위 안내에서 허용)':(!RS.hasOrderCol?'시트 S28_PERSON_FILE 에 order_id 열이 없어 쓸 수 없습니다(위 안내 참고)':'종료된 의뢰라 쓸 수 없습니다'));
   const steps=`<span class="hr-sub" data-rs-steps>처리 단계: 읽기 대기 <b>${st.pend.length}</b>건 → 가져옴 <b>${st.people.length}</b>명 → 후보 등록 <b>${st.regN}</b>명</span>`;
   const badge=st.pend.length?'<span class="hr-badge amber">읽기 대기</span>':(st.todo.some(x=>!x.same)?'<span class="hr-badge blue">후보 등록 차례</span>':(st.people.length?'<span class="hr-badge green">등록 완료</span>':''));
   const list=st.todo.length?`<div style="margin-top:8px"><b>이 회신에서 가져온 후보 ${st.todo.length}명 — 후보로 등록</b>${st.todo.map(x=>`<div class="hr-row" style="margin-top:4px;align-items:center" data-rs-person="${hrEsc(x.pid)}"><span>${hrEsc(rsName(x.pid))} <span class="hr-sub">${hrEsc(x.pid)} · ${hrEsc(x.file||'')}</span></span>${x.same?'<span class="hr-badge blue">같은 사람 확인 필요</span> <a class="btn btn-secondary btn-sm" href="intake.html">이력서 등록에서 처리</a>'
@@ -41,7 +42,7 @@ function rsBlock(o){
   const link=st.pend.length?` <a href="intake.html" style="font-size:12px">이력서 등록 화면에서 읽기를 맡기세요</a>`:'';
   return `<div class="hr-row" style="margin-top:10px;align-items:center;border-top:1px dashed var(--border);padding-top:10px">
       <button class="btn btn-secondary btn-sm" data-rs="pick" data-order="${hrEsc(o.order_id)}"${can?'':' disabled'}>받은 이력서 올리기</button>
-      <input type="file" multiple accept=".pdf,.docx,.doc,.pptx" data-rs-file="${hrEsc(o.order_id)}" style="display:none">${badge} ${steps}${link}</div>
+      <input type="file" multiple accept=".pdf,.docx,.doc,.pptx" data-rs-file="${hrEsc(o.order_id)}" style="display:none">${badge} ${why?`<span class="hr-sub" data-rs-why style="color:var(--red,#c0392b)">${why}</span> `:''}${steps}${link}</div>
     <div class="prog" data-rs-prog style="display:none" role="status"><span class="spinner"></span><span data-rs-progtxt></span></div>
     <div data-rs-msg>${RS.msg[o.order_id]||''}</div>${suggest}${list}${fail}`;
 }
