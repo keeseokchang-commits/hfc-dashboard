@@ -154,7 +154,7 @@ const HR_TABS={
     cols:'contact_id:ID,person_id:ID,contact_date:D,type:E,direction:E,summary:TL,feedback:TL,next_action:T,next_date:D,assign_id:ID,created_at:D,updated_at:DT',
     enums:{type:['통화','문자','메일','미팅','기타'],direction:['발신','수신']}},
   S28:{tab:'S28_PERSON_FILE',rows:3000,mode:'row',id:{prefix:'FIL-',digits:5},
-    cols:'file_id:ID,person_id:ID,drive_file_id:T,file_name:T,drive_url:T,file_hash:T,version_no:N0,source_party_id:ID,received_at:D,parse_status:E,parse_error:T,match_person_id:ID,run_id:ID,parsed_at:D,created_at:D',
+    cols:'file_id:ID,person_id:ID,drive_file_id:T,file_name:T,drive_url:T,file_hash:T,version_no:N0,source_party_id:ID,received_at:D,parse_status:E,parse_error:T,match_person_id:ID,run_id:ID,parsed_at:D,created_at:D,order_id:ID',   // order_id: 변경 014(v2.12.0) — 이 이력서를 받은 발송 건(S34.order_id). 빈 값이 정상
     enums:{parse_status:['대기','성공','읽기실패','검토필요','동일인확인','합침완료','처리종료']}},
   S29:{tab:'S29_RATING',rows:1200,mode:'row',id:{prefix:'RTG-',digits:5},
     cols:'rating_id:ID,person_id:ID,flag:E,reason:TL,rated_at:D,created_at:D',
@@ -167,6 +167,8 @@ const HR_TABS={
 function colLetter(n){ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
 // HR_TABS를 풀어 R(읽기)·W(쓰기)·HEADERS에 등록하고, 열별 형태·허용값 메타(HR_COLS)를 만든다.
 const HR_COLS={};      // {S20:[{name,type,enum?}], …}
+// 시트 머리글에 아직 없어도 오류로 보지 않는 열(새 열을 시트에 추가하기 전에도 화면이 멈추지 않게). 없으면 그 열은 읽지도 쓰지도 않는다.
+const HR_OPTIONAL_COLS={S28:['order_id']};
 const HR_ORDER=Object.keys(HR_TABS); // 신규 탭 18개(정의 순서)
 (function(){
   const TEXT_FMT=new Set(['ID','D','M','DT','T7']);   // 일반 텍스트 서식 고정(물리 설계 §6)

@@ -46,7 +46,7 @@ async function loadAll(){
   ORDERS=REQ?D.S34.filter(o=>o.request_id===REQ.request_id):[];
   DER=REQ?cmnDeriveRequests({reqs:[REQ],lines:D.S33,cands:D.S31,orders:D.S34},hrToday())[REQ.request_id]:null;
   if(!selLines.size||[...selLines].some(id=>!LINES.some(l=>l.line_id===id&&!cmnYes(l.is_cancelled)))) selLines=new Set(LINES.filter(l=>!cmnYes(l.is_cancelled)).map(l=>l.line_id));
-  MSGS=[]; renderTop(); fillInfo(); renderLines(); renderSend(); renderOrders(); hrQ('fMemo').value=REQ?REQ.memo:''; if(typeof renderCands==='function') renderCands(); if(typeof renderPromote==='function') renderPromote();
+  MSGS=[]; renderTop(); fillInfo(); renderLines(); renderSend(); renderOrders(); if(typeof renderResumes==='function') renderResumes(); hrQ('fMemo').value=REQ?REQ.memo:''; if(typeof renderCands==='function') renderCands(); if(typeof renderPromote==='function') renderPromote();
   ['btnSaveMemo'].forEach(i=>hrQ(i).disabled=!REQ);
 }
 const needSaved=()=>'<div class="hr-empty">의뢰 정보를 먼저 저장해 주세요.</div>';
@@ -342,7 +342,7 @@ function renderOrders(){
   const box=hrQ('orderBox'); if(!REQ){ box.innerHTML=needSaved(); return; }
   if(!ORDERS.length){ box.innerHTML='<div class="hr-empty">아직 발송한 서치업체가 없습니다.</div>'; return; }
   const pm=hrMap(D.S27,'party_id'), lm=hrMap(D.S33,'line_id'); const closed=DER&&DER.closed; const today=hrToday();
-  box.innerHTML=ORDERS.map(o=>{
+  box.innerHTML='<div id="rsNotice"></div>'+ORDERS.map(o=>{
     const d=cmnReplyDelay(o,REQ,today); const l=lm.get(o.line_id);
     const closedWait=closed&&o.reply_state==='대기';
     return `<div class="hr-line-card" data-order="${hrEsc(o.order_id)}">
@@ -355,6 +355,7 @@ function renderOrders(){
         <div class="hr-field fixed" style="min-width:120px"><label>제시 매입 단가 (만원/월)</label><input class="hr-input num hr-amt oc-rate" inputmode="decimal" value="${hrEsc(hrFmtMan(o.offered_rate_buy))}"></div>
       </div>
       <div class="hr-row"><div class="hr-field"><label>조건 요약</label><input class="hr-input oc-cond" value="${hrEsc(o.conditions||'')}"></div><div class="hr-field"><label>메모</label><input class="hr-input oc-memo" value="${hrEsc(o.memo||'')}"></div></div>
+      <div class="oc-resume" data-resume="${hrEsc(o.order_id)}"></div>
       <div class="hr-err oc-msg" style="margin-top:6px"></div>
       <div class="hr-row" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-oact="save">저장</button><button class="btn btn-danger btn-sm" data-oact="delete">삭제</button></div></div>`;
   }).join('');
@@ -367,10 +368,12 @@ document.addEventListener('click',ev=>{
 // 발송 기록 삭제 — 잘못 기록한 것을 지운다(변경 005). 이 발송으로 들어온 후보(S31.order_id)가 있으면 삭제하지 않는다. 직전에 시트를 다시 읽어 확인하고, 확인하지 못하면 삭제하지 않는다.
 async function deleteOrder(card){
   const cur=ORDERS.find(o=>o.order_id===card.dataset.order); const msg=card.querySelector('.oc-msg'); msg.textContent='';
-  const r=await hrReadMany(['S34','S31']); if(r.failed.length){ msg.textContent='사용 여부를 확인하지 못해 삭제하지 않았습니다. 다시 시도해 주세요.'; return; }
+  const r=await hrReadMany(['S34','S31','S28']); if(r.failed.length){ msg.textContent='사용 여부를 확인하지 못해 삭제하지 않았습니다. 다시 시도해 주세요.'; return; }
   const fresh=r.tabs.S34.rows.find(o=>o.order_id===cur.order_id); if(!fresh){ msg.textContent='이미 삭제된 발송 기록입니다.'; return; }
   const n=r.tabs.S31.rows.filter(c=>c.order_id===cur.order_id).length;
   if(n){ msg.textContent=`이 발송으로 들어온 후보 ${n}명이 연결되어 있어 삭제할 수 없습니다.`; return; }
+  const nf=r.tabs.S28.rows.filter(f=>f.order_id===cur.order_id).length;
+  if(nf){ msg.textContent=`이 발송으로 받은 이력서 ${nf}건이 연결되어 있어 삭제할 수 없습니다.`; return; }
   const pm=hrMap(D.S27,'party_id');
   if(!confirm(`${hrPartyName(pm,cur.party_id)} 발송 기록(${cur.order_id})을 삭제합니다. 되돌릴 수 없습니다. 삭제할까요?`)) return;
   const d=await hrDelete('S34',cur.order_id,{readUpdatedAt:fresh.updated_at}); if(!d.ok){ msg.textContent=hrSaveFailText(d); return; }

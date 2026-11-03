@@ -88,7 +88,8 @@ async function hrHeader(k,force){
   const r=await hrGet(hrRangeUrl(k,'1:1')+`?key=${API_KEY}`);
   if(!r.ok) return {ok:false,code:'READ_FAIL',message:HR_MSG.read(HR_TABS[k].tab)};
   const header=((r.json.values||[])[0]||[]).map(String);
-  const missing=HEADERS[k].filter(h=>!header.includes(h));
+  const opt=(typeof HR_OPTIONAL_COLS!=='undefined'&&HR_OPTIONAL_COLS[k])||[];
+  const missing=HEADERS[k].filter(h=>!header.includes(h)&&!opt.includes(h));
   if(missing.length) return {ok:false,code:'HEADER',message:`${HR_TABS[k].tab} 탭 헤더가 정의와 다릅니다 (없는 열: ${missing.join(', ')}).`};
   hrHeaderCache[k]=header;
   return {ok:true,header};
@@ -209,6 +210,7 @@ async function hrUpdate(k,id,changes,opts={}){
   if(cur===null) return {ok:false,code:'READ_FAIL',message:HR_MSG.read(t.tab)};
   if(hrConflict(k,cur,opts)) return {ok:false,code:'CONFLICT',message:HR_MSG.conflict};
   const upd={...changes}; if(hasUpd&&upd.updated_at===undefined) upd.updated_at=hrNow();
+  Object.keys(upd).forEach(c=>{ if(!h.header.includes(c)) delete upd[c]; });   // 선택 열이 시트에 아직 없으면 그 값은 쓰지 않는다
   const data=Object.keys(upd).map(c=>{
     const col=colLetter(h.header.indexOf(c)+1);
     return {range:`${t.tab}!${col}${row}`,values:[rowsFor([c],[upd])[0]]};

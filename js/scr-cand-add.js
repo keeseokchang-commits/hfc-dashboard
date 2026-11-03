@@ -15,6 +15,7 @@ const START_STAGE=ST.STAGE8[0];
 const RATE_MAX_MAN=5000;
 const MSG={none:'조건에 맞는 후보가 없습니다. 조건을 넓히거나 이력서를 먼저 등록해 주세요.',dup:'이미 이 라인에 같은 경로로 등록된 후보입니다.',black:'블랙 구분 후보입니다. 그래도 등록하시겠습니까?'};
 const GRADES=['특급','고급','중급','초급'];
+let PRE=null;   // v2.12.0: 의뢰 상세의 「후보로 등록」에서 온 미리 채움 {person,via,order} — 처음 한 번만 적용
 let D={}, LINE=null, REQ=null, VIEWS=[], PM=new Map(), ASOF='', CODES={industry:[],project_type:[]}, PROMPT_TPL='', SEL=null, roleSel=new Set(), shown=50, SKILLS=new Map(), CAREERS=new Map(), done=null, askText=null;
 const q=hrQ;
 const sel$=(items,cur,blank)=>(blank!==undefined?`<option value="">${hrEsc(blank)}</option>`:'')+items.map(x=>`<option${x===cur?' selected':''}>${hrEsc(x)}</option>`).join('');
@@ -38,7 +39,10 @@ async function loadAll(){
   q('title').innerHTML=`${hrEsc(REQ.alias||REQ.request_id)} <span class="hr-sub">${hrEsc(REQ.request_id)}</span>`;
   q('lineInfo').textContent=`요청 라인 ${LINE.line_no||''} · ${hrSplit(LINE.role_codes).join('·')||'(역할 없음)'} ${LINE.grade||''} ${LINE.headcount||''}명${LINE.must_skills?' · 필수 '+LINE.must_skills:''}`;
   VIEWS=build(); fillSelects(); if(!q('fSearch').dataset.init){ resetFilters(); q('fSearch').dataset.init='1'; }
-  render();
+  const sp=new URLSearchParams(location.search), pp=sp.get('person')||'';
+  if(pp&&!q('fSearch').dataset.pre){ q('fSearch').dataset.pre='1'; if(VIEWS.some(v=>v.id===pp)){ SEL=pp; PRE={via:sp.get('via')||'',order:sp.get('order')||''}; } }
+  const had=!!PRE; render();
+  if(had){ const e=q('secForm'); if(e&&e.scrollIntoView) e.scrollIntoView({block:'start'}); }
 }
 function build(){
   const views=cmnPersonViews({persons:D.S20,roles:D.S21,skills:D.S22,careers:D.S23,assigns:D.S25,files:D.S28,ratings:D.S29,cands:D.S31,contacts:D.S26},ASOF,settingsOf(D.S10),null);
@@ -157,6 +161,13 @@ function renderForm(){
   </div>
   <div class="card"><div class="hr-err" id="regMsg" style="margin-bottom:6px"></div>
     <div class="hr-row"><button class="btn btn-primary" data-act="register" id="btnReg">이 의뢰에 후보로 등록</button><a class="btn btn-secondary" id="btnCancel" href="request-detail.html?id=${encodeURIComponent(REQ.request_id)}">취소</a></div></div>`;
+  applyPre();
+}
+// 의뢰 상세에서 넘어온 값으로 경로(그 서치업체)와 이력서(그 발송 건으로 받은 파일)를 미리 고른다. 한 번만 쓰고 지운다.
+function applyPre(){
+  if(!PRE) return; const p=PRE; PRE=null;
+  const v=q('fVia'); if(v&&p.via&&[...v.options].some(o=>o.value===p.via)) v.value=p.via;
+  const r=q('fResume'); if(r&&p.order){ const f=D.S28.filter(x=>x.person_id===SEL&&x.order_id===p.order).sort((a,b)=>(parseInt(b.version_no)||0)-(parseInt(a.version_no)||0))[0]; if(f&&[...r.options].some(o=>o.value===f.file_id)) r.value=f.file_id; }
 }
 function marginUpdate(){ const b=hrManToWon(q('fBuy').value), s=hrManToWon(q('fSell').value); const e=q('marginTxt'); if(!e) return;
   e.textContent=(typeof b==='number'&&typeof s==='number'&&!isNaN(b)&&!isNaN(s))?(Math.round((s-b)/1000)/10).toLocaleString('ko-KR',{maximumFractionDigits:1}):'-'; }

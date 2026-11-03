@@ -1,4 +1,4 @@
-// HFC cmn-drive.js v2.11.0 — 이력서 드라이브 연동 (설계서 resume-intake-process-design v0.2 Phase 2, 사용자 승인 2026-11-02)
+// HFC cmn-drive.js v2.12.0 — 이력서 드라이브 연동 (설계서 resume-intake-process-design v0.2 Phase 2, 사용자 승인 2026-11-02)
 // 하는 일: New 폴더 읽기 · 이력서 올리기(속성 부착) · Result 폴더의 결과 파일 읽기 · 처리 끝난 파일 옮기기(New→Done/Fail, Fail→New, Result→Done 보관).
 // 안전장치(설계서 §7): ① 폴더 번호는 이 파일 상수(drive-folders-v0.1)에서만 온다 ② 옮기기는 아래 허용표의 조합만, 그리고 파일이 실제로 출발 폴더에 있을 때만
 //   ③ 삭제·이름 바꾸기·복사는 만들지 않았다 ④ 폴더 만들기는 Done 아래 「결과 보관」 하나뿐.
@@ -121,7 +121,7 @@ function drvPrepare(text,newFiles,defaults){
     if(!r||typeof r!=='object') return null; r.file=r.file&&typeof r.file==='object'?r.file:{};
     const m=drvMatchNew(r,newFiles); const f=r.file;
     if(m){ f.drive_file_id=m.id; f.drive_url=m.webViewLink||f.drive_url||''; if(drvH16(m)) f.file_hash=drvH16(m); if(!f.file_name) f.file_name=m.name;
-      const ap=m.appProperties||{}; if(!f.source_party_id&&ap.party) f.source_party_id=ap.party; if(!f.received_at) f.received_at=ap.received||drvDay(m.createdTime); }
+      const ap=m.appProperties||{}; if(!f.source_party_id&&ap.party) f.source_party_id=ap.party; if(!f.received_at) f.received_at=ap.received||drvDay(m.createdTime); if(ap.order) f.order_id=ap.order; }
     if(!f.source_party_id&&d.party) f.source_party_id=d.party;
     return m;
   });

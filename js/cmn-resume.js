@@ -83,6 +83,7 @@ async function cmnImportOne(st,res,io,runId){
     return out;
   }
   const fileBase={drive_file_id:cmnTxt(f.drive_file_id),file_name:cmnTxt(f.file_name),drive_url:cmnTxt(f.drive_url),file_hash:cmnTxt(f.file_hash),source_party_id:cmnTxt(f.source_party_id),received_at:cmnTxt(f.received_at)||today,run_id:runId||'',parsed_at:today};
+  if(cmnTxt(f.order_id)) fileBase.order_id=cmnTxt(f.order_id);   // v2.12.0 변경 014: 발송 건 연결(없으면 열 자체를 건드리지 않는다)
   const writeFile=async(extra,id)=>{ const rec={...fileBase,...extra}; if(prior){ await io.update('S28',prior.file_id,rec,prior); return prior.file_id; } const ids=await io.appendMany('S28',[{...(id?{file_id:id}:{}),...rec}]); return ids[0]; };
   if(res.status==='읽기실패'){
     await writeFile({parse_status:'읽기실패',parse_error:cmnTxt(res.error).slice(0,200)||'읽지 못했습니다.',person_id:'',version_no:'',match_person_id:''});
