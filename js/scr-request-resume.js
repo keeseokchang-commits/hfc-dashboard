@@ -58,7 +58,7 @@ async function renderResumes(){
   if(n) n.innerHTML=h;
   boxes.forEach(b=>{ const o=ORDERS.find(x=>x.order_id===b.dataset.resume); b.innerHTML=o?rsBlock(o):''; });
 }
-function rsProg(orderId,t){ const c=document.querySelector(`[data-order="${CSS.escape(orderId)}"]`); if(!c) return; const e=c.querySelector('[data-rs-prog]'); if(!e) return; e.style.display=t?'':'none'; c.querySelector('[data-rs-progtxt]').textContent=t||''; }
+function rsProg(orderId,t){ const c=document.querySelector(`[data-resume="${CSS.escape(orderId)}"]`); if(!c) return; const e=c.querySelector('[data-rs-prog]'); if(!e) return; e.style.display=t?'':'none'; c.querySelector('[data-rs-progtxt]').textContent=t||''; }
 async function rsUpload(orderId,files){
   const o=ORDERS.find(x=>x.order_id===orderId); if(!o||!files.length) return;
   await rsLoad();
@@ -88,7 +88,7 @@ async function rsReply(orderId){
 }
 document.addEventListener('click',ev=>{
   const b=ev.target.closest('[data-rs]'); if(!b) return; const act=b.dataset.rs, id=b.dataset.order;
-  if(act==='pick'){ const inp=b.closest('[data-order]').querySelector('[data-rs-file]'); if(inp) inp.click(); return; }
+  if(act==='pick'){ const inp=document.querySelector(`[data-rs-file="${CSS.escape(id)}"]`); if(inp) inp.click(); return; }
   if(act==='skip'){ try{ localStorage.setItem(rsSkipKey(id),'1'); }catch(e){} renderResumes(); return; }
   if(act==='reply'){ hrBusy(b,()=>rsReply(id)); return; }
   if(act==='grant'){ hrBusy(b,async()=>{ const ok=await authGrantDrive(); if(!ok){ toast('드라이브 권한을 받지 못했습니다. 동의 창에서 드라이브 항목을 선택해 주세요.',true); return; } await renderResumes(); }); }
