@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=2.13.1">
+<link rel="stylesheet" href="css/common.css?v=3.1.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -150,6 +150,7 @@
        이 코드 관리 UI를 통해서만 관리한다(설계 확정). -->
   <div class="card">
     <div class="card-title">🗂 코드 관리 <a href="docs/코드관리_매뉴얼.pdf" target="_blank" style="font-size:11px;font-weight:600;color:var(--blue);text-decoration:none;border:1px solid var(--blue);border-radius:6px;padding:3px 9px;margin-left:8px">📖 매뉴얼(PDF)</a> <span style="font-size:11px;color:var(--text3);font-weight:400">v1.2 — 유형·규칙·항목 추가/삭제 가능 (아래가 우선 적용, 상단 키워드는 폴백)</span></div>
+    <div id="codeBanner"></div>
     <div style="font-size:12px;font-weight:700;margin:4px 0 6px">① 거래 유형 & 키워드 <small style="color:var(--text3)">(CSV 자동분류·대사·집계의 기준)</small></div>
     <div id="ctTxn"></div><button class="btn-mini" onclick="addCode('txn_type')">+ 유형 추가</button>
     <div style="font-size:12px;font-weight:700;margin:16px 0 6px">② 거래점 분류 규칙 <small style="color:var(--text3)">(거래점 패턴 → 유형, 키워드보다 후순위)</small></div>
@@ -197,7 +198,17 @@
   */
   .code-row select{flex:0 0 132px;min-width:0;padding:7px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface);color:var(--text)}
   .code-row button{border:none;background:none;color:var(--red);cursor:pointer;font-size:12px;flex-shrink:0}
-  .code-row button[title]{color:var(--text3);font-size:11px}</style>
+  .code-row button[title]{color:var(--text3);font-size:11px}
+  .code-id{flex:0 0 62px;text-align:center;font-size:10.5px;color:var(--text3);font-family:monospace;border:1px solid var(--border);border-radius:5px;padding:4px 0;background:var(--bg)}
+  .code-row.inactive input,.code-row.inactive select,.code-row.inactive .code-id{opacity:.45;text-decoration:line-through}
+  .code-row .reuse{color:var(--blue,#1a56db)!important;font-size:11px!important}
+  #codeBanner{display:none;margin:8px 0;padding:9px 12px;border-radius:8px;background:#fff7e6;border:1px solid #f0c36d;font-size:12px;line-height:1.5}</style>
+  <div class="card" id="migCard">
+    <div class="card-title">🔁 코드 이관 <small style="font-weight:500;color:var(--text3)">(v3.1 — 저장된 거래·고정비 계획에 코드를 채웁니다)</small></div>
+    <div style="font-size:12px;line-height:1.6;margin-bottom:8px">① 위 「코드 전체 저장」으로 코드를 시트에 먼저 기록합니다. ② 시트 사본을 만듭니다. ③ 「미리보기」로 바뀔 건수와 이름을 못 찾는 항목을 확인합니다. ④ 「이관 확정」을 누르면 거래(S08_DETAIL)에 <b>type_code</b>, 고정비 계획(S06)에 <b>item_code</b> 열만 채우고 기존 열은 건드리지 않습니다. 이미 코드가 있는 행은 그대로 둡니다. 여러 번 실행해도 안전합니다.</div>
+    <button class="btn-mini" onclick="migPreview()">미리보기</button>
+    <div id="migBox" style="margin-top:10px;font-size:12px"></div>
+  </div>
   <div class="card">
     <div class="card-title">🔔 알림 파라미터</div>
     <div class="param-row">
@@ -311,13 +322,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.13.1"></script>
-<script src="js/common.js?v=2.13.1"></script>
-<script src="js/auth.js?v=2.13.1"></script>
-<script src="js/cmn-sheet.js?v=2.13.1"></script>
-<script src="js/cmn-init.js?v=2.13.1"></script>
-<script src="js/calc.js?v=2.13.1"></script>
-<script src="js/nav.js?v=2.13.1"></script>
+<script src="js/schema.js?v=3.1.0"></script>
+<script src="js/common.js?v=3.1.0"></script>
+<script src="js/auth.js?v=3.1.0"></script>
+<script src="js/cmn-sheet.js?v=3.1.0"></script>
+<script src="js/cmn-init.js?v=3.1.0"></script>
+<script src="js/calc.js?v=3.1.0"></script>
+<script src="js/nav.js?v=3.1.0"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -518,7 +529,7 @@ async function saveSettingsToSheet(hrUpd){
   // v2.9.38: 이 함수는 settingsMap(키워드·파라미터)만 알기 때문에, S10의 다른 행(코드 관리 카테고리 등)은 저장 직전 시트를 읽어 그대로 보존한다.
   // v2.9.73 SCR-12: 보존 대상을 "키워드·파라미터가 아닌 모든 행"으로 넓혔다 — 새 코드 카테고리(role·industry·project_type·fail_reason),
   // 인력 설정값(hr_setting), 알 수 없는 카테고리까지 지우거나 다른 카테고리로 바꾸지 않는다. 인력 설정값은 hrUpd({키:값})로 받은 것만 갱신한다.
-  const header=['setting_key','setting_value','category','description','updated_at'];
+  const header=['setting_key','setting_value','category','description','updated_at','code_id','is_active'];   // v3.0.0: 코드·사용 여부 열 보존
   const today=new Date().toISOString().slice(0,10);
   const descMap={
     kw_revenue_inflow:'매출 입금 키워드',kw_cost_outflow:'매입 지급 키워드',
@@ -536,12 +547,12 @@ async function saveSettingsToSheet(hrUpd){
   if(existing===null) return false; // 읽기 실패 — 무엇을 보존해야 할지 알 수 없으므로 쓰기 포기
   const upd=hrUpd||{}; const done=new Set();
   const preserved=existing.filter(r=>r.setting_key&&!S10_KP_CATS.includes(r.category||'')).map(r=>{
-    if(r.category===S10_HR_SETTING_CAT&&Object.prototype.hasOwnProperty.call(upd,r.setting_key)){ done.add(r.setting_key); return [r.setting_key,upd[r.setting_key],r.category,r.description||hrDesc[r.setting_key]||'',today]; }
-    return [r.setting_key,r.setting_value,r.category,r.description||'',r.updated_at||today];
+    if(r.category===S10_HR_SETTING_CAT&&Object.prototype.hasOwnProperty.call(upd,r.setting_key)){ done.add(r.setting_key); return [r.setting_key,upd[r.setting_key],r.category,r.description||hrDesc[r.setting_key]||'',today,r.code_id||'',r.is_active||'']; }
+    return [r.setting_key,r.setting_value,r.category,r.description||'',r.updated_at||today,r.code_id||'',r.is_active||''];
   });
-  Object.keys(upd).filter(k=>!done.has(k)).forEach(k=>preserved.push([k,upd[k],S10_HR_SETTING_CAT,hrDesc[k]||'',today]));
+  Object.keys(upd).filter(k=>!done.has(k)).forEach(k=>preserved.push([k,upd[k],S10_HR_SETTING_CAT,hrDesc[k]||'',today,'','']));
   const settingRows=Object.entries(settingsMap).map(([k,v])=>[
-    k,NUMERIC_PARAMS.has(k)?num(v):v,k.startsWith('kw_')?'keyword':'parameter',descMap[k]||'',today
+    k,NUMERIC_PARAMS.has(k)?num(v):v,k.startsWith('kw_')?'keyword':'parameter',descMap[k]||'',today,'',''
   ]);
   return await clearAndWrite(...W.S10,[header,...preserved,...settingRows]);
 }
@@ -593,13 +604,18 @@ async function loadCodes(){
   const rows=toObj(await fetchSheet(...R.S10));
   // v2.9.45: txn_type만 description 컬럼에 저장된 "집계 버킷"을 세 번째 요소로 함께 복원.
   // description은 그동안 이 카테고리들에서 항상 빈 문자열로만 저장되던 컬럼이라 스키마 변경 없이 재사용.
-  codeRows.txn_type=rows.filter(r=>r.category==='txn_type').map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.description||'']);
-  ['branch_rule','fixed_item','skill_tag','balance_item','recon_exclude',...S10_HR_CODE_CATS].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value]));
+  const _cd=r=>[r.code_id||'',String(r.is_active||'Y').trim().toUpperCase()==='N'?'N':'Y'];   // v3.0.0: [3]=code_id [4]=사용 여부
+  codeRows.txn_type=rows.filter(r=>r.category==='txn_type').map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.description||'',..._cd(r)]);
+  ['branch_rule','fixed_item','skill_tag','balance_item','recon_exclude',...S10_HR_CODE_CATS].forEach(c=>codeRows[c]=rows.filter(r=>r.category===c).map(r=>[r.setting_key||r.key,r.setting_value||r.value,'',..._cd(r)]));
   if(!codeRows.txn_type.length){
     // v2.9.42: 이 폴백도 옛 key/value 필드명이라 항상 빈 값만 반환하던 결함 — setting_key/setting_value로 정정.
     const kw=k=>(rows.find(r=>r.setting_key===k)||{}).setting_value||'';
-    codeRows.txn_type=DEF_TYPES.map(([n,_])=>[n,{'매출입금':kw('kw_revenue_inflow'),'매입지급':kw('kw_cost_outflow'),'고정비':kw('kw_fixed_outflow'),'세금':kw('kw_tax_outflow')}[n]||'']);
+    codeRows.txn_type=DEF_TYPES.map(([n,_])=>[n,{'매출입금':kw('kw_revenue_inflow'),'매입지급':kw('kw_cost_outflow'),'고정비':kw('kw_fixed_outflow'),'세금':kw('kw_tax_outflow')}[n]||'','','','Y']);
   }
+  // v3.0.0: 코드가 없는 행에 코드를 일괄 부여(메모리에서만 — 「코드 저장」을 눌러야 시트에 기록된다)
+  const nAssigned=assignCodes(codeRows);
+  const bn=document.getElementById('codeBanner');
+  if(bn){ bn.style.display='block'; bn.innerHTML=(nAssigned?`🆔 코드 ${nAssigned}건을 새로 부여했습니다. <b>아래 「코드 저장」을 눌러야 시트에 기록됩니다.</b><br>`:'')+'⚠ 이름을 바꿔도 코드는 그대로입니다. 다만 <b>이미 저장된 거래·고정비 계획의 이름은 이후 단계(v3.1·v3.2)에서 코드로 이관되기 전까지 옛 이름 그대로</b> 남아 있어, 그 전에는 이름 변경을 가급적 피해 주세요.'; }
   renderCodes();
  }catch(e){}
 }
@@ -618,15 +634,22 @@ const TXN_BUCKETS=[
   ['매입지급','매입지급(출금)'],['고정비','고정비(출금)'],['세금','세금(출금)'],
   ['법인카드','법인카드(출금)'],['AI사용료','AI사용료(출금)'],['기타비용','기타비용(출금)'],
 ];
+// v3.0.0: 코드 표시·사용 중지 공통 조각
+const cidBadge=r=>`<span class="code-id" title="코드 — 한 번 만들면 바뀌지 않습니다">${escAttr(r[3]||'신규')}</span>`;
+const rowCls=r=>r[4]==='N'?'code-row inactive':'code-row';
+const delBtn=(c,i)=>{ const r=codeRows[c][i];
+  if(isSysCode(r[3])) return `<button disabled title="내장 거래 유형 — 삭제·사용 중지 불가" style="color:var(--text3)">🔒</button>`;
+  if(r[4]==='N') return `<button class="reuse" onclick="reuseCode('${c}',${i})" title="다시 새 입력 목록에 나오게 합니다">다시 사용</button>`;
+  return `<button onclick="delCode('${c}',${i})" title="삭제(사용 중이면 사용 중지)">✕</button>`; };
 function renderCodes(){
-  const mk=(c,ph1,ph2,useDL,checkUse)=>codeRows[c].map((r,i)=>`<div class="code-row">
+  const mk=(c,ph1,ph2,useDL,checkUse)=>codeRows[c].map((r,i)=>`<div class="${rowCls(r)}">${cidBadge(r)}
     <input value="${escAttr(r[0])}" placeholder="${ph1}" data-c="${c}" data-i="${i}" data-f="0" oninput="codeRows['${c}'][${i}][0]=this.value${c==='txn_type'?';fillDL()':''}">
     <input value="${escAttr(r[1])}" placeholder="${ph2}" ${useDL?'list="typeDL"':''} oninput="codeRows['${c}'][${i}][1]=this.value">
     <button onclick="moveCode('${c}',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
     <button onclick="moveCode('${c}',${i},1)" title="우선순위 내리기" ${i===codeRows[c].length-1?'disabled style="opacity:.25"':''}>▼</button>
-    <button onclick="${checkUse?`delCode('${c}',${i})`:`codeRows['${c}'].splice(${i},1);renderCodes()`}">✕</button></div>`).join('');
-  document.getElementById('ctTxn').innerHTML=codeRows.txn_type.map((r,i)=>`<div class="code-row">
-    <input value="${r[0]||''}" placeholder="유형명 (예: 매출 입금)" data-c="txn_type" data-i="${i}" data-f="0" oninput="codeRows['txn_type'][${i}][0]=this.value;fillDL()">
+    ${delBtn(c,i)}</div>`).join('');
+  document.getElementById('ctTxn').innerHTML=codeRows.txn_type.map((r,i)=>`<div class="${rowCls(r)}">${cidBadge(r)}
+    <input value="${escAttr(r[0])}" placeholder="유형명 (예: 매출 입금)" data-c="txn_type" data-i="${i}" data-f="0" oninput="codeRows['txn_type'][${i}][0]=this.value;fillDL()">
     <input value="${r[1]||''}" placeholder="키워드 콤마구분 (예: 오벳소프트,외주비)" oninput="codeRows['txn_type'][${i}][1]=this.value">
     <select onchange="codeRows['txn_type'][${i}][2]=this.value">
       <option value="">집계 버킷 선택…</option>
@@ -634,11 +657,11 @@ function renderCodes(){
     </select>
     <button onclick="moveCode('txn_type',${i},-1)" title="우선순위 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
     <button onclick="moveCode('txn_type',${i},1)" title="우선순위 내리기" ${i===codeRows.txn_type.length-1?'disabled style="opacity:.25"':''}>▼</button>
-    <button onclick="codeRows['txn_type'].splice(${i},1);renderCodes()">✕</button></div>`).join('');
+    ${delBtn('txn_type',i)}</div>`).join('');
   document.getElementById('ctBalance').innerHTML=codeRows.balance_item.map((r,i)=>{
     const names=codeRows.txn_type.map(t=>String(t[0]||'').trim()).filter(Boolean);
     const cur=String(r[0]||'').trim(), miss=cur&&!names.includes(cur);
-    return `<div class="code-row">
+    return `<div class="${rowCls(r)}">${cidBadge(r)}
     <select onchange="codeRows['balance_item'][${i}][0]=this.value;renderCodes()">
       <option value="">거래 유형 선택…</option>
       ${(miss?[cur]:[]).concat(names).map(n=>`<option value="${escAttr(n)}" ${n===cur?'selected':''}>${escAttr(n)}${n===cur&&miss?' (①에 없음)':''}</option>`).join('')}
@@ -649,16 +672,16 @@ function renderCodes(){
     </select>
     <button onclick="moveCode('balance_item',${i},-1)" title="순서 올리기" ${i===0?'disabled style="opacity:.25"':''}>▲</button>
     <button onclick="moveCode('balance_item',${i},1)" title="순서 내리기" ${i===codeRows.balance_item.length-1?'disabled style="opacity:.25"':''}>▼</button>
-    <button onclick="codeRows['balance_item'].splice(${i},1);renderCodes()">✕</button></div>`;}).join('');
+    ${delBtn('balance_item',i)}</div>`;}).join('');
   document.getElementById('ctRecon').innerHTML=codeRows.recon_exclude.map((r,i)=>{
     const names=codeRows.txn_type.map(t=>String(t[0]||'').trim()).filter(Boolean);
     const cur=String(r[0]||'').trim(), miss=cur&&!names.includes(cur);
-    return `<div class="code-row">
+    return `<div class="${rowCls(r)}">${cidBadge(r)}
     <select onchange="codeRows['recon_exclude'][${i}][0]=this.value;renderCodes()">
       <option value="">거래 유형 선택…</option>
       ${(miss?[cur]:[]).concat(names).map(n=>`<option value="${escAttr(n)}" ${n===cur?'selected':''}>${escAttr(n)}${n===cur&&miss?' (①에 없음)':''}</option>`).join('')}
     </select>
-    <button onclick="codeRows['recon_exclude'].splice(${i},1);renderCodes()">✕</button></div>`;}).join('');
+    ${delBtn('recon_exclude',i)}</div>`;}).join('');
   document.getElementById('ctBranch').innerHTML=mk('branch_rule','거래점 패턴 (예: 하나은행0026)','적용 유형 (예: 법인카드)',true);
   document.getElementById('ctFixed').innerHTML=mk('fixed_item','항목명 (예: 임차료)','대사 키워드(선택)');
   document.getElementById('ctSkill').innerHTML=mk('skill_tag','태그명 (예: React)','동의어 콤마구분 (예: 리액트,react)');
@@ -676,7 +699,12 @@ function moveCode(c,i,d){
   [codeRows[c][i],codeRows[c][j]]=[codeRows[c][j],codeRows[c][i]];
   renderCodes();
 }
-function addCode(c){codeRows[c].push(c==='balance_item'?['','출금']:['','']);renderCodes();}
+function addCode(c){
+  const used=codeRows[c].map(r=>r[3]).filter(Boolean);
+  codeRows[c].push([ '', c==='balance_item'?'출금':'', '', nextCodeId(S10_CODE_PREFIX[c],used), 'Y' ]);   // v3.0.0: 새 행은 즉시 자동 채번
+  renderCodes();
+}
+function reuseCode(c,i){ codeRows[c][i][4]='Y'; renderCodes(); toast('다시 사용으로 바꿨습니다. 「코드 저장」을 눌러야 반영됩니다.'); }
 // v2.9.73 SCR-12 — 코드 삭제 전 사용 건수 확인(설계서 R2: 사용 중이어도 확인 뒤 삭제 허용, 기존 기록에는 값만 남음)
 async function codeUsage(c,name){
   const spec=S10_CODE_USAGE[c]||[]; const keys=[...new Set(spec.map(x=>x[0]))];
@@ -686,16 +714,18 @@ async function codeUsage(c,name){
   return {total,unread:r.failed.map(k=>R[k][0])};
 }
 async function delCode(c,i){
-  const name=String((codeRows[c][i]||[])[0]||'').trim();
-  if(name){
-    const u=await codeUsage(c,name);
-    if(u.total>0&&!confirm(`이 코드는 ${u.total}건에서 사용 중입니다. 삭제하면 기존 기록에는 값만 남습니다.`+(u.unread.length?`\n(읽지 못한 탭: ${u.unread.join(', ')} — 건수가 더 많을 수 있습니다)`:''))) return;
-  }
-  codeRows[c].splice(i,1); renderCodes();
+  // v3.0.0: 쓰이지 않는 코드만 삭제. 사용 중(또는 사용 여부를 확인하지 못함)이면 삭제 대신 「사용 중지」 — 코드는 지우지 않는다(설계서 §3-4).
+  const r=codeRows[c][i]; const name=String((r||[])[0]||'').trim();
+  if(!name||!S10_CODE_USAGE[c]){ codeRows[c].splice(i,1); renderCodes(); return; }   // 이름이 비었거나 연결 데이터가 없는 코드군은 바로 삭제
+  const u=await codeUsage(c,name);
+  if(u.total===0&&!u.unread.length){ codeRows[c].splice(i,1); renderCodes(); return; }
+  const why=u.total>0?`${u.total}건에서 사용 중이라 삭제할 수 없습니다.`:`사용 여부를 확인하지 못했습니다(읽지 못한 탭: ${u.unread.join(', ')}).`;
+  if(!confirm(why+'\n대신 「사용 중지」로 바꿀까요? 새로 입력하는 목록에서는 빠지고, 이미 저장된 기록은 그대로 보입니다.')) return;
+  r[4]='N'; renderCodes(); toast('사용 중지로 바꿨습니다. 「코드 저장」을 눌러야 반영됩니다.');
 }
 // 새 코드 4종은 카테고리 안에서 이름 중복 불가(설계서 §16.4 No.1). 기존 4종의 동작은 바꾸지 않는다.
 function dupCodeName(){
-  for(const c of S10_HR_CODE_CATS){ const seen=new Set();
+  for(const c of S10_CODE_CATS.filter(x=>x!=='branch_rule'&&x!=='balance_item'&&x!=='recon_exclude')){ const seen=new Set();
     for(const r of codeRows[c]){ const n=String(r[0]||'').trim(); if(!n) continue; if(seen.has(n)) return {c,n}; seen.add(n); } }
   for(const c of ['balance_item','recon_exclude']){ const seen=new Set(); for(const r of codeRows[c]){ const n=String(r[0]||'').trim(); if(!n) continue; if(seen.has(n)) return {c,n}; seen.add(n); } }
   return null;
@@ -703,18 +733,20 @@ function dupCodeName(){
 async function saveCodes(){
   const dup=dupCodeName();
   if(dup){ toast(`같은 이름의 코드가 있습니다. (${S10_CODE_LABEL[dup.c]||(dup.c==='recon_exclude'?'대사 제외 유형':'누적 잔액 항목')}: ${dup.n})`,true); return; }
+  assignCodes(codeRows);   // v3.0.0: 저장 직전 빠진 코드를 채운다
   const today=new Date().toISOString().slice(0,10);
   // v2.9.38: 헤더 컬럼 순서를 saveSettingsToSheet()와 통일 — 항상 category가 C열, description이 D열.
-  const H=['setting_key','setting_value','category','description','updated_at'];
+  const H=['setting_key','setting_value','category','description','updated_at','code_id','is_active'];   // v3.0.0: F·G열
   // v2.9.73 SCR-12: 저장 직전 S10을 다시 읽고, 이 화면이 관리하는 카테고리(S10_CODE_CATS)가 아닌 행은 읽은 그대로 보존한다
   // (키워드·파라미터·인력 설정값·알 수 없는 카테고리). 읽기가 실패하면 쓰지 않는다 — 예전에는 메모리 값으로 계속 진행했다.
   const fresh=await readS10Fresh();
   if(fresh===null){ toast(s10ReadMsg||'설정을 읽을 수 없어 저장을 중단했습니다.',true); return; }
-  const rows=fresh.filter(r=>!S10_CODE_CATS.includes(r.category)).map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.category,r.description,r.updated_at]);
+  const rows=fresh.filter(r=>!S10_CODE_CATS.includes(r.category)).map(r=>[r.setting_key||r.key,r.setting_value||r.value,r.category,r.description,r.updated_at,r.code_id||'',r.is_active||'']);
   // v2.9.45: txn_type은 description 컬럼에 사용자가 지정한 집계 버킷(r[2])을 저장 — 다른 카테고리는 description을 쓰지 않으므로 빈 문자열.
-  S10_CODE_CATS.forEach(c=>codeRows[c].filter(r=>r[0]&&String(r[0]).trim()).forEach(r=>rows.push([S10_HR_CODE_CATS.includes(c)?String(r[0]).trim():r[0],r[1]||'',c,c==='txn_type'?(r[2]||''):'',today])));
+  S10_CODE_CATS.forEach(c=>codeRows[c].filter(r=>r[0]&&String(r[0]).trim()).forEach(r=>rows.push([S10_HR_CODE_CATS.includes(c)?String(r[0]).trim():r[0],r[1]||'',c,c==='txn_type'?(r[2]||''):'',today,r[3]||'',r[4]==='N'?'N':'Y'])));
   const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
+  if(ok){ const bn=document.getElementById('codeBanner'); if(bn) bn.innerHTML='✅ 코드가 시트에 기록되었습니다. 이름을 바꿔도 코드는 그대로입니다.<br>⚠ 이미 저장된 거래·고정비 계획의 이름은 이후 단계(v3.1·v3.2)에서 코드로 이관되기 전까지 옛 이름 그대로 남습니다.'; renderCodes(); }
 }
 // v2.9.73 CMN-03 시트 준비 — 확인 창 → 신규 탭 18개·기본 행·기본 코드. 이미 있는 것은 건드리지 않는다.
 async function runSheetPrep(){
@@ -734,6 +766,96 @@ async function runSheetPrep(){
   toast(r.ok?'✓ 시트 준비 완료':(r.message||'일부 항목이 실패했습니다. 결과를 확인하세요'),!r.ok);
   await loadCodes(); await loadSettings();
 }
+// ── v3.1.0 코드 이관: 거래(S08_DETAIL.category→type_code)·고정비 계획(S06.category→item_code) ──
+const MIG_KINDS=[
+  {k:'txn',label:'거래 유형',sheet:'S08_DETAIL',nameCol:'category',codeCol:'type_code',cat:'txn_type',sums:['inflow_amt','outflow_amt'],limit:2000},
+  {k:'fix',label:'고정비 항목',sheet:'S06',nameCol:'category',codeCol:'item_code',cat:'fixed_item',sums:['amount'],limit:300},
+];
+let mig={s10:[],vals:{},manual:{txn:{},fix:{}},plans:{}};
+const migHash=str=>{ let h=5381; for(let i=0;i<str.length;i++) h=((h<<5)+h+str.charCodeAt(i))|0; return h>>>0; };
+// 코드 열을 뺀 나머지 열의 요약(행 수·열별 합계·내용 해시) — 이관 전후 대조용
+function migDigest(values,codeCol,sums){
+  const hdr=(values[0]||[]).map(String), ci=hdr.indexOf(codeCol), n=hdr.length;
+  const keep=hdr.map((h,i)=>i).filter(i=>i!==ci);
+  let txt=''; const sm={}; sums.forEach(c=>sm[c]=0);
+  for(let r=1;r<values.length;r++){ const row=values[r]||[]; txt+=keep.map(i=>String(row[i]??'')).join('\u0001')+'\u0002'; sums.forEach(c=>{ const x=hdr.indexOf(c); if(x>=0) sm[c]+=num(row[x]); }); }
+  return {rows:Math.max(0,values.length-1),hash:migHash(txt),sums:sm};
+}
+async function migLoad(){
+  const s10=await readS10Fresh(); if(s10===null) throw new Error(s10ReadMsg||'설정을 읽을 수 없습니다.');
+  const miss=s10.filter(r=>MIG_KINDS.some(m=>m.cat===r.category)&&String(r.setting_key||'').trim()&&!r.code_id);
+  if(miss.length) throw new Error(`코드가 없는 항목이 ${miss.length}건 있습니다(예: ${miss[0].setting_key}). 위 「코드 전체 저장」을 먼저 누르세요.`);
+  const vals={};
+  for(const m of MIG_KINDS){
+    const v=await fetchSheetSafe(...R[m.sheet]);
+    if(v===null||!v.length) throw new Error(m.sheet+' 시트를 읽을 수 없습니다.');
+    if(v.length>=m.limit) throw new Error(`${m.sheet} 행이 읽기 범위(${m.limit}행)를 채워 이관을 중단했습니다. 잘린 행에는 코드를 채울 수 없습니다.`);
+    vals[m.k]=v;
+  }
+  return {s10,vals};
+}
+function migPlan(m){
+  const resolve=n=>codeOfName(mig.s10,m.cat,n);
+  return planCodeMigration(mig.vals[m.k],m.nameCol,m.codeCol,resolve,mig.manual[m.k]);
+}
+async function migPreview(){
+  const box=document.getElementById('migBox'); box.textContent='읽는 중…';
+  try{ const r=await migLoad(); mig.s10=r.s10; mig.vals=r.vals; mig.manual={txn:{},fix:{}}; migRender(); }
+  catch(e){ box.innerHTML=`<div style="color:var(--red)">${escAttr(e.message)}</div>`; }
+}
+function migSetManual(k,name,code){ if(code) mig.manual[k][name]=code; else delete mig.manual[k][name]; migRender(); }
+function migRender(){
+  const box=document.getElementById('migBox'); let html=''; let totalFill=0;
+  MIG_KINDS.forEach(m=>{
+    const pl=migPlan(m); mig.plans[m.k]=pl; if(!pl.ok){ html+=`<div style="color:var(--red)">${m.label}: ${escAttr(pl.message)}</div>`; return; }
+    const st=pl.st; totalFill+=st.filled;
+    const codes=mig.s10.filter(r=>r.category===m.cat&&r.code_id&&String(r.setting_key||'').trim());
+    html+=`<div style="font-weight:700;margin:10px 0 4px">${m.label} — ${m.sheet}.${m.nameCol} → ${m.codeCol}</div>
+      <div style="margin-bottom:4px">전체 ${st.rows}건 · <b>새로 채움 ${st.filled}건</b> · 이미 코드 있음 ${st.kept}건 · 이름 비어 있음 ${st.empty}건 · <span style="color:${st.unresolved?'var(--red)':'inherit'}">이름을 못 찾음 ${st.unresolved}건</span>${pl.hasCol?'':' · (코드 열이 아직 없어 새로 만듭니다)'}</div>`;
+    if(st.mismatch.length) html+=`<div style="color:#b45309;margin-bottom:4px">⚠ 이미 있는 코드와 이름이 가리키는 코드가 다른 행: ${st.mismatch.length}건(예: ${escAttr(st.mismatch[0].name)} — 기존 ${st.mismatch[0].ex}, 이름은 ${st.mismatch[0].code}). 기존 코드는 바꾸지 않습니다.</div>`;
+    const ent=Object.entries(pl.names).filter(([n])=>n).sort((a,b)=>b[1].count-a[1].count);
+    html+=`<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:var(--bg)"><th style="text-align:center;padding:4px">이름</th><th style="text-align:center">건수</th><th style="text-align:center">코드</th><th style="text-align:center">상태</th></tr>`+
+      ent.map(([n,g])=>{ const un=g.unresolved&&!mig.manual[m.k][n];
+        const cell=un?`<select onchange="migSetManual('${m.k}',this.dataset.n,this.value)" data-n="${escAttr(n)}"><option value="">선택…</option>${codes.map(c=>`<option value="${escAttr(c.code_id)}">${escAttr(c.setting_key)} (${c.code_id})</option>`).join('')}</select>`:escAttr(g.code||'-');
+        const how=un?'<span style="color:var(--red)">못 찾음</span>':({이름:'이름 일치',공백:'공백 차이로 맞춤',수동:'수동 지정'}[g.how]||'-');
+        return `<tr style="border-top:1px solid var(--border)"><td style="padding:4px">${escAttr(n)}</td><td style="text-align:center">${g.count}</td><td style="text-align:center">${cell}</td><td style="text-align:center">${how}</td></tr>`; }).join('')+`</table>`;
+  });
+  html+=`<div style="margin-top:10px"><button class="btn btn-primary" onclick="migRun()" ${totalFill?'':'disabled style="opacity:.4"'}>이관 확정 (새로 채움 ${totalFill}건)</button> <small style="color:var(--text3)">못 찾은 항목은 비워 두며, 나중에 다시 실행할 수 있습니다.</small></div><div id="migResult" style="margin-top:8px"></div>`;
+  box.innerHTML=html;
+}
+async function migWriteCol(m,header,colIdx,codes){
+  if(!accessToken){ await signIn(); if(!accessToken) return false; }
+  const L=colLetter(colIdx+1); const rng=`${R[m.sheet][0]}!${L}1:${L}${codes.length+1}`;
+  const r=await fetch(`${SHEETS_BASE}/values/${encodeURIComponent(rng)}?valueInputOption=RAW`,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:[[header],...codes.map(c=>[c])]})});
+  return r.ok;
+}
+async function migRun(){
+  const res=document.getElementById('migResult');
+  if(!confirm('시트 사본을 만들어 두셨나요?\n거래·고정비 계획에 코드 열만 채웁니다(기존 열은 바뀌지 않습니다). 진행할까요?')) return;
+  res.textContent='이관 중…';
+  try{
+    const r=await migLoad(); mig.s10=r.s10; mig.vals=r.vals;   // 확정 직전에 다시 읽는다
+    const lines=[]; let allOk=true;
+    for(const m of MIG_KINDS){
+      const pl=migPlan(m); if(!pl.ok) throw new Error(pl.message);
+      const before=migDigest(mig.vals[m.k],m.codeCol,m.sums);
+      const hdr=(mig.vals[m.k][0]||[]).map(String); let ci=hdr.indexOf(m.codeCol); if(ci<0) ci=hdr.length;
+      if(pl.st.filled===0){ lines.push(`<div>✓ ${m.label}: 새로 채울 행이 없어 쓰지 않았습니다.</div>`); continue; }
+      const ok=await migWriteCol(m,m.codeCol,ci,pl.out);
+      if(!ok){ allOk=false; lines.push(`<div style="color:var(--red)">✗ ${m.label}: 쓰기 실패 — 시트는 바뀌지 않았거나 일부만 바뀌었을 수 있습니다. 시트 사본으로 확인하세요.</div>`); continue; }
+      // 대조: 다시 읽어 코드 열을 뺀 내용이 이관 전과 같은지, 채운 건수가 계획과 같은지 확인
+      const after=await fetchSheetSafe(...R[m.sheet]); const d=migDigest(after,m.codeCol,m.sums);
+      const ah=(after[0]||[]).map(String), aci=ah.indexOf(m.codeCol);
+      const got=after.slice(1).filter(row=>aci>=0&&String((row||[])[aci]??'').trim()).length, want=pl.out.filter(Boolean).length;
+      const same=d.rows===before.rows&&d.hash===before.hash&&m.sums.every(c=>d.sums[c]===before.sums[c]);
+      const good=same&&got===want; if(!good) allOk=false;
+      lines.push(`<div style="color:${good?'inherit':'var(--red)'}">${good?'✓':'✗'} ${m.label}: 행 수 ${before.rows}→${d.rows}${m.sums.map(c=>` · ${c} 합계 ${before.sums[c].toLocaleString()}→${d.sums[c].toLocaleString()}`).join('')} · 기존 열 내용 ${same?'동일':'<b>다름</b>'} · 코드 채움 ${got}/${want}건</div>`);
+    }
+    res.innerHTML=`<div style="font-weight:700;margin-bottom:4px">${allOk?'이관 완료 — 대조 통과':'이관 결과에 확인이 필요한 항목이 있습니다'}</div>`+lines.join('');
+    toast(allOk?'🔁 코드 이관 완료 ✓':'이관 대조 확인 필요',!allOk);
+  }catch(e){ res.innerHTML=`<div style="color:var(--red)">${escAttr(e.message)}</div>`; }
+}
+
 window.addEventListener('load',loadCodes);
 
 // v2.9.113 보안 카드 — 자동 잠금 시간·잠금 번호 (실제 처리는 js/auth.js)

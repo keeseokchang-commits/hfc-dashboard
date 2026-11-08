@@ -195,7 +195,7 @@ function cmnImportIo(st,dry){
 }
 function cmnImportState(r){
   const T=k=>r.tabs[k].rows; const rows=T('S10'); const codes={role:[],industry:[],project_type:[]};
-  rows.forEach(x=>{ const cat=cmnTxt(x.category), key=cmnTxt(x.setting_key); if(key&&codes[cat]) codes[cat].push(key); });
+  rows.forEach(x=>{ const cat=cmnTxt(x.category), key=cmnTxt(x.setting_key); if(key&&codes[cat]&&String(x.is_active??'Y').trim().toUpperCase()!=='N') codes[cat].push(key); });   // v3.0.0: 사용 중지 제외
   const rr=rows.find(x=>cmnTxt(x.setting_key)==='grade_rule');
   return {tabs:Object.fromEntries(['S20','S21','S22','S23','S24','S28','S39'].map(k=>[k,T(k).map(x=>({...x}))])),codes,rule:rr?cmnParseGradeRule(rr.setting_value):null,today:hrToday(),s37:T('S37')};
 }

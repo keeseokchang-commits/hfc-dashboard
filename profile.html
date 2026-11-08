@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>HFC 인력 프로필</title>
-<link rel="stylesheet" href="css/common.css?v=2.13.1">
+<link rel="stylesheet" href="css/common.css?v=3.1.0">
 <style>
 .chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--blue-lt,#EFF6FF);color:var(--blue);margin:1px 2px}
 .st-b{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
@@ -104,10 +104,10 @@
 </main>
 <nav class="tab-bar"></nav>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="js/schema.js?v=2.13.1"></script>
-<script src="js/common.js?v=2.13.1"></script>
-<script src="js/auth.js?v=2.13.1"></script>
-<script src="js/nav.js?v=2.13.1"></script>
+<script src="js/schema.js?v=3.1.0"></script>
+<script src="js/common.js?v=3.1.0"></script>
+<script src="js/auth.js?v=3.1.0"></script>
+<script src="js/nav.js?v=3.1.0"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
 <script>
 let profiles=[],items=[],tags=[],editingId=null;
@@ -156,7 +156,7 @@ async function loadAll(){
     sheetsMissing=(pR===null||iR===null);
     profiles=dedupe(toObj(pR||[]).filter(p=>p.profile_id),'profile_id');
     items=toObj(iR||[]).filter(x=>x.item_id);
-    tags=toObj(sR||[]).filter(r=>r.category==='skill_tag'&&(r.setting_key||r.key)).map(r=>({tag:r.setting_key||r.key,syn:((r.setting_value||r.value)||'').split(',').map(x=>x.trim()).filter(Boolean)}));
+    tags=toObj(sR||[]).filter(r=>r.category==='skill_tag'&&(r.setting_key||r.key)&&codeIsActive(r)).map(r=>({tag:r.setting_key||r.key,syn:((r.setting_value||r.value)||'').split(',').map(x=>x.trim()).filter(Boolean)}));
     const sel=document.getElementById('fTag');
     sel.innerHTML='<option value="">전체 태그</option>'+tags.map(t=>`<option>${t.tag}</option>`).join('');
     document.getElementById('tagDL').innerHTML=tags.map(t=>`<option value="${t.tag}">`).join('');

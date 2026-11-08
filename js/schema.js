@@ -5,13 +5,13 @@ const R={ // 읽기 [시트명, 범위]
   S03:['S03_PROJECT','A1:K200'],
   S04:['S04_REVENUE','A1:M1000'],
   S05:['S05_COST','A1:O1000'],
-  S06:['S06_FIXED_COST','A1:J300'],
+  S06:['S06_FIXED_COST','A1:K300'],
   S07:['S07_PROFILE','A1:S500'],
   S16:['S16_PROFILE_ITEM','A1:M3000'],
   S08:['S08_CASHFLOW_ACT','A1:O24'],
-  S08_DETAIL:['S08_DETAIL','A1:J2000'],
+  S08_DETAIL:['S08_DETAIL','A1:K2000'],
   S09:['S09_DASHBOARD','A1:H24'],
-  S10:['S10_SETTINGS','A1:E300'],
+  S10:['S10_SETTINGS','A1:G300'],
   S11:['S11_GRADE_RATE','A1:H100'],
   S12:['S12_ESTIMATE','A1:W500'],
   S13:['S13_VAT','A1:N20'],
@@ -25,13 +25,13 @@ const W={ // 쓰기 [시트명, 범위]
   S03:['S03_PROJECT','A:K'],
   S04:['S04_REVENUE','A:M'],
   S05:['S05_COST','A:O'],
-  S06:['S06_FIXED_COST','A:J'],
+  S06:['S06_FIXED_COST','A:K'],
   S07:['S07_PROFILE','A:S'],
   S16:['S16_PROFILE_ITEM','A:M'],
   S08:['S08_CASHFLOW_ACT','A:O'],
-  S08_DETAIL:['S08_DETAIL','A:J'],
+  S08_DETAIL:['S08_DETAIL','A:K'],
   S09:['S09_DASHBOARD','A:H'],
-  S10:['S10_SETTINGS','A:E'],
+  S10:['S10_SETTINGS','A:G'],
   S11:['S11_GRADE_RATE','A:H'],
   S12:['S12_ESTIMATE','A:W'],
   S13:['S13_VAT','A:N'],
@@ -56,12 +56,12 @@ const HEADERS={
   // 임대료·통신비 등 비정기 매입세액공제 대상을 부가세 계산에 반영하기 위함.
   // v2.9.41: 고정비도 매출(S04)·매입(S05)과 동일하게 통장 대사(계획↔실제 거래 매칭) 대상이 되어야 한다는
   // 사용자 확정 — matched_txn_id(대사된 통장거래 ID)·pay_actual_date(실제 지급일) 추가.
-  S06:["fixed_id", "year_month", "category", "amount", "payment_date", "memo", "has_tax_invoice", "vat_amt", "matched_txn_id", "pay_actual_date"],
+  S06:["fixed_id", "year_month", "category", "amount", "payment_date", "memo", "has_tax_invoice", "vat_amt", "matched_txn_id", "pay_actual_date", "item_code"],   // v3.1.0: item_code(K) — 고정비 항목 코드(S10 fixed_item.code_id)
   S08:["year_month","act_balance","act_inflow","act_outflow","inflow_revenue","outflow_cost","outflow_fixed","outflow_tax","outflow_card","outflow_ai","outflow_etc","inflow_capital","inflow_etc","unclassified_cnt","csv_uploaded_at"],
-  S08_DETAIL:["txn_id", "txn_date", "description", "inflow_amt", "outflow_amt", "balance", "recv", "branch", "category", "year_month"],
+  S08_DETAIL:["txn_id", "txn_date", "description", "inflow_amt", "outflow_amt", "balance", "recv", "branch", "category", "year_month", "type_code"],   // v3.1.0: type_code(K) — 거래 유형 코드(S10 txn_type.code_id)
   S09:["year_month","est_balance","act_balance","diff_amount","accuracy_pct","diff_cause","alert_flag","updated_at"],
   // v2.9.9: 저장 로직(settings.html)의 실제 헤더는 setting_key/setting_value — 구 정의(key/value)는 결함이었음(설계서 결정2 반영, 즉시 수정)
-  S10:["setting_key", "setting_value", "description", "category", "updated_at"],
+  S10:["setting_key", "setting_value", "description", "category", "updated_at", "code_id", "is_active"], // v3.0.0: code_id(F)·is_active(G) 추가 — 코드 기반 키 전환 1단계
   S11:["set_id","set_name","grade","sell_price","buy_price","description","is_default","updated_at"],
   S12:["estimate_id","pipeline_id","comp_type","item_name","grade","grade_set_id","qty","unit_price","buy_price","amount","mm","start_date","end_date","memo","created_at","mm_round","cut_unit","cut_mode","buy_mm_round","buy_cut_unit","buy_cut_mode","mm_mode","buy_mm_mode"],
   S13:["vat_id","year","quarter_code","period_start","period_end","due_date","sales_vat","purchase_vat","estimated_payment","actual_payment","paid_date","cashflow_reflected","status","memo"],
@@ -237,9 +237,74 @@ const S10_CODE_USAGE={
   industry:[['S23','industry',false],['S33','industry',false]],
   project_type:[['S23','project_type',true],['S33','project_type',false]],
   fail_reason:[['S31','fail_reason_code',false],['S32','fail_reason_code',false]], // S32 추가: 변경 003
+  txn_type:[['S08_DETAIL','category',false]],   // v3.0.0: 거래 유형은 아직 이름(category)으로 연결 — 3단계에서 코드로 전환
+  fixed_item:[['S06','category',false]],        // v3.0.0: 고정비 항목은 S06.category 이름으로 연결
 };
-const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유'};
+const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유',txn_type:'거래 유형',fixed_item:'고정비 항목',branch_rule:'거래점 규칙',skill_tag:'기술 태그',balance_item:'누적 잔액 항목',recon_exclude:'대사 제외 유형'};
+// v3.0.0 코드 기반 키: 코드군별 접두어. 코드는 '접두어-숫자'(자동 채번), 한 번 만들면 바뀌지 않는다.
+const S10_CODE_PREFIX={txn_type:'TT',fixed_item:'FX',balance_item:'BL',recon_exclude:'RX',branch_rule:'BR',skill_tag:'SK',role:'RL',industry:'IN',project_type:'PT',fail_reason:'FR'};
+// 내장 거래 유형 9종의 시스템 코드(이름은 바꿀 수 있고 코드는 고정 · 삭제·사용 중지 불가)
+const S10_SYS_TXN=[['TT-S01','매출입금'],['TT-S02','매입지급'],['TT-S03','고정비'],['TT-S04','세금'],['TT-S05','법인카드'],['TT-S06','AI사용료'],['TT-S07','자본납입'],['TT-S08','기타비용'],['TT-S09','기타입금']];
+const isSysCode=c=>/^TT-S\d+$/.test(String(c||''));
+// 다음 코드: 같은 접두어의 숫자 코드 최댓값+1 (TT-S01 같은 시스템 코드는 건너뜀)
+function nextCodeId(prefix,used){
+  let mx=0; const re=new RegExp('^'+prefix+'-(\\d+)$');
+  (used||[]).forEach(c=>{ const m=re.exec(String(c||'')); if(m) mx=Math.max(mx,parseInt(m[1],10)); });
+  return prefix+'-'+String(mx+1).padStart(3,'0');
+}
+// 코드가 없는 행에 코드를 채운다(일괄 부여). rows: {cat:[[name,val,bucket,code,active],...]} — 반환: 새로 채운 건수
+function assignCodes(rows){
+  let n=0;
+  Object.keys(S10_CODE_PREFIX).forEach(cat=>{
+    const list=rows[cat]||[]; const used=new Set(list.map(r=>r[3]).filter(Boolean));
+    if(cat==='txn_type'){
+      S10_SYS_TXN.forEach(([code,name])=>{
+        if(used.has(code)) return;
+        const r=list.find(x=>!x[3]&&String(x[0]||'').trim()===name);
+        if(r){ r[3]=code; used.add(code); n++; }
+      });
+    }
+    list.forEach(r=>{
+      if(r[3]||!String(r[0]||'').trim()) return;
+      r[3]=nextCodeId(S10_CODE_PREFIX[cat],[...used]); used.add(r[3]); n++;
+    });
+    list.forEach(r=>{ if(!r[4]) r[4]='Y'; });
+  });
+  return n;
+}
+const codeIsActive=r=>String((r&&r.is_active)??'Y').trim().toUpperCase()!=='N';   // 시트 행 객체용: 비면 사용 중
 // 인력 설정값(S10 category=hr_setting) 중 파라미터 카드에서 편집하는 항목 [키, 기본값, 화면 라벨]
 const HR_SETTING_FIELDS=[['short_tenure_months',3,'단기 이력 기준'],['exit_alert_days',30,'철수 알림'],['reconfirm_days',90,'재확인'],['mm_round_digit',3,'일할 비율 자리'],['mm_mode','반올림','일할 비율 처리'],['cut_unit',10000,'입사·퇴사월 금액 단위'],['cut_mode','절사','입사·퇴사월 금액 처리'],
   // v2.9.111 지급 스케줄 기본 지급일 — '월오프셋:일' (0=귀속월, 1=익월 / 일 1~28, 99=말일). 행마다 직접 고칠 수 있다.
   ['payout_pay_salary','1:10','급여 지급일 기본'],['payout_pay_biz','1:10','사업소득 지급일 기본'],['payout_pay_etc','1:10','기타경비 지급일 기본'],['payout_remit_tax','0:10','원천세 납부일 기본(지급월 기준)'],['payout_remit_ins','0:10','4대보험 납부일 기본(지급월 기준)']];
+
+// ── v3.1.0 코드 이관(순수 함수) ──────────────────────────────────────────
+// S10 행 → 이름으로 코드 찾기. 공백 차이는 무시해 맞춘다(how='공백'). 사용 중지 코드도 찾는다(과거 기록 연결용).
+function codeOfName(s10rows,cat,name){
+  const n=String(name??'').trim(); if(!n) return null;
+  const rows=(s10rows||[]).filter(r=>r.category===cat&&r.code_id&&String(r.setting_key||'').trim());
+  let r=rows.find(x=>String(x.setting_key).trim()===n); if(r) return {code:r.code_id,how:'이름'};
+  const z=n.replace(/\s+/g,''); r=rows.find(x=>String(x.setting_key).replace(/\s+/g,'')===z); if(r) return {code:r.code_id,how:'공백'};
+  return null;
+}
+// 이름 열을 보고 코드 열 값을 채울 계획을 세운다. values: 시트 원본 2차원(1행=헤더). 이미 코드가 있는 행은 그대로 둔다.
+// manual: {이름:코드} 수동 지정. 반환 out[i] = 데이터 i번째 행의 최종 코드(없으면 '')
+function planCodeMigration(values,nameCol,codeCol,resolve,manual){
+  const hdr=(values[0]||[]).map(String), ni=hdr.indexOf(nameCol), ci=hdr.indexOf(codeCol);
+  const out=[], names={}, st={rows:Math.max(0,values.length-1),kept:0,filled:0,empty:0,unresolved:0,mismatch:[]};
+  if(ni<0) return {ok:false,message:nameCol+' 열을 찾을 수 없습니다.',out,names,st};
+  for(let i=1;i<values.length;i++){
+    const row=values[i]||[]; const name=String(row[ni]??'').trim(); const ex=ci>=0?String(row[ci]??'').trim():'';
+    const g=names[name]||(names[name]={count:0,code:'',how:'',unresolved:false}); g.count++;
+    const res=(manual&&manual[name])?{code:manual[name],how:'수동'}:resolve(name);
+    if(res){ g.code=res.code; g.how=res.how; }
+    if(ex){ out.push(ex); st.kept++; if(res&&res.code!==ex) st.mismatch.push({name,ex,code:res.code}); continue; }
+    if(!name){ out.push(''); st.empty++; continue; }
+    if(res){ out.push(res.code); st.filled++; } else { out.push(''); st.unresolved++; g.unresolved=true; }
+  }
+  return {ok:true,out,names,st,hasCol:ci>=0};
+}
+// 저장 직전, 이름이 코드로 풀리는 행의 코드를 이름에 맞춰 둔다(이름이 진실인 동안 — 3단계 전). 풀리지 않으면 기존 코드를 둔다.
+function syncCodes(list,nameField,codeField,s10rows,cat){
+  (list||[]).forEach(r=>{ const m=codeOfName(s10rows,cat,r[nameField]); if(m) r[codeField]=m.code; });
+}

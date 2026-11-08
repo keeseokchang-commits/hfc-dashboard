@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=2.13.1">
+<link rel="stylesheet" href="css/common.css?v=3.1.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -376,12 +376,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=2.13.1"></script>
-<script src="js/common.js?v=2.13.1"></script>
-<script src="js/auth.js?v=2.13.1"></script>
-<script src="js/calc.js?v=2.13.1"></script>
-<script src="js/payout.js?v=2.13.1"></script>
-<script src="js/nav.js?v=2.13.1"></script>
+<script src="js/schema.js?v=3.1.0"></script>
+<script src="js/common.js?v=3.1.0"></script>
+<script src="js/auth.js?v=3.1.0"></script>
+<script src="js/calc.js?v=3.1.0"></script>
+<script src="js/payout.js?v=3.1.0"></script>
+<script src="js/nav.js?v=3.1.0"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -545,7 +545,7 @@ function classify(desc,recv,branch,inAmt,outAmt){
   // ②거래점 분류규칙)에서 등록한 데이터가 여기 전혀 반영되지 않고 있었다(전수조사로 발견 —
   // 실제로 "세금납부"라는 사용자 정의 유형을 등록해도 분류 결과는 하드코딩된 기본 유형명
   // "세금"으로만 나왔음). setting_key/setting_value로 정정.
-  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.setting_value)){
+  for(const r of s10All.filter(x=>x.category==='txn_type'&&x.setting_value&&codeIsActive(x))){   // v3.0.0: 사용 중지 유형은 자동분류에서 제외
     if((r.setting_value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.setting_key;
   }
   for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.setting_key)){
@@ -958,7 +958,7 @@ function txnTypeNames(){
   // v2.9.42: classify()·fixed.html의 항목 자동완성과 동일했던 필드명 불일치 결함(r.key/r.value →
   // setting_key/setting_value) — 미분류 거래 재지정 드롭다운도 코드 관리에서 등록한 거래유형을
   // 전혀 못 읽고 항상 하드코딩 기본값만 보여주고 있었다(사용자 지적으로 전수재확인 중 발견).
-  const c=s10All.filter(r=>r.category==='txn_type'&&r.setting_key).map(r=>r.setting_key);
+  const c=s10All.filter(r=>r.category==='txn_type'&&r.setting_key&&codeIsActive(r)).map(r=>r.setting_key);   // v3.0.0: 사용 중지 제외
   return c.length?c:['매출입금','매입지급','고정비','급여','세금','법인카드','AI사용료','기타비용','기타입금'];
 }
 function openUnclassModal(){
@@ -1002,7 +1002,7 @@ async function saveToSheets(){
   toast('Sheets 저장 중…');
   const today=new Date().toISOString().slice(0,10);
   // S08_DETAIL(원천) 병합을 먼저 확정하고, S08_ACT는 그 원장에서 재파생해 기록 — v2.5.6: 시트 간 완전 정합
-  const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
+  const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month','type_code'];
   // v2.4.3: 기존 거래(detailAll)와 병합(txn_id 기준, 신규 우선) — 과거 업로드분 보존
   // v2.5.2: 지문(fp)으로 기존 거래 식별 — 기존 txn_id 유지(대사 링크 보존), 신규만 새 ID. 일시는 txn_date에 시분초로 저장
   const _fpOf=d=>String(d.txn_date)+'|'+(num(d.inflow_amt)||0)+'|'+(num(d.outflow_amt)||0)+'|'+(num(d.balance)||0);
@@ -1016,6 +1016,7 @@ async function saveToSheets(){
   });
   const _mergedD=dedupe([...detailAll,..._newD],'txn_id')
     .sort((a,b)=>String(a.txn_date).localeCompare(String(b.txn_date))||String(a.txn_id).localeCompare(String(b.txn_id)));
+  syncCodes(_mergedD,'category','type_code',s10All,'txn_type');   // v3.1.0
   const s08dRows=rowsFor(s08dHeader,_mergedD);
   const ok2=await clearAndWrite(...W.S08_DETAIL,[s08dHeader,...s08dRows]);
   if(ok2){ detailAll=_mergedD; actData=deriveActFromDetail(detailAll); }
@@ -1437,7 +1438,7 @@ const H4C=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_a
 const H5C=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
 // v2.9.41: 고정비도 매출·매입과 동일하게 통장 대사 대상(사용자 확정) — S06 헤더에 matched_txn_id·
 // pay_actual_date 추가(js/schema.js와 동일 순서 유지).
-const H6C=['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt','matched_txn_id','pay_actual_date'];
+const H6C=['fixed_id','year_month','category','amount','payment_date','memo','has_tax_invoice','vat_amt','matched_txn_id','pay_actual_date','item_code'];
 async function saveS05(next){
   return await clearAndWrite(...W.S05,[H5C,...rowsFor(H5C,dedupe(next,'cost_id'))]);
 }
@@ -1445,6 +1446,7 @@ async function saveS04(next){
   return await clearAndWrite(...W.S04,[H4C,...rowsFor(H4C,dedupe(next,'revenue_id'))]);
 }
 async function saveS06(next){
+  syncCodes(next,'category','item_code',s10All,'fixed_item');   // v3.1.0
   return await clearAndWrite(...W.S06,[H6C,...rowsFor(H6C,dedupe(next,'fixed_id'))]);
 }
 async function reconcile(){
@@ -1568,7 +1570,8 @@ async function saveReclass(){
   let n=0;
   Object.entries(changes).forEach(([tid,val])=>{const t=detailAll.find(x=>x.txn_id===tid); if(t){t.category=val;n++;}});
   if(!n){toast('변경된 분류가 없습니다');return;}
-  const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month'];
+  const H=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month','type_code'];
+  syncCodes(detailAll,'category','type_code',s10All,'txn_type');   // v3.1.0
   const ok=await clearAndWrite(...W.S08_DETAIL,[H,...rowsFor(H,detailAll)]);
   toast(ok?`분류 재지정 ${n}건 저장 ✓`:'저장 실패',!ok);
   if(ok){ rebuildRecon(); if(document.getElementById('txModal').classList.contains('open')) renderTx(); }
@@ -1829,7 +1832,7 @@ function renderRecon(autoCnt,costCnt,fixCnt){
         ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
       </select></div>`).join('')):'';
 }
-// v2.13.0: 합산 매칭 — 거래 1건에 청구(매입) 여러 건. v2.13.1: 합계 차액 ±10,000원 이내(끝전)일 때만 확정(고정비는 대상 아님).
+// v2.13.0: 합산 매칭 — 거래 1건에 청구(매입) 여러 건. v3.0.0: 합계 차액 ±10,000원 이내(끝전)일 때만 확정(고정비는 대상 아님).
 function smItems(kind){
   if(kind==='dep') return s04All.filter(r=>r.is_received!=='Y'&&!r.matched_txn_id).sort((a,b)=>String(a.cash_recv_date||'9999').localeCompare(String(b.cash_recv_date||'9999')))
     .map(r=>({id:r.revenue_id,a:smRevAmt(r),label:`${r.year_month} ${r.project_id}`,d:r.cash_recv_date||''}));

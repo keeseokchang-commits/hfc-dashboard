@@ -34,7 +34,7 @@ async function loadAll(){
   if(cmnYes(LINE.is_cancelled)){ q('screen').style.display='none'; box.innerHTML='<div class="hr-notice warn">취소된 라인에는 후보를 등록할 수 없습니다. <a href="request-detail.html?id='+encodeURIComponent(REQ.request_id)+'" style="color:inherit;font-weight:600">의뢰 상세로</a></div>'; return; }
   box.innerHTML=''; q('screen').style.display='';
   CODES={industry:[],project_type:[]}; PROMPT_TPL='';
-  D.S10.forEach(s=>{ const cat=String(s.category??'').trim(), key=String(s.setting_key??'').trim(); if(CODES[cat]&&key) CODES[cat].push(key); else if(cat===S10_HR_SETTING_CAT&&key==='claude_prompt_template') PROMPT_TPL=String(s.setting_value??''); });
+  D.S10.forEach(s=>{ const cat=String(s.category??'').trim(), key=String(s.setting_key??'').trim(); if(CODES[cat]&&key){ if(String(s.is_active??'Y').trim().toUpperCase()!=='N') CODES[cat].push(key); } else if(cat===S10_HR_SETTING_CAT&&key==='claude_prompt_template') PROMPT_TPL=String(s.setting_value??''); });
   q('btnBack').href='request-detail.html?id='+encodeURIComponent(REQ.request_id);
   q('title').innerHTML=`${hrEsc(REQ.alias||REQ.request_id)} <span class="hr-sub">${hrEsc(REQ.request_id)}</span>`;
   q('lineInfo').textContent=`요청 라인 ${LINE.line_no||''} · ${hrSplit(LINE.role_codes).join('·')||'(역할 없음)'} ${LINE.grade||''} ${LINE.headcount||''}명${LINE.must_skills?' · 필수 '+LINE.must_skills:''}`;
