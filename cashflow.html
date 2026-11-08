@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=3.1.0">
+<link rel="stylesheet" href="css/common.css?v=3.2.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -376,12 +376,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.1.0"></script>
-<script src="js/common.js?v=3.1.0"></script>
-<script src="js/auth.js?v=3.1.0"></script>
-<script src="js/calc.js?v=3.1.0"></script>
-<script src="js/payout.js?v=3.1.0"></script>
-<script src="js/nav.js?v=3.1.0"></script>
+<script src="js/schema.js?v=3.2.0"></script>
+<script src="js/common.js?v=3.2.0"></script>
+<script src="js/auth.js?v=3.2.0"></script>
+<script src="js/calc.js?v=3.2.0"></script>
+<script src="js/payout.js?v=3.2.0"></script>
+<script src="js/nav.js?v=3.2.0"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -549,22 +549,22 @@ function classify(desc,recv,branch,inAmt,outAmt){
     if((r.setting_value||'').split(',').some(k=>k&&((desc||'').includes(k)||(recv||'').includes(k)))) return r.setting_key;
   }
   for(const b of s10All.filter(x=>x.category==='branch_rule'&&x.setting_key)){
-    if((branch||'').includes(b.setting_key)) return b.setting_value||'기타비용';
+    if((branch||'').includes(b.setting_key)) return txnNameOfRef(b)||b.setting_value||sysName('기타비용');
   }
   const d=desc, rv=recv, br=branch;
   // v2.2 §4: S10 설정만 참조 (하드코딩 없음)
   if(inAmt>0){
-    for(const k of kws('kw_revenue_inflow','이노라인,비플레이스')){ if(rv.includes(k)||d.includes(k)) return '매출입금'; }
-    for(const k of kws('kw_capital_inflow','장기석')){ if(rv.includes(k)||d.includes(k)) return '자본납입'; }
-    return '기타입금';
+    for(const k of kws('kw_revenue_inflow','이노라인,비플레이스')){ if(rv.includes(k)||d.includes(k)) return sysName('매출입금'); }
+    for(const k of kws('kw_capital_inflow','장기석')){ if(rv.includes(k)||d.includes(k)) return sysName('자본납입'); }
+    return sysName('기타입금');
   }
   if(outAmt>0){
-    for(const k of kws('kw_cost_outflow','오벳소프트,외주비,용역비')){ if(rv.includes(k)||d.includes(k)) return '매입지급'; }
-    for(const k of kws('kw_tax_outflow','부가세,법인세,원천세,소득세')){ if(d.includes(k)) return '세금'; }
-    for(const k of kws('kw_fixed_outflow','급여,임차료,4대보험,세무')){ if(d.includes(k)) return '고정비'; }
-    for(const k of kws('kw_card_branch','하나은행0026,하나은행0996')){ if(br===k) return '법인카드'; }
-    for(const k of kws('kw_ai_branch','하나금융센터,하나증권금융센터')){ if(k&&br.includes(k)) return 'AI사용료'; }
-    return '기타비용';
+    for(const k of kws('kw_cost_outflow','오벳소프트,외주비,용역비')){ if(rv.includes(k)||d.includes(k)) return sysName('매입지급'); }
+    for(const k of kws('kw_tax_outflow','부가세,법인세,원천세,소득세')){ if(d.includes(k)) return sysName('세금'); }
+    for(const k of kws('kw_fixed_outflow','급여,임차료,4대보험,세무')){ if(d.includes(k)) return sysName('고정비'); }
+    for(const k of kws('kw_card_branch','하나은행0026,하나은행0996')){ if(br===k) return sysName('법인카드'); }
+    for(const k of kws('kw_ai_branch','하나금융센터,하나증권금융센터')){ if(k&&br.includes(k)) return sysName('AI사용료'); }
+    return sysName('기타비용');
   }
   return '기타';
 }
@@ -614,9 +614,30 @@ function deriveActFromDetail(det){
 }
 // v2.9.45: 유형명 → 집계 버킷 조회(코드 관리에서 사용자가 명시적으로 지정한 매핑, S10의 category=
 // 'txn_type' 행의 description 컬럼). 지정이 없으면(구버전 데이터·미분류) 기타로 폴백.
+// v3.2.0: 집계 버킷 키(내부 식별자) — 시스템 코드 ↔ 버킷. 사용자가 유형 이름을 바꿔도 시스템 코드는 그대로라 버킷이 유지된다.
+const SYS_BUCKET_CODE=Object.fromEntries(S10_SYS_TXN.map(([c,n])=>[n,c]));
+const SYS_CODE_BUCKET=Object.fromEntries(S10_SYS_TXN);
 function bucketOf(category){
-  const r=(s10All||[]).find(x=>x.category==='txn_type'&&x.setting_key===category);
-  return (r&&r.description)||'';
+  const n=String(category??'').trim();
+  const r=(s10All||[]).find(x=>x.category==='txn_type'&&String(x.setting_key||'').trim()===n);
+  if(r&&r.description) return r.description;
+  if(r&&isSysCode(r.code_id)) return SYS_CODE_BUCKET[r.code_id]||'';          // 내장 유형은 버킷 지정이 없어도 코드가 버킷을 정한다
+  const z=n.replace(/\s+/g,''); return (!r&&SYS_BUCKET_CODE[z])?z:'';          // 등록 전 옛 표기(공백만 다른 내장 이름) 호환
+}
+// 설정 행(거래점 규칙·누적 잔액·대사 제외)이 description 에 가진 거래 유형 코드 → 그 유형의 현재 이름. 없으면 ''
+function txnNameOfRef(r){ const c=String((r&&r.description)||'').trim(); if(!/^TT-/.test(c)) return ''; const t=(s10All||[]).find(x=>x.category==='txn_type'&&x.code_id===c); return t?String(t.setting_key||'').trim():''; }
+// 내장 유형(버킷 키)의 현재 이름 — 설정에서 이름을 바꿨으면 바뀐 이름
+function sysName(bucketKey){
+  const r=(s10All||[]).find(x=>x.category==='txn_type'&&x.code_id===SYS_BUCKET_CODE[bucketKey]);
+  return (r&&String(r.setting_key||'').trim())||bucketKey;
+}
+// 데이터를 읽는 경계에서 코드를 현재 이름으로 해석한다 — 이후의 모든 집계·대사·비교는 현재 이름 기준으로 일관되게 동작(이름을 바꿔도 과거 기록이 새 이름으로 보임)
+function resolveNames(){
+  const tt=new Map((s10All||[]).filter(r=>r.category==='txn_type'&&r.code_id).map(r=>[r.code_id,String(r.setting_key||'').trim()]));
+  const fx=new Map((s10All||[]).filter(r=>r.category==='fixed_item'&&r.code_id).map(r=>[r.code_id,String(r.setting_key||'').trim()]));
+  detailAll.forEach(t=>{ const n=tt.get(String(t.type_code||'').trim()); if(n) t.category=n; });
+  planFix.forEach(f=>{ const n=fx.get(String(f.item_code||'').trim()); if(n) f.category=n; });
+  calcSetCardName(sysName('법인카드'));
 }
 function addToBucket(m,bucket,inA,outA){
   switch(bucket){
@@ -848,9 +869,8 @@ function openDetailModal(ym){
     planFixByCat[c]=(planFixByCat[c]||0)+(f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0));
   });
   const actBy=(act&&act.by)||{};
-  const INFLOW_TXN_NAMES=['매출 입금','매출입금'], OUTFLOW_COST_NAMES=['매입 지급','매입지급'];
-  const actInSum=Object.entries(actBy).filter(([c])=>INFLOW_TXN_NAMES.includes(c)).reduce((s,[,v])=>s+v.in,0);
-  const actOutCostSum=Object.entries(actBy).filter(([c])=>OUTFLOW_COST_NAMES.includes(c)).reduce((s,[,v])=>s+v.out,0);
+  const actInSum=Object.entries(actBy).filter(([c])=>isCat(c,'매출입금')).reduce((s,[,v])=>s+v.in,0);
+  const actOutCostSum=Object.entries(actBy).filter(([c])=>isCat(c,'매입지급')).reduce((s,[,v])=>s+v.out,0);
 
   // KPI 스트립: 추정 잔액 / 실잔액 / 차이 — 가장 중요한 "차이"만 색 배경으로 강조해 시선을 먼저 끈다.
   const diffCellCls=diff===null?'':(diff>=0?'diff-pos':'diff-neg');
@@ -1113,6 +1133,7 @@ async function loadSheets(){
     detailAll=dedupe(toObj(dtR).filter(t=>t.txn_id),'txn_id');
     setTimeout(rebuildRecon,50);
     planFix=toObj(fxRows).filter(f=>f.fixed_id);
+    resolveNames();   // v3.2.0: 코드 → 현재 이름
     vatRows=toObj(vtRows).filter(v=>v.vat_id);
     // v2.5.4 SSOT: 실적 표시는 항상 원천(S08_DETAIL)에서 재파생 — 원천 삭제·수정이 즉시 반영. S08_ACT는 기록용.
     actData=deriveActFromDetail(detailAll);
@@ -1172,13 +1193,13 @@ function planActItems(ym){
 // 묶는 기준: 프로젝트 매출 계획=「매출입금」, 프로젝트 매입 계획=「매입지급」(통장 거래에는 프로젝트가 없어 합계로만 비교), 고정비 계획=항목명.
 // 실적은 거래의 유형이 매출입금·매입지급 버킷이면 각각 그 줄에 합치고, 나머지는 유형명 그대로(계획에 없으면 예산 외). 실적 금액은 순액(같은 유형의 반대 방향 거래 차감).
 const paGOpen=new Set();
-function paActKey(c){ if(isCat(c,'매출입금')) return {key:'매출입금',dir:'in'}; if(isCat(c,'매입지급')) return {key:'매입지급',dir:'out'};
+function paActKey(c){ if(isCat(c,'매출입금')) return {key:sysName('매출입금'),dir:'in'}; if(isCat(c,'매입지급')) return {key:sysName('매입지급'),dir:'out'};
   const b=bucketOf(c); return {key:c||'미분류',dir:['자본납입','기타입금'].includes(b)?'in':(b?'out':'')}; }
 function planActDetailRow(ym){
   const items=planActItems(ym);
   const txs=detailAll.filter(t=>t.year_month===ym&&((num(t.inflow_amt)||0)||(num(t.outflow_amt)||0))).sort((a,b)=>String(a.txn_date||'').localeCompare(String(b.txn_date||'')));
   const G={}; const g=(key,dir)=>G[dir+'|'+key]||(G[dir+'|'+key]={key,dir,plan:0,act:0,pItems:[],tItems:[]});
-  items.forEach(i=>{ const key=i.src==='fix'?i.cat:(i.dir==='in'?'매출입금':'매입지급'); const x=g(key,i.dir); x.plan+=i.amt; x.pItems.push(i); });
+  items.forEach(i=>{ const key=i.src==='fix'?i.cat:(i.dir==='in'?sysName('매출입금'):sysName('매입지급')); const x=g(key,i.dir); x.plan+=i.amt; x.pItems.push(i); });
   const catNet={}; txs.forEach(t=>{ const c=t.category||'미분류'; catNet[c]=(catNet[c]||0)+(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0); }); // 버킷 미지정 유형은 순 방향으로 구분을 정한다
   txs.forEach(t=>{ const i=num(t.inflow_amt)||0,o=num(t.outflow_amt)||0; const k=paActKey(t.category); const dir=k.dir||(catNet[t.category||'미분류']>=0?'out':'in');
     const x=g(k.key,dir); x.act+=dir==='in'?(i-o):(o-i); x.tItems.push(t); });
@@ -1291,7 +1312,7 @@ document.addEventListener('click',e=>{
 });
 const balOpen=new Set();
 const balNorm=v=>String(v??'').replace(/\s+/g,'');
-function balItems(){ return (s10All||[]).filter(r=>r.category==='balance_item'&&(r.setting_key||'').trim()).map(r=>({name:r.setting_key.trim(),dir:r.setting_value==='입금'?'입금':'출금'})); }
+function balItems(){ return (s10All||[]).filter(r=>r.category==='balance_item'&&(r.setting_key||'').trim()).map(r=>({name:(txnNameOfRef(r)||r.setting_key).trim(),dir:r.setting_value==='입금'?'입금':'출금'})); }   // v3.2.0: 거래 유형 코드가 있으면 현재 이름
 function balTxs(name){ const k=balNorm(name); return detailAll.filter(t=>balNorm(t.category)===k).sort((a,b)=>String(a.txn_date||'').localeCompare(String(b.txn_date||''))||String(a.txn_id||'').localeCompare(String(b.txn_id||''))); }
 function balDetailRow(it){
   const txs=balTxs(it.name);
@@ -1358,7 +1379,7 @@ function renderFixCompareItems(){
   const actual={};
   detailAll.filter(t=>t.year_month===ym).forEach(t=>{
     const c=t.category||'미분류';
-    if(['매출 입금','매출입금','매입 지급','매입지급','자본 납입','자본납입','기타 입금','기타입금'].includes(c)) return;
+    if(['매출입금','매입지급','자본납입','기타입금'].includes(bucketOf(c))) return;   // v3.2.0: 이름 대신 버킷(시스템 코드)으로 판별
     const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0);
     if(!net) return;
     actual[c]=(actual[c]||0)+net;
@@ -1418,7 +1439,7 @@ function renderVatBanner(){
 function isCat(raw,canon){ return raw===canon || bucketOf(raw)===canon; }
 // v2.9.113: 설정 ⑩ 「대사 제외 유형」(S10 category=recon_exclude) — 매입 건이 없는 지급(보증금 등)·계산서 없는 지급이 미매칭 목록에 영원히 남는 문제.
 // 대사(자동·수동) 대상에서만 빼며 월별 집계·버킷은 그대로다.
-function reconExcluded(cat){ const k=String(cat??'').replace(/\s+/g,''); return (s10All||[]).some(r=>r.category==='recon_exclude'&&String(r.setting_key||'').replace(/\s+/g,'')===k&&k); }
+function reconExcluded(cat){ const k=String(cat??'').replace(/\s+/g,''); return (s10All||[]).some(r=>r.category==='recon_exclude'&&String(txnNameOfRef(r)||r.setting_key||'').replace(/\s+/g,'')===k&&k); }   // v3.2.0
 function dDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 // v2.9.69(사용자 지적): 고정비 계획은 예산 추정치라 실제 지급과 금액이 정확히 안 맞을 수 있고,
 // 계획 1건에 실제 지급이 여러 건(분할 지급 — 예: 차량구입 500만원 계획을 100만원×5회로 지급)으로
@@ -1824,7 +1845,7 @@ function renderRecon(autoCnt,costCnt,fixCnt){
       ${reclassRow(t)}
     </div>`).join('')):'';
   // v1.2(#13): 미분류·기타 재지정 (상시)
-  const rl=detailAll.filter(t=>!t.category||['기타비용','기타입금'].includes(t.category)).slice(0,20);
+  const rl=detailAll.filter(t=>!t.category||['TT-S08','TT-S09'].includes(t.type_code)||[sysName('기타비용'),sysName('기타입금')].includes(t.category)).slice(0,20);   // v3.2.0
   document.getElementById('reconUnmatched').innerHTML+=rl.length?('<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">미분류·기타 거래 재지정 <button onclick="saveReclass()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--blue);color:#fff;cursor:pointer;margin-left:6px">재지정 저장</button></div>'+rl.map(t=>`
     <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span style="flex:1;min-width:140px">${t.txn_date} ${t.description||t.recv||''} <b>${won(num(t.inflow_amt)||num(t.outflow_amt)||0)}</b></span>

@@ -187,12 +187,14 @@ function csvRhythm(today,last){
 // ── v2.9.111: 법인카드 월 예산 방식(설계서 cash-rhythm v0.2, 사용자 승인) ──
 // 고정비 항목명이 「법인카드」인 줄은 그 달 월 예산으로 본다. 체크카드라 쓴 날 통장에서 빠지므로
 // 사용액 = 그 달 통장 거래 중 유형(category)이 법인카드인 건의 순액(출금-입금). 남은 사용 예상 = max(0, 예산-사용).
-const CARD_BUDGET_ITEM='법인카드';
+let CARD_BUDGET_ITEM='법인카드';   // v3.2.0: 화면이 설정의 현재 이름(시스템 코드 TT-S05)으로 바꿔 준다 — calcSetCardName
+function calcSetCardName(n){ const v=String(n||'').trim(); if(v) CARD_BUDGET_ITEM=v; }
+function isCardTxn(t){ return String((t&&t.type_code)||'').trim()==='TT-S05'||String((t&&t.category)||'').trim()===CARD_BUDGET_ITEM; }   // 코드가 있으면 코드로
 function isCardBudget(f){ return String((f&&f.category)||'').trim()===CARD_BUDGET_ITEM; }
 function cardBudgetStatus(ym,fixRows,detailRows){
   const n=v=>parseInt(String(v??'').replace(/,/g,'').trim())||0;
   const budget=(fixRows||[]).filter(f=>isCardBudget(f)&&f.year_month===ym).reduce((s,f)=>s+n(f.amount),0);
-  const used=(detailRows||[]).filter(t=>String(t.category||'').trim()===CARD_BUDGET_ITEM&&String(t.txn_date||'').slice(0,7)===ym)
+  const used=(detailRows||[]).filter(t=>isCardTxn(t)&&String(t.txn_date||'').slice(0,7)===ym)
     .reduce((s,t)=>s+n(t.outflow_amt)-n(t.inflow_amt),0);
   return {budget,used,remain:Math.max(0,budget-used),over:Math.max(0,used-budget)};
 }
