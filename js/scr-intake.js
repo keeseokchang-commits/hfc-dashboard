@@ -195,7 +195,7 @@ async function drvLoadResult(btn){
     await loadDrive(); if(!DR.ok||!DR.resultFiles.length){ render(); toast('도착한 결과가 없습니다.',true); return; }
     const merged={schema:'hfc-resume-import/1',resumes:[]}; const used=[], bad=[];
     setProg('Result 폴더의 결과를 읽는 중…'); for(const f of DR.resultFiles){ try{ const j=JSON.parse(await driveReadText(f.id)); if(j&&Array.isArray(j.resumes)){ merged.resumes.push(...j.resumes); used.push(f.id); } else bad.push(f.name); }catch(e){ bad.push(f.name); } }
-    if(!used.length){ hrQ('impErr').textContent=`결과 파일을 읽지 못했습니다: ${bad.join(', ')}`; return; }
+    if(!used.length){ setProg(''); hrQ('impErr').textContent=`결과 파일을 읽지 못했습니다: ${bad.join(', ')}`; return; }
     setProg(''); hrQ('impText').value=JSON.stringify(merged); impReset(); impSrc=used;
     await impPreview(hrQ('btnPreview'));
     if(bad.length) hrQ('impErr').textContent=`읽지 못한 결과 파일이 있어 건너뛰었습니다(폴더에 그대로 둡니다): ${bad.join(', ')}`;
@@ -421,7 +421,7 @@ async function impPreview(btn){
   if(!p.ok){ hrQ('impErr').textContent=p.message; return; }
   await hrBusy(btn,async()=>{ const r=await cmnImportRun(p.payload,{dry:true}); if(!r.ok){ hrQ('impErr').textContent=r.message||'미리보기를 만들지 못했습니다.'; return; }
     impPayload=p.payload; hrQ('impResult').innerHTML='<div class="hr-sub" style="margin-bottom:6px">미리보기 — 아직 시트에 쓰지 않았습니다.</div>'+impTable(r);
-    hrQ('btnImport').disabled=!r.results.some(x=>!['건너뜀'].includes(x.action)); });
+    const tidy=DR.ok&&(impSrc.length>0||impMatches.some(Boolean)); hrQ('btnImport').disabled=!(r.results.some(x=>!['건너뜀'].includes(x.action))||tidy); });   // v3.6.2(#30): 전부 건너뜀이어도 드라이브 파일 정리(Done·보관)는 할 수 있게 켠다
 }
 async function impRun(btn){
   if(!impPayload) return;

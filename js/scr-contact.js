@@ -16,7 +16,7 @@ const tYm=s=>{ const t=String(s||'').trim(); const m=/^(\d{4})-(0[1-9]|1[0-2])(-
 const progressRow=()=>mine('S25').filter(a=>String(a.status??'').trim()==='진행').sort((p,q)=>String(q.created_at||'').localeCompare(String(p.created_at||'')))[0]||null;
 const partyOpts=(roles,cur)=>{ const rows=D.S27.filter(p=>String(p.is_active??'Y').trim()!=='N'&&cmnSplit(p.roles).some(r=>roles.includes(r))||p.party_id===cur);
   return `<option value="">선택 안 함</option>`+rows.map(p=>`<option value="${hrEsc(p.party_id)}"${p.party_id===cur?' selected':''}>${hrEsc(p.name)} (${hrEsc(p.party_id)})</option>`).join(''); };
-const projOpts=cur=>{ const rows=touch.s03||[]; return `<option value="">연결 안 함</option>`+rows.map(r=>`<option value="${hrEsc(r.project_id)}"${r.project_id===cur?' selected':''}>${hrEsc(r.project_name)} (${hrEsc(r.project_id)})</option>`).join(''); };
+const projOpts=cur=>{ const rows=touch.s03||[]; const miss=cur&&!rows.some(r=>r.project_id===cur)?`<option value="${hrEsc(cur)}" selected>${hrEsc(cur)} (목록 미확인)</option>`:''; return `<option value="">연결 안 함</option>`+miss+rows.map(r=>`<option value="${hrEsc(r.project_id)}"${r.project_id===cur?' selected':''}>${hrEsc(r.project_name)} (${hrEsc(r.project_id)})</option>`).join(''); };
 
 // ── 현행 프로젝트 입력 칸 (접촉 입력 안의 것 'n', ① 수정 'e') ─────────────────────────────
 function curFields(p,r){
@@ -157,9 +157,9 @@ async function saveTouch(btn){
       if(!r.ok){ failMsg(r); if(r.code==='CONFLICT') await reload(); return; }
     } else {
       if(old){ const r=await hrUpdate('S25',old.assign_id,{status:'종료'},{readUpdatedAt:old.updated_at}); if(!r.ok){ failMsg(r); if(r.code==='CONFLICT') await reload(); return; } }
-      const ai=await hrNextIds('S25',1); if(!ai.ok){ failMsg(ai); await reload(); return; }
+      const ai=await hrNextIds('S25',1); if(!ai.ok){ failMsg(ai); if(old) await hrUpdate('S25',old.assign_id,{status:'진행'},{readUpdatedAt:await hrFresh('S25',old.assign_id)}); await reload(); return; }
       asgId=ai.ids[0]; const r=await hrAppend('S25',{assign_id:asgId,person_id:PID,...cv,status:'진행',source_contact_id:ctId});
-      if(!r.ok){ failMsg(r); await reload(); return; }
+      if(!r.ok){ failMsg(r); if(old) await hrUpdate('S25',old.assign_id,{status:'진행'},{readUpdatedAt:await hrFresh('S25',old.assign_id)}); await reload(); return; }
     }
     const r2=await hrAppend('S26',{contact_id:ctId,person_id:PID,...c,assign_id:asgId});
     if(!r2.ok){ toast('현행 프로젝트는 저장했지만 접촉 이력 저장에 실패했습니다. 접촉을 다시 입력해 주세요.',true); await hrUpdate('S25',asgId,{source_contact_id:''},{readUpdatedAt:await hrFresh('S25',asgId)}); await reload(); return; }

@@ -30,7 +30,7 @@ function openRequestsUsing(partyId,reqs,orders){
 }
 function countsFor(pid){
   return {contacts:D.S36.filter(c=>c.party_id===pid&&hrYes(c.is_active||'Y')).length,
-    requests:D.S32.filter(r=>r.requester_party_id===pid).length,
+    requests:D.S32.filter(r=>r.requester_party_id===pid||r.end_client_party_id===pid).length,
     orders:D.S34.filter(o=>o.party_id===pid).length,
     files:D.S28.filter(f=>f.source_party_id===pid).length};
 }

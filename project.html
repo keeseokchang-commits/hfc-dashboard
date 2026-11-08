@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 프로젝트 조회</title>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -136,11 +136,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 function wf(n){return comma(n)+'원';}
 const SC={'수주':['#ECFDF5','#059669'],'계약':['#F0FDFA','#0D9488'],'종료':['#F1F5F9','#64748B']};
@@ -186,7 +186,7 @@ function renderList(){
     const rv=revOf(p.project_id);
     const tot=rv.reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
     const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
-    const today=new Date().toISOString().slice(0,10);
+    const today=kstToday();
     const od=rv.filter(r=>r.is_received!=='Y'&&r.cash_recv_date&&r.cash_recv_date<today).length;
     const pct=tot?Math.round(done/tot*100):0;
     const [bg,fg]=SC[pl.status]||['#EEE','#666'];
@@ -234,7 +234,7 @@ function openDetail(pid){
     const eB=items.reduce((s,e)=>s+(e.comp_type==='인건비'?laborAmt(e,'buy_price'):(num(e.qty)||1)*(num(e.buy_price)||0)),0);
     document.getElementById('dEstNote').textContent=`견적: 매출 ${comma(eS)}원 · 매입 ${comma(eB)}원 (${items.length}개 항목)`;
   } else document.getElementById('dEstNote').textContent='저장된 견적 없음';
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   const totV=rv.reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
   const done=rv.filter(r=>r.is_received==='Y').reduce((s,r)=>s+(num(r.cash_recv_amt)||0),0);
   const open=rv.filter(r=>r.is_received!=='Y');
@@ -273,7 +273,7 @@ async function showHist(){
     document.getElementById('histBody').innerHTML=list.length?list.map(h=>`
       <div style="padding:9px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between"><b>${h.target}</b><span style="color:var(--text3);font-size:11px">${h.changed_at}</span></div>
-        <div>${comma(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${comma(h.new_value)||'(없음)'}</b></div>
+        <div>${histVal(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${histVal(h.new_value)||'(없음)'}</b></div>
         ${h.reason?`<div style="color:var(--text3);font-size:11px">사유: ${h.reason}</div>`:''}</div>`).join('')
       :'<div style="text-align:center;padding:20px;color:var(--text3)">기록된 변경 이력이 없습니다</div>';
   }catch(e){document.getElementById('histBody').innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">S14_HISTORY 시트가 없습니다</div>';}

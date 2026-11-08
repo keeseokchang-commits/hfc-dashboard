@@ -121,7 +121,7 @@ function monthlyAmounts(price,sd,ed,opt){
 // 견적 인건비 한 행의 총액(단가×투입). 기간이 있고 MM이 날짜 계산값과 같으면 월별 금액 합(부분월 절사 반영), 아니면 단가×MM(직접 고친 MM 존중). 급여형 매입은 기존 식 그대로.
 function laborAmt(e,field){
   const p=parseInt(String(e[field]??'').replace(/,/g,''),10)||0, mm=parseFloat(e.mm)||0;
-  if(field==='buy_price'&&String(e.memo||'').startsWith('급여형')) return Math.round(p*mm);
+  if(field==='buy_price'&&String(e.memo||'').startsWith('급여형')) return p; // v3.6.0: 급여형은 buy_price에 월별 합계 총액을 저장 — MM을 곱하지 않는다
   if(e.start_date&&e.end_date){ const t=parseFloat(mmTotal(e.start_date,e.end_date));
     if(t>0&&Math.abs(t-mm)<0.006) return monthlyAmounts(p,e.start_date,e.end_date,calcOpt(e,field)).reduce((x,y)=>x+y.amount,0); }
   return Math.round(p*mm);

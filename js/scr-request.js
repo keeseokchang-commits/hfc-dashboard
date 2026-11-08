@@ -136,7 +136,9 @@ async function loadAll(){
   box.innerHTML=''; hrQ('screen').style.display=''; D=r.data; ASOF=hrToday();
   ROWS=buildRows(D,ASOF);
   // 알림 — 연락처 유무가 필요한 후보가 있을 때만 S39 를 읽는다. 읽기가 실패해도 화면은 정상 표시하고 연락처 요청만 "확인 불가".
-  ALERTS=await cmnAlertSummary({reqs:D.S32,lines:D.S33,cands:D.S31,orders:D.S34,persons:{}},ASOF,{});
+  // v3.6.2(#22): 합쳐진·비활성 후보를 알림에서 빼기 위해 S20 을 읽는다. 제외 대상만 맵에 담아 생일 알림 등이 새로 생기지 않게 한다. 읽기에 실패하면 기존처럼 제외 없이 계산.
+  let hidden={}; try{ const pr=await hrReadMany(['S20']); if(!pr.failed.length) pr.tabs.S20.rows.forEach(p=>{ if(p.person_id&&!(cmnBlank(p.merged_into)&&String(p.is_active??'Y').trim()!=='N')) hidden[p.person_id]=p; }); }catch(e){ hidden={}; }
+  ALERTS=await cmnAlertSummary({reqs:D.S32,lines:D.S33,cands:D.S31,orders:D.S34,persons:hidden},ASOF,{});
   fillFilters(); render(); renderAlerts();
 }
 window.addEventListener('load',loadAll);

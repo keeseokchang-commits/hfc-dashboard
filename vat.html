@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -75,7 +75,7 @@
 
 <main class="main">
   <div class="card">
-    <div class="card-title">2026년 분기별 부가세 <span style="font-size:11px;color:var(--text3)">재무 반영: 수주·계약·종료 프로젝트</span></div>
+    <div class="card-title"><select id="vatYearSel" onchange="setVatYear(this.value)" style="font-size:13px;padding:2px 6px"></select>년 분기별 부가세 <span style="font-size:11px;color:var(--text3)">재무 반영: 수주·계약·종료 프로젝트</span></div>
     <div id="qList"><div class="loading-wrap"><div class="spinner"></div></div></div>
   </div>
 
@@ -102,17 +102,25 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 let vats=[],revs=[],costs=[],fixedTax=[],prjMap={},selQ=null;
-const QINFO={'1P':{name:'1기 예정',months:['2026-01','2026-02','2026-03'],due:'2026-04-25',payYm:'2026-04'},
-  '1F':{name:'1기 확정',months:['2026-04','2026-05','2026-06'],due:'2026-07-25',payYm:'2026-07'},
-  '2P':{name:'2기 예정',months:['2026-07','2026-08','2026-09'],due:'2026-10-25',payYm:'2026-10'},
-  '2F':{name:'2기 확정',months:['2026-10','2026-11','2026-12'],due:'2027-01-25',payYm:'2027-01'}};
+let vatYear=Number(kstToday().slice(0,4));
+function buildQ(y){
+  const n=y+1;
+  return {'1P':{name:'1기 예정',months:[y+'-01',y+'-02',y+'-03'],due:y+'-04-25',payYm:y+'-04'},
+  '1F':{name:'1기 확정',months:[y+'-04',y+'-05',y+'-06'],due:y+'-07-25',payYm:y+'-07'},
+  '2P':{name:'2기 예정',months:[y+'-07',y+'-08',y+'-09'],due:y+'-10-25',payYm:y+'-10'},
+  '2F':{name:'2기 확정',months:[y+'-10',y+'-11',y+'-12'],due:n+'-01-25',payYm:n+'-01'}};
+}
+let QINFO=buildQ(vatYear);
+function findV(code){return vats.find(x=>x.quarter_code===code&&String(x.year||'2026')===String(vatYear));}
+function lastDay(ym){const [y,m]=ym.split('-').map(Number);return ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');}
+function setVatYear(y){vatYear=Number(y);QINFO=buildQ(vatYear);selQ=null;document.getElementById('detailCard').style.display='none';renderQuarters();}
 
 function wf(n){return comma(n)+'원';}
 let pendingAuth=null;
@@ -156,9 +164,11 @@ function calcQ(code){
   return {sVat,pVat,pVatPrj,pVatFx,pay:Math.max(0,sVat-pVat),sRows,pRows,fxRows};
 }
 function renderQuarters(){
+  const ys=document.getElementById('vatYearSel');
+  if(ys){const cur=Number(kstToday().slice(0,4));let o='';for(let y=2026;y<=Math.max(cur+1,vatYear);y++)o+=`<option value="${y}"${y===vatYear?' selected':''}>${y}</option>`;ys.innerHTML=o;}
   document.getElementById('qList').innerHTML=Object.entries(QINFO).map(([code,q])=>{
     const c=calcQ(code);
-    const v=vats.find(x=>x.quarter_code===code)||{};
+    const v=findV(code)||{};
     // v2.9.21: "납부완료" 분기는 실제 신고·납부에 쓰인 확정값(v.sales_vat 등, S13 저장분)을 그대로 표시하고
     // 이후 매출·매입 스케줄이 바뀌어 실시간 재계산값(c.sVat 등)과 달라지면 경고를 띄운다.
     // 부가세는 실제로 세무서에 신고·납부하는 금액이라, 확정 후 화면 숫자가 조용히 바뀌어 보이면
@@ -191,7 +201,7 @@ function selectQ(code){
   const q=QINFO[code],c=calcQ(code);
   document.getElementById('detailCard').style.display='block';
   document.getElementById('detailTitle').textContent=`${q.name} 상세 (${q.months[0]} ~ ${q.months[2]})`;
-  const vv=vats.find(x=>x.quarter_code===code)||{};
+  const vv=findV(code)||{};
   const lockedD=vv.status==='납부완료';
   const estD=lockedD?(num(vv.estimated_payment)||c.pay):c.pay;
   const actD=lockedD?(num(vv.actual_payment)||0):0;
@@ -209,7 +219,7 @@ function selectQ(code){
     (c.pRows.length?c.pRows.map(r=>`<tr><td>${r.year_month.slice(5)}월 ${prjMap[r.project_id]||r.project_id}</td><td>${wf(r.amount)}</td><td>${wf(vatOf(r,'amount'))}</td></tr>`).join('')
       +`<tr class="sum"><td>소계</td><td></td><td>${wf(c.pVat)}</td></tr>`
     :'<tr><td colspan="3" style="text-align:center;color:var(--text3)">내역 없음</td></tr>');
-  const v=vats.find(x=>x.quarter_code===code)||{};
+  const v=findV(code)||{};
   document.getElementById('actualPay').value=v.actual_payment?comma(v.actual_payment):comma(c.pay);
   document.getElementById('paidDate').value=v.paid_date||'';
   document.getElementById('detailCard').scrollIntoView({behavior:'smooth'});
@@ -222,9 +232,9 @@ async function saveS13(){
 }
 function upsertVat(code,patch){
   const q=QINFO[code];const c=calcQ(code);
-  let v=vats.find(x=>x.quarter_code===code);
-  if(!v){v={vat_id:`VAT-2026-${code}`,year:'2026',quarter_code:code,
-    period_start:q.months[0]+'-01',period_end:q.months[2]+'-30',due_date:q.due,
+  let v=findV(code);
+  if(!v){v={vat_id:`VAT-${vatYear}-${code}`,year:String(vatYear),quarter_code:code,
+    period_start:q.months[0]+'-01',period_end:lastDay(q.months[2]),due_date:q.due,
     cashflow_reflected:'N',status:'집계중',memo:q.name};vats.push(v);}
   // v2.9.70: 이미 납부완료로 확정된 분기는 신고 시점 스냅샷(sales_vat·purchase_vat·estimated_payment)을
   // 다시 쓰지 않는다 — 이전엔 [자금수지 반영] 등이 호출될 때마다 현재 재계산값/입력한 실납부액으로
@@ -245,7 +255,7 @@ async function savePayment(){
 async function reflectCashflow(){
   if(!selQ){toast('분기를 선택하세요',true);return;}
   const q=QINFO[selQ],c=calcQ(selQ);
-  const v=vats.find(x=>x.quarter_code===selQ);
+  const v=findV(selQ);
   // v2.9.70: 자금수지 "추정"에는 실납부액이 아니라 시스템 예상액을 반영한다(추정=계획, 실제는 통장 CSV).
   const amt=(v&&v.status==='납부완료'&&num(v.estimated_payment))?num(v.estimated_payment):c.pay;
   if(!amt){toast('시스템 예상 납부액이 0원입니다',true);return;}

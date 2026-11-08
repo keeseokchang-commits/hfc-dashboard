@@ -41,7 +41,7 @@ function hrShowLoadProblem(el,state,message){
 async function hrRelogin(){ accessToken=null; await signIn(); if(typeof loadAll==='function') loadAll(); }
 // 버튼 중복 클릭 방지
 // v2.11.2: 처리 중에는 버튼 안에 돌아가는 표시와 「처리 중…」을 보여 준다(끝나면 원래 글자로 복원)
-async function hrBusy(btn,fn){ if(btn.disabled) return; const html=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="spinner btn-spin"></span> 처리 중…'; try{ return await fn(); } finally{ btn.disabled=false; if(btn.isConnected) btn.innerHTML=html; } }
+async function hrBusy(btn,fn){ if(btn.disabled) return; const html=btn.innerHTML; btn.disabled=true; const spin='<span class="spinner btn-spin"></span> 처리 중…'; btn.innerHTML=spin; const spinNow=btn.innerHTML; try{ return await fn(); } finally{ btn.disabled=false; if(btn.isConnected&&btn.innerHTML===spinNow) btn.innerHTML=html; } }   // v3.6.2(#29): 처리 중 글자가 호출한 쪽에서 바뀌었으면(숨김→숨김 해제) 되돌리지 않는다
 const hrYes=v=>String(v??'').trim().toUpperCase()==='Y';
 // 쉼표 목록 ↔ 배열
 const hrSplit=s=>String(s??'').split(',').map(x=>x.trim()).filter(Boolean);

@@ -39,7 +39,7 @@ function filtered(){
   const list=VIEWS.filter(v=>{
     if(!qf(v)) return false; if(!flagOk(v,fl)) return false;
     if(q&&!v.search.includes(q)) return false;
-    if(g&&(v.grade||'')!==g) return false;
+    if(g&&(v.grade||v.gradeReported||'')!==g) return false;
     if(roleSel.size){ const have=new Set(v.roles.map(r=>r.code)); const sel=[...roleSel]; if(!(mode==='all'?sel.every(r=>have.has(r)):sel.some(r=>have.has(r)))) return false; }
     if(multi&&!v.multi.has) return false;
     if(a1!==null||a2!==null){ const a=cmnAge(v.person,asof); if(a.kind!=='exact') return false; if(a1!==null&&a.age<a1) return false; if(a2!==null&&a.age>a2) return false; }

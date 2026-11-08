@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -197,7 +197,7 @@
     <div class="form-group" id="probGroup">
       <label class="form-label">확도</label>
       <div class="slider-wrap">
-        <input type="range" min="0" max="100" step="10" value="50" id="f_prob" oninput="document.getElementById('probVal').textContent=this.value+'%'">
+        <input type="range" min="0" max="100" step="5" value="50" id="f_prob" oninput="document.getElementById('probVal').textContent=this.value+'%'">
         <span class="slider-val" id="probVal">50%</span>
       </div>
     </div>
@@ -241,13 +241,14 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 let opps=[];
+let knownPl=new Set();   // v3.5.1(#9)
 let currentFilter='전체';
 
 const STATUS_ORDER=['기회','확정','수주','계약','종료','포기','실주'];
@@ -255,6 +256,8 @@ const FINANCE_STATUS=['수주','계약','종료'];
 const NEXT_STATUS={'기회':'확정','확정':'수주','수주':'계약','계약':'종료'};
 
 // ── 유틸 ──────────────────────────────────────────────────────
+// v3.6.1(#17): 확정 단계는 확도 최소 75%(사용자 결정), 수주 이후는 100%
+function probFor(status){ if(['수주','계약','종료'].includes(status)) return '100'; const v=parseInt(document.getElementById('f_prob').value,10)||0; return String(status==='확정'&&v<75?75:v); }
 function uncomma(s){ return parseInt(String(s).replace(/,/g,''))||0; }
 function formatComma(v){ const n=String(v).replace(/[^\d]/g,''); return n?parseInt(n).toLocaleString():''; }
 // ── Sheets ────────────────────────────────────────────────────
@@ -264,6 +267,7 @@ async function loadOpps(){
   try{
     const rows=await fetchSheet(...R.S01);
     opps=dedupe(toObj(rows).filter(o=>o.pipeline_id),'pipeline_id');
+    knownPl=new Set(opps.map(o=>o.pipeline_id));   // v3.5.1(#9): 이 화면이 읽은 시점의 사업기회 번호
     const yf=document.getElementById('yearFilter');
     const cur=yf.value;
     const years=[...new Set(opps.map(o=>(o.created_at||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort().reverse();
@@ -524,7 +528,7 @@ async function saveOpp(){
   btn.disabled=true; btn.textContent='저장 중…';
   const snapshot=JSON.parse(JSON.stringify(opps)); // PK 무결성: 실패 시 롤백용
 
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   if(id){
     // 수정 또는 전환
     const o=opps.find(x=>x.pipeline_id===id);
@@ -535,7 +539,7 @@ async function saveOpp(){
       o.expected_start=document.getElementById('f_start').value;
       o.expected_end=document.getElementById('f_end').value;
       // v2.8.1: 수주~종료 단계 진입 시 확도 100% 물리 확정(계산상 폴백이 아니라 시트 값 자체를 갱신)
-      o.probability=['수주','계약','종료'].includes(status)?'100':document.getElementById('f_prob').value;
+      o.probability=probFor(status);
       o.payment_cycle=document.getElementById('f_payment').value;
       o.biz_type=document.getElementById('f_biz_type').value;
       o.status=status;
@@ -548,7 +552,7 @@ async function saveOpp(){
       pipeline_id:`PL-2026-${String(maxNum+1).padStart(3,'0')}`,
       opportunity:name, client,
       end_client:document.getElementById('f_end_client').value,
-      probability:['수주','계약','종료'].includes(status)?'100':document.getElementById('f_prob').value,
+      probability:probFor(status),
       contract_amount:String(amount||''),
       expected_start:document.getElementById('f_start').value,
       expected_end:document.getElementById('f_end').value,
@@ -594,9 +598,15 @@ async function saveOpp(){
 async function saveAll(successMsg){
   const header=['pipeline_id','opportunity','client','end_client','probability','contract_amount','expected_start','expected_end','payment_cycle','status','memo','created_at','biz_type'];
   opps=dedupe(opps,'pipeline_id'); // PK 무결성 규칙
+  // v3.5.1(#9): 저장 직전에 시트를 다시 읽는다 — 이 화면을 연 뒤 다른 곳(의뢰→사업기회 승격 등)이 추가한 행이 전체 덮어쓰기로 사라지는 것을 막는다
+  try{
+    const fresh=toObj(await fetchSheet(...R.S01)).filter(o=>o.pipeline_id);
+    const added=fresh.filter(o=>!knownPl.has(o.pipeline_id));
+    if(added.length&&!confirm(`이 화면을 연 뒤 사업기회 ${added.length}건이 다른 곳에서 추가되었습니다.\n그대로 저장하면 그 ${added.length}건이 사라집니다.\n\n확인 = 그래도 저장 / 취소 = 저장 중단(새로고침 후 다시 작업)`)) return false;
+  }catch(e){ toast('사업기회 시트를 다시 읽지 못해 저장을 중단했습니다',true); return false; }
   const rows=rowsFor(header,opps);
   const ok=await clearAndWrite(...W.S01,[header,...rows]);
-  if(ok){ toast(successMsg); renderFilter(); renderList(); }
+  if(ok){ knownPl=new Set(opps.map(o=>o.pipeline_id)); toast(successMsg); renderFilter(); renderList(); }
   else toast('저장 실패. 로그인 상태를 확인하세요',true);
   return ok;
 }
@@ -681,10 +691,11 @@ async function ensureProject(plId,status){
 async function logHistory(entries){
   try{
     let list=[];
-    try{const rows=await fetchSheet(...R.S14);list=toObj(rows);}catch(e){}
+    // v3.5.1(#7): 읽기에 실패했는데(탭이 없는 경우 제외) 빈 목록으로 덮어쓰면 기존 이력이 모두 지워진다 — 읽기 실패면 기록하지 않고 알린다
+    try{const rows=await fetchSheetSafe(...R.S14);list=rows?toObj(rows):[];}catch(e){toast('변경 이력을 읽지 못해 이력 기록을 건너뛰었습니다 (기존 이력 보호)',true);return;}
     const H=['hist_id','changed_at','pipeline_id','target','old_value','new_value','reason','source'];
     let n=list.reduce((m,h)=>Math.max(m,parseInt((h.hist_id||'').replace(/\D/g,''))||0),0);
-    const now=new Date().toISOString().slice(0,16).replace('T',' ');
+    const now=kstNow16();
     entries.forEach(e=>{n++;list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:now,pipeline_id:e.pl,target:e.target,old_value:String(e.old??''),new_value:String(e.newv??''),reason:e.reason||'',source:e.source});});
     const ok=await clearAndWrite(...W.S14,[H,...dedupe(list,'hist_id').map(h=>H.map(k=>h[k]??''))]);
     if(!ok)toast('이력 기록 실패 (S14_HISTORY 시트 확인)',true);
@@ -703,7 +714,7 @@ async function showHistory(plId){
       <div style="padding:9px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;margin-bottom:2px">
           <b>${h.target}</b><span style="color:var(--text3);font-size:11px">${h.changed_at} · ${h.source}</span></div>
-        <div>${comma(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${comma(h.new_value)||'(없음)'}</b></div>
+        <div>${histVal(h.old_value)||'(없음)'} → <b style="color:var(--blue)">${histVal(h.new_value)||'(없음)'}</b></div>
         ${h.reason?`<div style="color:var(--text3);font-size:11px;margin-top:2px">사유: ${h.reason}</div>`:''}
       </div>`).join('')
       :'<div style="text-align:center;padding:20px;color:var(--text3)">기록된 변경 이력이 없습니다</div>';

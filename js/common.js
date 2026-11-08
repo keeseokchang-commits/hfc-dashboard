@@ -2,6 +2,9 @@
 const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
 // v2.9.111: API_KEY·SCOPES·accessToken·signIn·initOAuth 는 js/auth.js 로 이동(로그인 게이트·세션·자동 잠금). 읽기도 로그인 열쇠로만 한다.
 const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
+// v3.6.0(결함 후보 #14): 「오늘」은 한국 시간 기준 날짜 — new Date().toISOString() 은 세계 표준시라 한국 0~9시에 전날로 기록됐다
+function kstToday(){ return new Date(Date.now()+9*3600*1000).toISOString().slice(0,10); }
+function kstNow16(){ return new Date(Date.now()+9*3600*1000).toISOString().slice(0,16).replace('T',' '); }
 async function fetchSheet(sheet,range){
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}`;
   // v2.0.2: 429(쿼터)·5xx 일시 오류 자동 재시도 — 0.8s→1.6s→3.2s 백오프
@@ -32,8 +35,26 @@ async function ensureSheet(sheet,header){
   const r2=await fetch(base+'?valueInputOption=RAW',{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:[header]})});
   return r2.ok;
 }
+// v3.5.1(결함 후보 #2·#5): 전체 덮어쓰기 안전장치 — 읽기 범위(R)의 끝 행 바로 아래에 값이 있으면 그 행들은 이 화면이 읽지 못했으므로
+// 덮어쓰면 사라진다. 그 경우 쓰지 않는다. 확인 자체가 실패해도(권한·통신) 안전을 위해 쓰지 않는다. 탭이 아직 없으면(400) 그대로 진행.
+async function writeGuard(sheet){
+  try{
+    if(typeof R==='undefined') return {ok:true};
+    const k=Object.keys(R).find(x=>R[x][0]===sheet); if(!k) return {ok:true};
+    const m=String(R[k][1]).match(/:[A-Z]+(\d+)$/); if(!m) return {ok:true};
+    const L=parseInt(m[1],10);
+    const res=await authFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!A'+(L+1)+':A'+(L+1))}`);
+    if(res.status===400) return {ok:true};
+    if(!res.ok) return {ok:false,msg:`${sheet} 의 행 수를 확인하지 못해 저장을 중단했습니다.`};
+    const v=(await res.json()).values||[];
+    if(v.length&&String((v[0]||[])[0]??'').trim()!=='') return {ok:false,msg:`${sheet} 에 읽기 한도(${L}행)를 넘는 행이 있어 저장을 중단했습니다. 넘는 행은 읽히지 않아 저장하면 사라집니다. 관리자 확인이 필요합니다.`};
+    return {ok:true};
+  }catch(e){ return {ok:false,msg:`${sheet} 의 행 수를 확인하지 못해 저장을 중단했습니다.`}; }
+}
 async function clearAndWrite(sheet,range,rows){
   if(!accessToken){ await signIn(); if(!accessToken) return false; }
+  const g=await writeGuard(sheet);
+  if(!g.ok){ console.error(g.msg); try{ alert(g.msg); }catch(_){ if(typeof toast==='function') toast(g.msg,true); } return false; }   // 호출한 쪽이 곧바로 「저장 실패」 토스트로 덮어쓰므로, 이유는 알림 창으로 알린다
   const base=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}`;
   try{
     let r=await fetch(base+':clear',{method:'POST',headers:{Authorization:'Bearer '+accessToken}});
@@ -80,6 +101,8 @@ const toObjects=toObj;
 function dedupe(list,key){ const m=new Map(); (list||[]).forEach(r=>{ if(r&&r[key]) m.set(r[key],r); }); return [...m.values()]; }
 function toast(msg,err=false){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.style.background=err?'#DC2626':'#1A202C'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
 function comma(n){ return (parseInt(String(n).replace(/,/g,''))||0).toLocaleString(); }
+// v3.6.2(#18): 변경 이력 값 표시 — 숫자만 천 단위 쉼표, 상태·날짜 같은 문자열은 그대로
+function histVal(v){ const s=String(v??'').trim(); return /^-?[\d,]+$/.test(s)&&s!==''?comma(s):s; }
 function wonFull(n){ return comma(n)+'원'; }
 function fc(el){ el.value=comma(el.value); }
 function un(v){ return parseInt(String(v).replace(/,/g,''))||0; }

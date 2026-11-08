@@ -77,7 +77,8 @@ async function candAction(b){
   toast('✓ 단계를 저장했습니다'); await loadAll();
 }
 document.addEventListener('click',ev=>{
-  const cl=ev.target.closest('#candLines [data-cl]'); if(cl){ candLine=cl.dataset.cl; renderCandBox(); return; }
+  const cl=ev.target.closest('#candLines [data-cl]'); if(cl){ candLine=cl.dataset.cl; askSel=new Set(); askResult=null; renderCandBox(); renderAskBox(); return; }   // v3.6.2(#21): 라인을 바꾸면 ⑥ 선택·문구도 초기화
+
   const b=ev.target.closest('[data-cact]'); if(b){ hrBusy(b,()=>candAction(b)); }
 });
 document.addEventListener('change',ev=>{

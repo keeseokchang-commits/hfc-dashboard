@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -376,12 +376,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/payout.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/payout.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1019,8 +1019,9 @@ function promptSaveToSheets(){
 }
 
 async function saveToSheets(){
+  if(!detailReadOk){ toast(DETAIL_BLOCK_MSG,true); return; }   // v3.5.1(#1)
   toast('Sheets 저장 중…');
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   // S08_DETAIL(원천) 병합을 먼저 확정하고, S08_ACT는 그 원장에서 재파생해 기록 — v2.5.6: 시트 간 완전 정합
   const s08dHeader=['txn_id','txn_date','description','inflow_amt','outflow_amt','balance','recv','branch','category','year_month','type_code'];
   // v2.4.3: 기존 거래(detailAll)와 병합(txn_id 기준, 신규 우선) — 과거 업로드분 보존
@@ -1054,13 +1055,13 @@ async function saveToSheets(){
 // v2.5.6: S08_ACT 시트를 원장(S08_DETAIL) 재파생본으로 재작성 — 파생 시트 동기화
 async function writeActFromDetail(today){
   const H=['year_month','act_balance','act_inflow','act_outflow','inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc','unclassified_cnt','csv_uploaded_at'];
-  const derived=deriveActFromDetail(detailAll).map(m=>({...m,csv_uploaded_at:today||new Date().toISOString().slice(0,10)}));
+  const derived=deriveActFromDetail(detailAll).map(m=>({...m,csv_uploaded_at:today||kstToday()}));
   return await clearAndWrite(...W.S08,[H,...rowsFor(H,derived)]);
 }
 async function updateDashboard(){
   // S02에서 추정잔액 읽기 (이미 estData에 있음)
   const s09Header=['year_month','est_balance','act_balance','diff_amount','accuracy_pct','diff_cause','alert_flag','updated_at'];
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   const s09Rows=estData.map(e=>{
     const act=actData.find(a=>a.year_month===e.year_month);
     const estBal=num(e.est_balance)||0;
@@ -1082,7 +1083,10 @@ function renderPoBanner(){
   el.innerHTML=`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:12px;line-height:1.6">지급 스케줄 미생성 프로젝트 ${nm.length}건(${nm.map(n=>n.replace(/[&<>]/g,'')).join(', ')}) — 견적 계산(월별 합계, 익월 10일 지급)으로 보여 드립니다. <a href="payout.html" style="color:#B45309;font-weight:600">지급 스케줄에서 생성</a></div>`;
 }
 let planRev=[],planCost=[],planFix=[],vatRows=[],s04All=[],s05All=[],okPrjSet=new Set(),pipelinesAll=[],prjAll=[],unmatchedDep=[],unmatchedOut=[],unmatchedFix=[],detailAll=[],s10All=[],estAll=[],payoutAll=[],poFallbackPrj=[];
+let detailReadOk=true;   // v3.5.1: 거래 원장(S08_DETAIL)을 제대로 읽었는지 — false 면 원장을 덮어쓰는 저장을 하지 않는다
+const DETAIL_BLOCK_MSG='거래 내역을 읽지 못해 저장을 중단했습니다. 화면을 새로고침한 뒤 다시 시도하세요.';
 async function loadSheets(){
+  detailReadOk=true;
   try{
     const [estRows,dashRows,s10Rows,plRows,prRows,rvRows,csRows,fxRows,vtRows,dtR,esR,poR]=await Promise.all([
       fetchSheet(...R.S02),
@@ -1094,7 +1098,7 @@ async function loadSheets(){
       fetchSheet(...R.S05),
       fetchSheet(...R.S06),
       fetchSheet(...R.S13),
-      fetchSheet(...R.S08_DETAIL).catch(()=>[]),
+      fetchSheetSafe(...R.S08_DETAIL).then(v=>v||[]).catch(()=>{ detailReadOk=false; return []; }),   // v3.5.1(#1): 읽기 실패를 기억해 저장을 막는다(탭이 아직 없으면 빈 목록으로 정상)
       fetchSheet(...R.S12).catch(()=>[]),
       fetchSheetSafe(...R.S15).catch(()=>null),
     ]);
@@ -1145,6 +1149,7 @@ async function loadSheets(){
     renderStaleEstBanner();
     renderVatBanner();
     renderAging();
+    await handleRecalcParam();   // v3.6.2(#19): 부가세 화면의 ?recalc=1 은 화면을 열 때 처리한다
   } catch(e){ toast('데이터 로드 실패: '+e.message,true); }
 }
 // v2.4.5: 계획 금액 건별 근거 — 셀 클릭 시 구성 내역(프로젝트·예정일·금액) 표시
@@ -1414,7 +1419,7 @@ function renderStaleEstBanner(){
   el.style.display=stale?'flex':'none';
 }
 function renderVatBanner(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   const next=vatRows.filter(v=>v.status!=='납부완료'&&v.due_date>=today&&(num(v.estimated_payment)||0)>0)
     .sort((a,b)=>a.due_date.localeCompare(b.due_date))[0];
   if(next){
@@ -1574,6 +1579,7 @@ function fixCands(t,i){const open=planFix.filter(f=>!f.pay_actual_date&&!isCardB
   return _cands(open,t.outAmt).map(c=>`<button onclick="quickPick('mf_${i}','${c.id}')" title="지급예정 ${c.d||'-'}" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--text2);background:var(--bg2,#F3F4F6);color:var(--text2);cursor:pointer">👍 ${c.ym} ${c.cat||''} ${won(c.a)}</button>`).join(' ');}
 function quickPick(sel,val){const el=document.getElementById(sel);if(el)el.value=val;}
 async function saveReclass(){
+  if(!detailReadOk){ toast(DETAIL_BLOCK_MSG,true); return; }   // v3.5.1(#1)
   // v2.9.47: 미분류 재지정 목록(id="rc_...")과 CSV 거래 내역 팝업(id="rct_...") 양쪽의 드롭다운을
   // 모두 훑어 저장 — 두 UI 모두 [id^=rc_]로 매치되는 문제를 피하기 위해 접두사를 명시적으로 분리.
   // v2.9.66: 통장 대사 미매칭 목록(id="rcu_...")도 동일한 이유로 별도 접두사 추가 — 추가하면서
@@ -1850,8 +1856,9 @@ function renderRecon(autoCnt,costCnt,fixCnt){
     <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span style="flex:1;min-width:140px">${t.txn_date} ${t.description||t.recv||''} <b>${won(num(t.inflow_amt)||num(t.outflow_amt)||0)}</b></span>
       <select id="rc_${t.txn_id}" data-tid="${t.txn_id}" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface)">
-        ${txnTypeNames().map(n=>`<option ${n===t.category?'selected':''}>${n}</option>`).join('')}
-      </select></div>`).join('')):'';
+        <option value="">현재: ${t.category||'미분류'} (변경 안 함)</option>
+        ${txnTypeNames().filter(n=>n!==t.category).map(n=>`<option>${n}</option>`).join('')}
+      </select></div>`).join('')):'';   // v3.6.0(#20): 빈 선택지 추가 — 선택 없는 미분류 거래가 첫 유형으로 바뀌던 결함
 }
 // v2.13.0: 합산 매칭 — 거래 1건에 청구(매입) 여러 건. v3.0.0: 합계 차액 ±10,000원 이내(끝전)일 때만 확정(고정비는 대상 아님).
 function smItems(kind){
@@ -1918,7 +1925,7 @@ async function manualMatch(i){
   else toast('저장 실패',true);
 }
 function renderAging(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   // v2.9.68(사용자 지적): 미지급금(payList)은 okPrjSet(파이프라인이 수주·계약·종료인 "재무반영
   // 대상" 프로젝트)로 걸러져 있었는데, 바로 아래 미수금(list)에는 같은 필터가 빠져 있었다.
   // 그 결과 연결 파이프라인이 "포기"로 전환되어 재무반영 대상에서 빠진 프로젝트(S03_PROJECT.status
@@ -1957,7 +1964,7 @@ async function recalcEstimate(){
     const baseYm=(settings.param_base_ym||'2026-03').slice(0,7);
     let bal=un2(settings.param_base_balance)||20000000;
     const weighted=document.getElementById('probToggle').checked;
-    const today=new Date().toISOString().slice(0,10);
+    const today=kstToday();
     // v2.8: 확도가중 정상화 — 실제 probability 사용(강제 100% 폐기), 매출·매입 대칭 반영
     // '확정' 단계(스케줄 미생성)는 항상 반영 대상(확도 실값 사용, 없으면 100% 폴백) + weighted ON 시 '기회' 단계 추가(확도 실값)
     const confNoSch=pipelinesAll.filter(p=>p.status==='확정'&&un2(p.contract_amount)&&p.expected_start&&p.expected_end

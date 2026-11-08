@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 월마감 리포트</title>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -151,12 +151,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/payout.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/payout.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 let cutoff='',showDone=false;
 let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
@@ -193,11 +193,13 @@ async function loadAll(){
   }catch(e){ toast('로드 실패: '+e.message,true); document.getElementById('paper').innerHTML='<div style="padding:20px;color:#B91C1C">데이터를 불러오지 못했습니다: '+esc(e.message)+'</div>'; }
 }
 const num2=v=>parseInt(String(v??'').replace(/,/g,''),10)||0;
+// v3.6.0(결함 후보 #10): 매입 부가세 — vat_amt 가 적혀 있으면(0 포함) 그 값, 비어 있을 때만 공급가의 10%. 부가세 화면(vat.html vatOf)과 같은 규칙
+function costVat(c){ const raw=String(c.vat_amt??'').trim(); return raw!==''?num2(c.vat_amt):Math.round(num2(c.amount)*0.1); }
 function buildItems(){
   const out=[]; const add=o=>out.push(o);
   D.rev.forEach(r=>{ if(r.is_received==='Y'||r.matched_txn_id||r.recv_actual_date) return; const a=num2(r.cash_recv_amt); if(!a) return;
     add({id:r.revenue_id,dir:'in',grp:'매출 입금',date:r.cash_recv_date||mEnd(r.year_month),label:P(r.project_id),sub:'발생 '+r.year_month,amt:a,est:false,inv:r.invoice_date?'발행':'미발행'}); });
-  D.cost.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=Math.round(num2(c.amount)*1.1); if(!a) return;
+  D.cost.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=num2(c.amount)+costVat(c); if(!a) return;   // v3.6.0(#10): 적은 부가세(0 포함)를 우선, 비어 있을 때만 10%
     add({id:c.cost_id,dir:'out',grp:'매입 (세금계산서)',date:c.payment_date||mEnd(c.year_month),label:P(c.project_id)+(c.person_name?' · '+c.person_name:''),sub:'발생 '+c.year_month,amt:a,est:false}); });
   D.poCosts.forEach(c=>{ if(c.pay_actual_date||c.matched_txn_id) return; const a=num2(c.amount); if(!a) return; const r=c._po;
     const grp=r?({'사업소득':'사업소득 지급','급여':'급여 지급','기타경비':'기타경비 (계산서 없음)','원천세':'원천세 납부','4대보험':'4대보험 납부'}[r.pay_type]):'계산서 없는 지급 (견적 계산)';
@@ -271,7 +273,7 @@ function render(s){
   const inv1=D.rev.filter(r=>!r.invoice_date&&r.invoice_plan_date&&r.invoice_plan_date<=s.end&&num2(r.tax_invoice_amt)).sort((a,b)=>a.invoice_plan_date.localeCompare(b.invoice_plan_date));
   const inv2=D.cost.filter(c=>!c.invoice_date&&c.invoice_plan_date&&c.invoice_plan_date<=s.end&&num2(c.amount)).sort((a,b)=>a.invoice_plan_date.localeCompare(b.invoice_plan_date));
   const invT=(list,vatf,amtf)=>list.length?`<table class="rp-t"><thead><tr><th style="width:44px">예정일</th><th>프로젝트</th><th style="width:84px">공급가액</th><th style="width:76px">부가세</th></tr></thead><tbody>`+list.map(r=>`<tr><td class="c">${r.invoice_plan_date.slice(5)}</td><td class="l">${esc(P(r.project_id))}${r.person_name?' · '+esc(r.person_name):''}</td><td class="n">${won(amtf(r))}</td><td class="n">${won(vatf(r))}</td></tr>`).join('')+'</tbody></table>':'<div style="color:#777;font-size:10px">없음</div>';
-  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="rp-h"><span>발행할 매출 세금계산서 (${inv1.length}건)</span></div>${invT(inv1,r=>num2(r.vat_amt),r=>num2(r.tax_invoice_amt))}</div><div><div class="rp-h"><span>수취할 매입 세금계산서 (${inv2.length}건)</span></div>${invT(inv2,r=>num2(r.vat_amt)||Math.round(num2(r.amount)*0.1),r=>num2(r.amount))}</div></div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="rp-h"><span>발행할 매출 세금계산서 (${inv1.length}건)</span></div>${invT(inv1,r=>num2(r.vat_amt),r=>num2(r.tax_invoice_amt))}</div><div><div class="rp-h"><span>수취할 매입 세금계산서 (${inv2.length}건)</span></div>${invT(inv2,r=>costVat(r),r=>num2(r.amount))}</div></div>`;
   // 경과 미결 — 처리됨으로 표시한 건은 목록에서 빼고 화면 아래에 접어 둔다(출력에는 나오지 않는다)
   const shown=over.filter(x=>!x.skip).sort((a,b)=>a.date.localeCompare(b.date)), done=over.filter(x=>x.skip).sort((a,b)=>a.date.localeCompare(b.date));
   h+=`<div class="rp-h"><span>경과 미결 (기준일 이전 예정일, 아직 입금·지급 처리가 안 된 건)</span><span>${shown.length}건</span></div>`+

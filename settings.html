@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -331,14 +331,14 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/cmn-sheet.js?v=3.5.0"></script>
-<script src="js/cmn-init.js?v=3.5.0"></script>
-<script src="js/integrity.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/cmn-sheet.js?v=3.6.2"></script>
+<script src="js/cmn-init.js?v=3.6.2"></script>
+<script src="js/integrity.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -438,7 +438,7 @@ function addNewSet(){
   const newId=`SET-${String(maxNum+1).padStart(3,'0')}`;
   // 빈 세트 추가 (기본 4개 등급 골격)
   ['특급','고급','중급','초급'].forEach(g=>{
-    rateRows.push({set_id:newId,set_name:'새 단가 세트',grade:g,sell_price:'0',buy_price:'0',description:'',is_default:'N',updated_at:new Date().toISOString().slice(0,10)});
+    rateRows.push({set_id:newId,set_name:'새 단가 세트',grade:g,sell_price:'0',buy_price:'0',description:'',is_default:'N',updated_at:kstToday()});
   });
   selectSet(newId);
   (el=>{if(el)el.value='새 단가 세트';})(document.getElementById('setNameInput'));
@@ -453,7 +453,7 @@ async function saveRates(){
   // 현재 편집 세트의 등급 행 수집
   const trs=document.querySelectorAll('#rateBody tr');
   const newGrades=[];
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   trs.forEach(tr=>{
     const inputs=tr.querySelectorAll('input');
     const grade=inputs[0].value.trim();
@@ -540,7 +540,7 @@ async function saveSettingsToSheet(hrUpd){
   // v2.9.73 SCR-12: 보존 대상을 "키워드·파라미터가 아닌 모든 행"으로 넓혔다 — 새 코드 카테고리(role·industry·project_type·fail_reason),
   // 인력 설정값(hr_setting), 알 수 없는 카테고리까지 지우거나 다른 카테고리로 바꾸지 않는다. 인력 설정값은 hrUpd({키:값})로 받은 것만 갱신한다.
   const header=['setting_key','setting_value','category','description','updated_at','code_id','is_active'];   // v3.0.0: 코드·사용 여부 열 보존
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   const descMap={
     kw_revenue_inflow:'매출 입금 키워드',kw_cost_outflow:'매입 지급 키워드',
     kw_fixed_outflow:'고정비 키워드',kw_tax_outflow:'세금 키워드',
@@ -613,7 +613,9 @@ const txnCodeByName=n=>{ const z=String(n||'').trim(); const t=codeRows.txn_type
 const txnNameByCode=c=>{ const t=c&&codeRows.txn_type.find(x=>x[3]===c); return t?String(t[0]||'').trim():''; };
 let codeRows={txn_type:[],branch_rule:[],fixed_item:[],skill_tag:[],balance_item:[],recon_exclude:[],role:[],industry:[],project_type:[],fail_reason:[]}; // v2.9.73: 인력 모듈 코드 4종 추가
 const DEF_TYPES=[['매출입금',''],['매입지급',''],['고정비',''],['급여',''],['세금',''],['법인카드',''],['AI사용료',''],['기타비용',''],['기타입금','']];
+let codesLoadOk=false;   // v3.5.1(#4): 코드를 제대로 읽었을 때만 「코드 전체 저장」을 허용한다
 async function loadCodes(){
+ codesLoadOk=false;
  try{
   const rows=toObj(await fetchSheet(...R.S10));
   // v2.9.45: txn_type만 description 컬럼에 저장된 "집계 버킷"을 세 번째 요소로 함께 복원.
@@ -631,7 +633,10 @@ async function loadCodes(){
   const bn=document.getElementById('codeBanner');
   if(bn){ bn.style.display='block'; bn.innerHTML=(nAssigned?`🆔 코드 ${nAssigned}건을 새로 부여했습니다. <b>아래 「코드 저장」을 눌러야 시트에 기록됩니다.</b><br>`:'')+'⚠ 이름을 바꿔도 코드는 그대로입니다. 다만 <b>이미 저장된 거래·고정비 계획·인력 시트의 이름은 「🔁 코드 이관」으로 코드로 바꾸기 전까지 옛 이름 그대로</b> 남아 있어, 이관 전에는 이름 변경을 가급적 피해 주세요.'; }
   renderCodes();
- }catch(e){}
+ codesLoadOk=true;
+ }catch(e){
+  const bn=document.getElementById('codeBanner'); if(bn){ bn.style.display='block'; bn.innerHTML='⚠ 설정(코드)을 읽지 못했습니다. 이 상태에서 「코드 전체 저장」을 하면 코드가 지워질 수 있어 <b>저장을 막았습니다</b>. 화면을 새로고침한 뒤 다시 시도하세요.'; }
+ }
 }
 // v2.9.45: 근본 결함 수정 — 자금수지 집계(대시보드 배지·상세 모달)가 "매출입금"·"매입지급" 등
 // 정확히 9개의 하드코딩된 유형명 문자열에 의존해왔다. 사용자는 이 화면에서 원하는 이름으로 자유롭게
@@ -750,10 +755,11 @@ function dupCodeName(){
   return null;
 }
 async function saveCodes(){
+  if(!codesLoadOk){ toast('설정(코드)을 읽지 못해 저장을 중단했습니다. 새로고침 후 다시 시도하세요.',true); return; }   // v3.5.1(#4)
   const dup=dupCodeName();
   if(dup){ toast(`같은 이름의 코드가 있습니다. (${S10_CODE_LABEL[dup.c]||(dup.c==='recon_exclude'?'대사 제외 유형':'누적 잔액 항목')}: ${dup.n})`,true); return; }
   assignCodes(codeRows);   // v3.0.0: 저장 직전 빠진 코드를 채운다
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   // v2.9.38: 헤더 컬럼 순서를 saveSettingsToSheet()와 통일 — 항상 category가 C열, description이 D열.
   const H=['setting_key','setting_value','category','description','updated_at','code_id','is_active'];   // v3.0.0: F·G열
   // v2.9.73 SCR-12: 저장 직전 S10을 다시 읽고, 이 화면이 관리하는 카테고리(S10_CODE_CATS)가 아닌 행은 읽은 그대로 보존한다

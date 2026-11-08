@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.5.0">
+<link rel="stylesheet" href="css/common.css?v=3.6.2">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -243,11 +243,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.5.0"></script>
-<script src="js/common.js?v=3.5.0"></script>
-<script src="js/auth.js?v=3.5.0"></script>
-<script src="js/calc.js?v=3.5.0"></script>
-<script src="js/nav.js?v=3.5.0"></script>
+<script src="js/schema.js?v=3.6.2"></script>
+<script src="js/common.js?v=3.6.2"></script>
+<script src="js/auth.js?v=3.6.2"></script>
+<script src="js/calc.js?v=3.6.2"></script>
+<script src="js/nav.js?v=3.6.2"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -706,7 +706,7 @@ async function saveGen(){
         ratio:parseFloat((document.getElementById('msR_'+i)||{}).value)||0,
         date:(document.getElementById('msD_'+i)||{}).value||''
       }));
-      const rec={project_id:c.pid,rounds:n,items_json:JSON.stringify(items),updated_at:new Date().toISOString().slice(0,10)};
+      const rec={project_id:c.pid,rounds:n,items_json:JSON.stringify(items),updated_at:kstToday()};
       const next=[...milestones.filter(m=>m.project_id!==c.pid),rec];
       let ok=await clearAndWrite(...W.S17,[HEADERS.S17,...rowsFor(HEADERS.S17,next)]);
       if(!ok){ await ensureSheet(R.S17[0],HEADERS.S17); ok=await clearAndWrite(...W.S17,[HEADERS.S17,...rowsFor(HEADERS.S17,next)]); } // 시트 미생성 시 자동 생성 후 1회 재시도
@@ -737,9 +737,11 @@ async function saveGen(){
   }
   if(allOk&&doCost){
     let base=costs;
-    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date);
+    // v3.5.1(결함 후보 #6): 「계산서 없는 매입」(cost_type 에 「계산서없음」)은 세금계산서 스케줄이 아니므로 대체 대상에서 제외하고 그대로 둔다
+    const _noInv=x=>/계산서없음/.test(String(x.cost_type||''))||/계산서없음/.test(String(x.memo||''));
+    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date&&!_noInv(x));
     if(existOpen.length&&confirm(`이 프로젝트의 기존 미수취 매입 ${existOpen.length}건을 새 스케줄로 대체할까요?\n(취소 = 기존 유지하고 추가)`))
-      base=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
+      base=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date&&!_noInv(x)));
     let seq=costs.reduce((m,x)=>{const n=parseInt((x.cost_id||'').replace(/\D/g,'').slice(-3))||0;return Math.max(m,n);},0);
     // v2.9.36: genCostRows는 이제 세금계산서형만 생성되므로(genCtx·buildGen·msCalc에서 계산서없음
     // 제외) isInvoice는 사실상 항상 true다. 구조는 유지하되 실질적으로 이 분기에서 만들어지는 매입은
@@ -756,9 +758,10 @@ async function saveGen(){
     // v2.9.11: 견적·직접입력 둘 다 없어 매입 생성이 불가능한 상태(genDoCost 비활성)에서는
     // 매입 체크박스가 꺼져 이 분기 자체를 건너뛰어 과거 매입 스케줄이 방치되던 결함.
     // v2.9.15: canCost로 조건 교체 — "직접 입력"을 선택했다면 이 분기를 타지 않고 정상 갱신 경로로 간다.
-    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date);
+    const _noInv2=x=>/계산서없음/.test(String(x.cost_type||''))||/계산서없음/.test(String(x.memo||''));   // v3.5.1(#6)
+    const existOpen=costs.filter(x=>x.project_id===c.pid&&!x.invoice_date&&!_noInv2(x));
     if(existOpen.length&&confirm(`이 프로젝트는 매입 기준 금액이 없어 매입 스케줄을 생성할 수 없습니다.\n기존 미수취 매입 ${existOpen.length}건이 남아 있습니다 — 삭제할까요?\n(취소 = 그대로 보존)`)){
-      const next=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date));
+      const next=costs.filter(x=>!(x.project_id===c.pid&&!x.invoice_date&&!_noInv2(x)));
       const ok=await clearAndWrite(...W.S05,[H5,...next.map(x=>H5.map(h=>x[h]??''))]);
       if(ok){costs=next;msgs.push(`매입 ${existOpen.length}건 삭제`);}else allOk=false;
     }
@@ -907,7 +910,7 @@ async function unmarkPay(id){
 }
 async function markInvoiced(id){
   const r=revenues.find(x=>x.revenue_id===id); if(!r)return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   if(!confirm(`${r.year_month} · ${r.project_id} 건을 오늘(${today}) 발행 완료 처리할까요?`))return;
   const prj=allPrjs.find(p=>p.project_id===r.project_id);
   const pl=prj?pipelines.find(p=>p.pipeline_id===prj.pipeline_id):null;
@@ -920,7 +923,7 @@ async function markInvoiced(id){
 }
 async function markCostInvoiced(id){
   const c=costs.find(x=>x.cost_id===id); if(!c)return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=kstToday();
   if(!confirm(`${c.year_month} · ${c.cost_type} 건을 오늘(${today}) 수취 완료 처리할까요?`))return;
   // v2.9.33: 매출의 markInvoiced(발행 완료)는 입금예정일이 비어있으면 자동 계산해 채우는데, 매입의
   // 수취 완료 처리는 지급예정일을 전혀 건드리지 않아 방치되던 비대칭(사용자 지적으로 발견) — 매출과
