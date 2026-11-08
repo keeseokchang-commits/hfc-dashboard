@@ -1,37 +1,18 @@
 // HFC common.js v2.0 — 설정·인증·API·유틸 단일 정의(SSOT)
 const SHEETS_ID='1PZs1mEbqoWUlgbx7FgvCoTHoDjzJTv6JNDoX6-yVg5Q';
-const API_KEY='AIzaSyBrS2UCtL1aRqo-lFltJvbCwNxTt_ooIOE';
+// v2.9.111: API_KEY·SCOPES·accessToken·signIn·initOAuth 는 js/auth.js 로 이동(로그인 게이트·세션·자동 잠금). 읽기도 로그인 열쇠로만 한다.
 const CLIENT_ID='129067702204-tn3oom6h6giu0cj2bphs4ve8rsti03be.apps.googleusercontent.com';
-const SCOPES='https://www.googleapis.com/auth/spreadsheets';
-let accessToken=null,tokenClient;
-function initOAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,scope:SCOPES,
-    callback:(resp)=>{
-      if(resp.access_token){ accessToken=resp.access_token; toast('로그인 완료 ✓'); }
-      if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); }
-    }
-  });
-}
-function signIn(){
-  return new Promise(res=>{
-    pendingAuth=res;
-    try{ tokenClient.requestAccessToken(); }
-    catch(e){ pendingAuth=null; res(false); return; }
-    setTimeout(()=>{ if(pendingAuth){ const r=pendingAuth; pendingAuth=null; r(!!accessToken); } },60000);
-  });
-}
 async function fetchSheet(sheet,range){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheet+'!'+range)}`;
   // v2.0.2: 429(쿼터)·5xx 일시 오류 자동 재시도 — 0.8s→1.6s→3.2s 백오프
   for(let i=0;i<4;i++){
-    const res=await fetch(url);
+    const res=await authFetch(url);
     if(res.ok) return (await res.json()).values||[];
     if(res.status===429||res.status>=500){
       if(i<3){ await new Promise(r=>setTimeout(r,800*Math.pow(2,i))); continue; }
       throw new Error(sheet+' 읽기 오류 '+res.status+' — API 호출 한도. 잠시 후 다시 시도하세요');
     }
-    throw new Error(sheet+' 읽기 오류 '+res.status);
+    throw new Error(sheet+' 읽기 오류 '+res.status+(res.status===403?' (이 구글 계정은 시트 접근 권한이 없습니다)':''));
   }
 }
 // v2.8.2: 존재하지 않는 시트를 안전하게 조회(400 → 빈 배열). 필요 시 자동 생성 후 헤더 기록.
@@ -72,7 +53,7 @@ function rowsFor(H,list){
     let v=r[h];
     if(NUMERIC_COLS.has(h)){
       if(v===undefined||v===null||v===''){ return ZERO_DEFAULT_COLS.has(h)?0:''; }
-      return num(v);
+      return (typeof DECIMAL_COLS!=='undefined'&&DECIMAL_COLS.has(h))?numF(v):num(v); // v2.9.73: 소수 한 자리 컬럼(경력 연수)은 정수로 자르지 않는다
     }
     return v??'';
   }));

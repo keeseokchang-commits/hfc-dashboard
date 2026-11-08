@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 이력서 등록</title>
+<link rel="stylesheet" href="css/common.css?v=2.13.0">
+<link rel="stylesheet" href="css/hr.css?v=2.13.0">
+</head>
+<body data-page="stf_intake">
+
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>이력서 등록</span></div>
+  <button class="btn-icon" onclick="loadAll()" title="새로고침">🔄</button>
+  <button class="btn-icon" onclick="location.href='candidate.html'" title="후보 목록">👥</button>
+</header>
+
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div id="loadBox"></div>
+  <div id="screen" style="display:none">
+    <div class="hr-steps">
+      <span class="hr-chip" onclick="location.href='candidate.html'">후보 목록</span>
+      <span class="hr-chip disabled" title="다음 개발 단계에서 열립니다">철수·재확인 일정</span>
+      <span class="hr-chip on">이력서 등록</span>
+    </div>
+
+    <div class="card proc-now" id="procNow">
+      <div class="hr-row" style="justify-content:space-between;align-items:center"><span class="hr-badge amber" id="procBadge"></span><span class="hr-sub" id="procAge"></span></div>
+      <div class="proc-big" id="procTitle"></div>
+      <div class="hr-sub" id="procSub" style="margin-top:4px"></div>
+      <div id="staleBox"></div>
+      <div id="drvNotice"></div>
+      <div id="drvProg" class="prog" style="display:none" role="status"><span class="spinner"></span><span id="drvProgTxt"></span></div>
+
+      <details class="proc-sec" id="secUp" style="display:none">
+        <summary>① 이력서 올리기</summary>
+        <div class="hr-sub" style="margin:0 0 8px">받은 이력서 파일(pdf, docx, doc, pptx)을 고르면 드라이브 New 폴더에 저장됩니다. 이미 등록된 이력서는 올리지 않고 알려 드립니다. 드라이브에서 New 폴더에 직접 넣어도 됩니다.</div>
+        <div class="hr-row">
+          <div class="hr-field fixed" style="min-width:220px"><label for="uParty">보낸 곳</label><select class="hr-select" id="uParty"></select></div>
+          <div class="hr-field fixed" style="min-width:150px"><label for="uDate">받은 날</label><input class="hr-input" id="uDate" type="date"></div>
+          <div class="hr-field"><label for="uFiles">이력서 파일 (여러 개 선택 가능)</label><input type="file" id="uFiles" multiple accept=".pdf,.docx,.doc,.pptx" style="font-size:12px"></div>
+          <button class="btn btn-primary" id="btnUpload" data-act="doUpload">New 폴더에 올리기</button>
+        </div>
+        <div id="uResult"></div>
+      </details>
+
+      <details class="proc-sec" id="secAsk">
+        <summary id="askSum">② Claude 에게 읽기 맡기기</summary>
+        <div class="hr-sub" id="askHelpDrv" style="display:none;margin:0 0 8px">New 폴더에 있는 이력서를 Claude 가 읽게 하는 한 줄입니다. 「문구 복사」를 누르고 새 Claude 대화에 붙여 넣으세요(파일을 첨부할 필요가 없습니다). 보낸 곳·받은 날은 올릴 때 파일에 붙어 있어 따로 알릴 필요가 없습니다. 읽은 결과는 Result 폴더에 저장되고, 도착하면 이 화면이 ③에서 알려 줍니다.</div>
+        <div class="hr-sub" id="askHelpOld" style="margin:0 0 8px">보낸 곳과 받은 날을 고르면 아래 문구가 만들어집니다. 「문구 복사」를 누르면 읽기를 맡겼다고 기록되고, 이 문구를 새 Claude 대화에 붙여 넣은 뒤 이력서 파일을 첨부하세요. 받은 결과 파일은 ③에서 가져옵니다.</div>
+        <div class="hr-sub" id="folderPath" style="margin-bottom:8px"></div>
+        <div class="hr-row" id="askParty">
+          <div class="hr-field fixed" style="min-width:220px"><label for="pParty">보낸 곳</label><select class="hr-select" id="pParty"></select></div>
+          <div class="hr-field fixed" style="min-width:150px"><label for="pDate">받은 날</label><input class="hr-input" id="pDate" type="date"></div>
+        </div>
+        <div class="hr-field" style="margin-top:8px"><label for="pText">요청 문구</label><textarea class="hr-textarea" id="pText" rows="3" readonly></textarea></div>
+        <div class="hr-row" style="margin-top:6px"><button class="btn btn-primary" id="btnCopyPrompt" data-act="copyPrompt">문구 복사</button><span class="hr-sub" id="pMsg"></span></div>
+        <details style="margin-top:12px" id="askOld"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">Drive 파일 1건만 읽기</summary>
+          <div class="hr-row" style="margin-top:8px">
+            <div class="hr-field"><label for="fLink">Drive 파일 링크</label><input class="hr-input" id="fLink" placeholder="https://drive.google.com/file/d/…"><div class="hr-err" id="fLinkErr"></div></div>
+            <div class="hr-field fixed" style="min-width:180px"><label for="fParty">경로 (보낸 곳)</label><select class="hr-select" id="fParty"></select></div>
+            <button class="btn btn-secondary" id="btnFile" data-act="runFile">이 파일 읽기 요청</button>
+          </div>
+        </details>
+      </details>
+
+      <details class="proc-sec" id="secImport">
+        <summary id="impSum">③ 받은 결과 가져오기</summary>
+        <div id="drvImp" style="display:none;margin-bottom:10px">
+          <div id="drvResult"></div>
+          <div class="hr-row" style="margin-top:8px"><div class="hr-field fixed" style="min-width:260px"><label for="iParty">보낸 곳이 비어 있는 이력서에 적용할 보낸 곳</label><select class="hr-select" id="iParty"></select></div></div>
+          <div class="hr-sub" style="margin-top:4px">올릴 때 보낸 곳을 골랐다면 그 값이 먼저 쓰입니다. 드라이브에 직접 넣은 이력서만 여기서 고른 값이 쓰입니다.</div>
+        </div>
+        <div class="hr-sub" style="margin:0 0 8px">Claude 가 만들어 준 결과 파일(JSON)을 올리거나 붙여 넣고, 미리보기로 건수를 확인한 뒤 가져옵니다.</div>
+        <details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">JSON 형식 안내</summary>
+          <pre class="hr-pre" id="impFormat" style="margin-top:6px"></pre></details>
+        <div class="hr-row"><div class="hr-field"><label for="impText">읽기 결과 (JSON)</label><textarea class="hr-textarea" id="impText" rows="5" placeholder='{"schema":"hfc-resume-import/1","resumes":[ … ]}'></textarea><div class="hr-err" id="impErr"></div></div></div>
+        <div class="hr-row" style="margin-top:8px;align-items:center"><input type="file" id="impFile" accept=".json,application/json" style="font-size:12px">
+          <button class="btn btn-secondary" id="btnPreview" data-act="impPreview">미리보기</button>
+          <button class="btn btn-primary" id="btnImport" data-act="impRun" disabled>가져오기</button></div>
+        <div id="impResult" style="margin-top:12px"></div>
+        <div class="hr-row" style="margin-top:10px;align-items:center" id="reqTools"></div>
+      </details>
+    </div>
+
+    <div class="proc-steps" id="procSteps"></div>
+
+    <div class="card" id="failCard" style="display:none">
+      <div class="card-title"><span>읽지 못한 이력서 (Fail 폴더) <span class="hr-sub" id="failCount"></span></span></div>
+      <div id="failBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>④ 확인 필요 처리 <span class="hr-sub" id="needCount"></span></span></div>
+      <div class="hr-chips" id="needChips" style="margin-bottom:10px"></div>
+      <div id="needBox"></div>
+      <div id="panelBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">최근 처리 결과</div>
+      <div id="runBox"></div>
+    </div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=2.13.0"></script>
+<script src="js/common.js?v=2.13.0"></script>
+<script src="js/auth.js?v=2.13.0"></script>
+<script src="js/cmn-sheet.js?v=2.13.0"></script>
+<script src="js/cmn-derive.js?v=2.13.0"></script>
+<script src="js/cmn-alert.js?v=2.13.0"></script>
+<script src="js/cmn-person.js?v=2.13.0"></script>
+<script src="js/cmn-review.js?v=2.13.0"></script>
+<script src="js/cmn-merge.js?v=2.13.0"></script>
+<script src="js/cmn-resume.js?v=2.13.0"></script>
+<script src="js/cmn-drive.js?v=2.13.0"></script>
+<script src="js/hr-ui.js?v=2.13.0"></script>
+<script src="js/scr-intake.js?v=2.13.0"></script>
+<script src="js/nav.js?v=2.13.0"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>

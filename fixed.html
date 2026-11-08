@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=2.9.68">
+<link rel="stylesheet" href="css/common.css?v=2.13.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -124,7 +124,7 @@
 <main class="main">
   <div style="margin-bottom:10px;display:flex;gap:14px"><a href="input.html" style="font-size:12px;color:var(--blue);text-decoration:none">🧾 세금계산서 관리 →</a><a href="settings.html" style="font-size:12px;color:var(--blue);text-decoration:none">⚙️ 고정비 항목 관리(설정) →</a></div>
   <div class="list-card"><div class="card-title"><span>월별 고정비 계획 <span id="fxCnt" style="font-size:11px;color:var(--text3)"></span></span>
-    <span style="display:flex;gap:6px"><select id="fxYear" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 연도</option></select>
+    <span style="display:flex;gap:6px"><select id="fxYear" onchange="fxYearChanged()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 연도</option></select><select id="fxMonth" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 월</option></select><select id="fxCatSel" onchange="renderFx()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><option value="">전체 항목</option></select>
     <button onclick="openFxModal()" style="font-size:12px;padding:6px 12px;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer">+ 고정비 추가</button></span></div>
     <!-- v2.9.50: 체크박스 다중 선택 → 일괄 삭제/수정(사용자 요청). 선택된 건이 1건 이상일 때만
          이 액션 바가 나타난다 — "선택 삭제"는 선택된 건 전부, "선택 수정"은 첫 번째로 선택된
@@ -151,7 +151,8 @@
   <div class="form-row"><label class="form-label">항목 <small style="color:var(--text3)">(설정에서 관리)</small></label>
     <input class="form-input" id="fx_cat" list="fxCatDL" placeholder="예: 임차료"><datalist id="fxCatDL"></datalist></div>
   <div class="form-row"><label class="form-label">월 금액 (원)</label><input class="form-input" id="fx_amt" oninput="this.value=fcv(this.value)" style="text-align:right"></div>
-  <div class="form-row"><label class="form-label">지급일 (매월 n일)</label><input class="form-input" type="number" id="fx_day" min="1" max="31" value="25"></div>
+  <div class="form-row"><label class="form-label">지급일 <small style="color:var(--text3)">(아래 적용 기간의 각 월 안에서, 그 월의 n일)</small></label>
+    <div style="display:flex;gap:10px;align-items:center"><input class="form-input" type="number" id="fx_day" min="1" max="31" value="25" style="flex:1"><label style="display:flex;align-items:center;gap:5px;font-size:13px;white-space:nowrap"><input type="checkbox" id="fx_eom" onchange="fxEomToggle()"> 말일</label></div></div>
   <!-- v2.9.50: 근본 결함 수정(사용자 지적: "수정 팝업에서 기간의 From은 수정이 되지만 TO는
        수정이 안 되고 있음") — editFx()가 단건 수정 시 TO를 disabled로 막아 사용자가 아예 바꿀 수
        없었다. 단건 수정에서 TO는 애초에 저장 로직(saveFx의 editingFxId 분기)이 쓰지 않으므로
@@ -159,6 +160,7 @@
        모드에서는 TO 필드 자체를 숨기고 라벨을 "해당 월"로 바꿔 단건 수정임을 명확히 한다
        (신규 추가 모드에서는 그대로 시작월~종료월 반복 생성 UI 유지). -->
   <div class="form-row"><label class="form-label" id="fx_period_label">적용 기간 <small style="color:var(--text3)">(반복: 시작월~종료월, 단건은 동일 월)</small></label>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:6px">※ 여기서 월은 <b>돈이 실제로 나가는 달</b>입니다. 익월에 지급하는 항목(예: 전월 급여를 당월 10일 지급)은 지급하는 달로 입력하세요.</div>
     <div style="display:flex;gap:8px"><input class="form-input" type="month" id="fx_sm" style="flex:1" oninput="syncFxEm()"><input class="form-input" type="month" id="fx_em" style="flex:1"></div></div>
   <!-- v2.9.22: 기타경비(고정비) 세금계산서 수취 여부·부가세 — 프로젝트 매입에 안 걸리는 임대료·통신비 등의
        매입세액공제를 부가세 계산에 반영하기 위함(비정기 발생이라 등록 시 기본은 미수취, 실제 계산서를 받으면 단건 수정으로 체크). -->
@@ -170,19 +172,27 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=2.9.68"></script>
-<script src="js/common.js?v=2.9.68"></script>
-<script src="js/calc.js?v=2.9.68"></script>
-<script src="js/nav.js?v=2.9.68"></script>
+<script src="js/schema.js?v=2.13.0"></script>
+<script src="js/common.js?v=2.13.0"></script>
+<script src="js/auth.js?v=2.13.0"></script>
+<script src="js/calc.js?v=2.13.0"></script>
+<script src="js/nav.js?v=2.13.0"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
-let fixedAll=[],s10All=[];
+let fixedAll=[],s10All=[],detailAll=[];
+// v2.9.69: 고정비 계획의 "계획상 기대 총 지급액"·"지금까지 연결된 실제 지급 누적액" — cashflow.html의
+// 동일 함수와 같은 개념(SSOT는 js/calc.js의 splitIds/joinIds, 금액 계산은 이 화면이 S08_DETAIL을
+// 직접 들고 있지 않았던 기존 구조상 로컬 정의가 더 간단해 중복 허용 — detailAll 의존이라 calc.js로
+// 옮기면 오히려 결합이 늘어남).
+function fxPlanTotal(f){ return f.has_tax_invoice==='Y'?(num(f.amount)||0)+(num(f.vat_amt)||0):(num(f.amount)||0); }
+function fxMatchedTotal(f){ return splitIds(f.matched_txn_id).reduce((s,tid)=>{const t=detailAll.find(x=>x.txn_id===tid); return s+(t?(num(t.outflow_amt)||0):0);},0); }
 async function loadAll(){
  try{
-  const [fxR,stR]=await Promise.all([fetchSheet(...R.S06),fetchSheet(...R.S10).catch(()=>[])]);
+  const [fxR,stR,dtR]=await Promise.all([fetchSheet(...R.S06),fetchSheet(...R.S10).catch(()=>[]),fetchSheet(...R.S08_DETAIL).catch(()=>[])]);
   fixedAll=dedupe(toObj(fxR).filter(x=>x.fixed_id),'fixed_id');
   s10All=toObj(stR);
+  detailAll=dedupe(toObj(dtR).filter(t=>t.txn_id),'txn_id');
   // v2.9.40: 필드명 불일치 결함 수정 — S10은 setting_key/setting_value 헤더인데 r.key를 참조해
   // 코드 관리 화면(③고정비 항목)에서 등록한 항목이 이 자동완성 목록에 절대 반영되지 못하고
   // 항상 하드코딩 기본값만 보이던 결함(전수조사로 발견).
@@ -190,29 +200,63 @@ async function loadAll(){
   document.getElementById('fxCatDL').innerHTML=(items.length?items:['임차료','급여','4대보험','통신비','세무기장료']).map(k=>`<option value="${k}">`).join('');
   const yrs=[...new Set(fixedAll.map(x=>(x.year_month||'').slice(0,4)).filter(Boolean))].sort();
   document.getElementById('fxYear').innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option value="${y}">${y}년</option>`).join('');
+  fxBuildMonths();
   renderFx();
  }catch(e){toast('로드 실패: '+e.message,true);}
+}
+// v2.9.71: 월별 조건 필터 — 연도와 별개로 1~12월을 고정 나열(사용자 요청). 연도·월은 AND 조합이며,
+// 목록 필터를 fxList() 한 곳에 두어 목록 렌더와 '첫 건 수정'이 항상 같은 기준을 쓴다.
+function fxList(){
+  const y=(document.getElementById('fxYear')||{}).value||'';
+  const m=(document.getElementById('fxMonth')||{}).value||'';
+  const c=(document.getElementById('fxCatSel')||{}).value||'';
+  return fixedAll.filter(x=>(!y||(x.year_month||'').startsWith(y))&&(!m||(x.year_month||'').slice(5,7)===m)&&(!c||x.category===c))
+    .sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
+}
+function fxBuildMonths(){
+  const sel=document.getElementById('fxMonth');
+  if(sel.options.length===13) return;
+  sel.innerHTML='<option value="">전체 월</option>'+Array.from({length:12},(_,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}">${i+1}월</option>`;}).join('');
+}
+function fxYearChanged(){ renderFx(); }
+// v2.9.113: 항목 필터 — 등록된 고정비의 항목명을 모아 드롭다운으로 제공(선택값이 사라지면 전체로 복귀)
+function fxBuildCats(){
+  const sel=document.getElementById('fxCatSel'); if(!sel) return;
+  const cur=sel.value;
+  const cats=[...new Set(fixedAll.map(x=>x.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  sel.innerHTML='<option value="">전체 항목</option>'+cats.map(k=>`<option value="${k}">${k}</option>`).join('');
+  sel.value=cats.includes(cur)?cur:'';
 }
 // v2.9.50: 체크박스 다중 선택 상태(사용자 요청 — 여러 건을 한 번에 삭제·첫 건 수정). 필터를
 // 바꾸거나 다시 그릴 때 화면에 없는 항목의 선택은 자연히 무의미해지므로, renderFx가 항상 현재
 // 화면에 보이는 fixed_id 집합으로 좁혀 정합성을 유지한다.
 let fxSelected=new Set();
 function renderFx(){
-  const y=document.getElementById('fxYear').value;
-  const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
+  fxBuildCats();
+  fxBuildMonths(); // 추가·수정으로 새 월이 생겨도 드롭다운에 반영
+  const list=fxList();
   document.getElementById('fxCnt').textContent=`(${list.length}건 · 합계 ${comma(list.reduce((s,x)=>s+(num(x.amount)),0))}원)`;
   const visibleIds=new Set(list.map(x=>x.fixed_id));
   fxSelected=new Set([...fxSelected].filter(id=>visibleIds.has(id)));
   // v2.9.41: 통장 대사(자금수지 화면)로 확인된 실제 지급 여부를 여기서도 보여준다 — 매입 화면과
   // 동일하게 "지급 완료" 배지 + 실지급일, 그리고 대사를 잘못 확인한 경우 여기서 직접 해제 가능.
-  document.getElementById('fxBody').innerHTML=list.length?list.map(x=>`
+  // v2.9.69(사용자 지적 — 계획은 예산 추정치, 실지급은 분할·금액 불일치 가능): 거래가 일부
+  // 연결됐지만(matched_txn_id 있음) 아직 계획 금액에 도달하지 않아 자동 완료되지 않은 "진행중"
+  // 상태를 배지로 보여주고, 이 경우 사용자가 직접 "지급완료 처리"를 눌러 더 이상 기다리지 않고
+  // 바로 닫을 수 있게 한다(예: 계획보다 적게 지출하고 끝난 경우).
+  document.getElementById('fxBody').innerHTML=list.length?list.map(x=>{
+    const linkedN=splitIds(x.matched_txn_id).length;
+    const matchedSum=linkedN?fxMatchedTotal(x):0;
+    const inProgress=linkedN>0&&!x.pay_actual_date;
+    const progressBadge=inProgress?` <span class="badge-tag" style="font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:4px;padding:1px 4px" title="연결된 통장 거래 ${linkedN}건 합계">연결 ${linkedN}건·누적 ${comma(matchedSum)}원</span>`:'';
+    return `
     <tr><td class="nowrap"><input type="checkbox" class="fx-sel" data-id="${x.fixed_id}" onchange="onFxSelChange('${x.fixed_id}',this.checked)" ${fxSelected.has(x.fixed_id)?'checked':''}></td>
     <td class="nowrap">${x.year_month}</td>
-    <td class="cell-cat">${x.category}${x.has_tax_invoice==='Y'?` <span class="badge-tag" style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span class="badge-tag" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}${x.memo?`<div class="cat-memo">${x.memo}</div>`:''}</td>
+    <td class="cell-cat">${x.category}${x.has_tax_invoice==='Y'?` <span class="badge-tag" style="font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:4px;padding:1px 4px" title="세금계산서 수취(부가세 ${comma(x.vat_amt||0)}원)">계산서</span>`:''}${x.pay_actual_date?` <span class="badge-tag" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 4px" title="실지급 ${x.pay_actual_date}">지급완료</span>`:''}${progressBadge}${x.memo?`<div class="cat-memo">${x.memo}</div>`:''}</td>
     <td class="nowrap" style="text-align:right">${comma(x.amount)}원</td>
     <td class="nowrap">${x.payment_date||'─'}</td>
     <td class="wrap cell-memo" style="color:var(--text3)" title="${(x.memo||'').replace(/"/g,'&quot;')}">${x.memo||''}</td>
-    <td class="cell-act"><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;padding:0">수정</button>${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;padding:0">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer;padding:0">삭제</button></td></tr>`).join('')
+    <td class="cell-act"><button onclick="editFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer;padding:0">수정</button>${inProgress?`<button onclick="completeFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--green);cursor:pointer;padding:0">지급완료 처리</button>`:''}${x.pay_actual_date?`<button onclick="unmatchFxPay('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--amber);cursor:pointer;padding:0">지급 해제</button>`:''}<button onclick="delFx('${x.fixed_id}')" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer;padding:0">삭제</button></td></tr>`;}).join('')
     :'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:16px 0">고정비 계획이 없습니다 — [+ 고정비 추가]</td></tr>';
   const selAll=document.getElementById('fxSelAll'); if(selAll) selAll.checked=list.length>0&&list.every(x=>fxSelected.has(x.fixed_id));
   updateFxBulkBar();
@@ -237,8 +281,7 @@ function updateFxBulkBar(){
 // 화면에서 인식하는 순서(현재 렌더링된 목록의 정렬 순서)를 기준으로 "첫 번째"를 판단한다.
 function bulkEditFx(){
   if(!fxSelected.size) return;
-  const y=document.getElementById('fxYear').value;
-  const list=fixedAll.filter(x=>!y||(x.year_month||'').startsWith(y)).sort((a,b)=>(a.year_month||'').localeCompare(b.year_month||'')||(a.category||'').localeCompare(b.category||''));
+  const list=fxList();
   const first=list.find(x=>fxSelected.has(x.fixed_id));
   if(first) editFx(first.fixed_id);
 }
@@ -264,6 +307,20 @@ async function unmatchFxPay(id){
   const ok=await writeFx(next);
   toast(ok?'지급 해제 완료':'저장 실패',!ok);
 }
+// v2.9.69(사용자 지적 — 계획은 예산 추정치라 실지급과 금액이 정확히 안 맞을 수 있음): 거래가
+// 하나 이상 연결됐지만 누적액이 계획 금액에 못 미쳐 자동 완료되지 않은 건을, 사용자가 직접
+// "이제 이 계획은 끝났다"고 확정하는 수동 종료. 연결된 거래 목록(matched_txn_id)은 그대로 두고
+// pay_actual_date만 채운다 — 지급 해제(unmatchFxPay)와 달리 연결 이력을 지우지 않는다.
+async function completeFxPay(id){
+  const x=fixedAll.find(v=>v.fixed_id===id); if(!x) return;
+  const linkedN=splitIds(x.matched_txn_id).length;
+  const matchedSum=fxMatchedTotal(x);
+  if(!confirm(`연결된 통장 거래 ${linkedN}건(누적 ${comma(matchedSum)}원)으로 이 고정비 계획을 지급완료 처리할까요?\n(계획 금액 ${comma(fxPlanTotal(x))}원과 차이가 있어도 그대로 종료됩니다)`))return;
+  const lastDate=[...detailAll].filter(t=>splitIds(x.matched_txn_id).includes(t.txn_id)).map(t=>t.txn_date).sort().slice(-1)[0]||new Date().toISOString().slice(0,10);
+  const next=fixedAll.map(v=>v.fixed_id===id?{...v,pay_actual_date:lastDate}:v);
+  const ok=await writeFx(next);
+  toast(ok?'지급완료 처리 ✓':'저장 실패',!ok);
+}
 async function writeFx(next){
   // v2.9.41: 헤더에 matched_txn_id·pay_actual_date 추가(js/schema.js HEADERS.S06와 동일 순서 유지) —
   // 이 화면이 계획(금액·항목)만 편집해도 자금수지의 통장 대사 결과(대사 상태)가 함께 보존되어야
@@ -279,6 +336,10 @@ let editingFxId=null;
 // 반영 안 됨"이라는 혼란을 준다. 편집 모드에서는 FROM을 바꿀 때마다 TO를 자동으로 같은 값으로
 // 맞춰, 두 필드가 항상 같은 하나의 달을 가리키게 한다(신규 추가 모드에서는 FROM~TO로 여러 달을
 // 반복 생성하는 것이 정상 동작이므로 이 자동 동기화를 적용하지 않는다).
+function fxEomToggle(){
+  const e=document.getElementById('fx_eom').checked, d=document.getElementById('fx_day');
+  d.disabled=e; if(e) d.value=31;
+}
 function syncFxEm(){
   if(!editingFxId) return;
   document.getElementById('fx_em').value=document.getElementById('fx_sm').value;
@@ -289,7 +350,10 @@ function editFx(id){
   editingFxId=id;
   document.getElementById('fx_cat').value=x.category||'';
   document.getElementById('fx_amt').value=fcv(x.amount||'');
-  document.getElementById('fx_day').value=parseInt((x.payment_date||'').slice(8,10))||25;
+  const pd=parseInt((x.payment_date||'').slice(8,10))||25;
+  const ymp=x.year_month||''; const dimE=ymp?new Date(parseInt(ymp.slice(0,4)),parseInt(ymp.slice(5,7)),0).getDate():0;
+  const dayEl=document.getElementById('fx_day'), eomEl=document.getElementById('fx_eom');
+  eomEl.checked=!!dimE&&pd===dimE; dayEl.value=pd; dayEl.disabled=eomEl.checked;
   document.getElementById('fx_sm').value=x.year_month||'';
   // v2.9.50: 근본 결함 수정(사용자 지적: "수정 팝업에서 기간의 From은 수정이 되지만 TO는 수정이
   // 안 되고 있음") — 이전에는 em.disabled=true로 TO 입력 자체를 막고 있었다. 이제 TO를 실제로
@@ -306,7 +370,7 @@ function editFx(id){
 }
 async function saveFx(){
   const cat=document.getElementById('fx_cat').value.trim(), amt=unv(document.getElementById('fx_amt').value);
-  const day=parseInt(document.getElementById('fx_day').value)||25;
+  const day=document.getElementById('fx_eom').checked?31:(parseInt(document.getElementById('fx_day').value)||25);
   const sm=document.getElementById('fx_sm').value, em=document.getElementById('fx_em').value||sm;
   if(!cat||!amt||!sm){toast('항목·금액·기간을 입력하세요',true);return;}
   const hasTax=document.getElementById('fx_has_tax').checked;
@@ -350,7 +414,8 @@ function resetFxEdit(){
   editingFxId=null;
   const cat=document.getElementById('fx_cat'); if(cat) cat.value='';
   const amt=document.getElementById('fx_amt'); if(amt) amt.value='';
-  const day=document.getElementById('fx_day'); if(day) day.value='25';
+  const day=document.getElementById('fx_day'); if(day){ day.value='25'; day.disabled=false; }
+  const eom=document.getElementById('fx_eom'); if(eom) eom.checked=false;
   const memo=document.getElementById('fx_memo'); if(memo) memo.value='';
   const em=document.getElementById('fx_em'); if(em) em.disabled=false;
   const btn=document.getElementById('fxSaveBtn'); if(btn) btn.textContent='저장';
