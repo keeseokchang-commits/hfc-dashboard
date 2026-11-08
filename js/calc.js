@@ -200,9 +200,10 @@ function cardBudgetStatus(ym,fixRows,detailRows){
 function cardBudgetMonths(fixRows){ return [...new Set((fixRows||[]).filter(isCardBudget).map(f=>f.year_month).filter(Boolean))].sort(); }
 
 // v2.13.0: 합산 매칭 — 통장 거래 1건이 청구(매입) 여러 건을 한꺼번에 이행한 경우(예: 두 달치 입금)의 정합 판정(SSOT, 순수 함수).
-// 선택한 건들의 금액 합이 거래 금액과 정확히 같고(원 단위, 허용 오차 없음), 2건 이상일 때만 ok.
-function calcSumMatch(amts,txnAmt){
-  const a=(amts||[]).map(x=>Number(x)||0), t=Number(txnAmt)||0;
+// v2.13.1: 끝전(원 단위 반올림) 차이를 허용 — 선택 합계와 거래 금액의 차이가 SUM_MATCH_TOL(10,000원) 이내(경계 포함)이고 2건 이상일 때 ok.
+const SUM_MATCH_TOL=10000;
+function calcSumMatch(amts,txnAmt,tol){
+  const a=(amts||[]).map(x=>Number(x)||0), t=Number(txnAmt)||0, T=(tol===undefined?SUM_MATCH_TOL:Number(tol)||0);
   const sum=a.reduce((s,x)=>s+x,0), diff=sum-t;
-  return {count:a.length,sum,txnAmt:t,diff,ok:a.length>=2&&t>0&&diff===0};
+  return {count:a.length,sum,txnAmt:t,diff,tol:T,ok:a.length>=2&&t>0&&Math.abs(diff)<=T};
 }
