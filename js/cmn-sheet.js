@@ -64,7 +64,25 @@ function hrParse(values){
 }
 // 여러 탭 읽기(TC-CMN01-01/02): batchGet 1회. 한 탭이라도 실패해 전체가 거부되면 탭별로 다시 읽어 실패한 탭만 실패로 표시한다.
 // 반환 {tabs:{키:{ok,headers,rows,message?}}, failed:[키…], calls}
+// v3.4.0: 인력 코드 지도(S10 코드군 → 이름·코드). 한 화면 안에서 60초 캐시. 읽지 못하면 null — 이름 그대로 두고 동작(변환 안 함)
+let HR_CODEMAP=null, HR_CODEMAP_AT=0;
+async function hrCodeMap(force){
+  if(!force&&HR_CODEMAP&&Date.now()-HR_CODEMAP_AT<60000) return HR_CODEMAP;
+  const r=await hrGet(`${HR_API}/values/${encodeURIComponent(R.S10[0]+'!'+R.S10[1])}?key=${API_KEY}`);
+  if(!r.ok) return HR_CODEMAP;   // 읽기 실패 — 이전 지도가 있으면 그것, 없으면 null
+  HR_CODEMAP=hrCodeMapOf(hrParse(r.json.values).rows); HR_CODEMAP_AT=Date.now(); return HR_CODEMAP;
+}
+const HR_CODE_SHEETS=[...new Set(HR_CODE_COLS.map(c=>c.sheet))];
+// 읽은 뒤: 코드 → 현재 이름. 이관 전(이름 저장) 데이터도 그대로 보인다.
 async function hrReadMany(keys){
+  const out=await hrReadManyRaw(keys);
+  if(!keys.some(k=>HR_CODE_SHEETS.includes(k))) return out;
+  let map=null;
+  if(out.tabs.S10&&out.tabs.S10.ok){ map=HR_CODEMAP=hrCodeMapOf(out.tabs.S10.rows); HR_CODEMAP_AT=Date.now(); } else map=await hrCodeMap();
+  if(map) keys.forEach(k=>{ const t=out.tabs[k]; if(t&&t.ok&&HR_CODE_SHEETS.includes(k)) hrApplyCodeCols(k,t.rows,map,'names'); });
+  return out;
+}
+async function hrReadManyRaw(keys){
   const out={tabs:{},failed:[],calls:0};
   const qs=keys.map(k=>'ranges='+encodeURIComponent(R[k][0]+'!'+R[k][1])).join('&');
   out.calls++;
@@ -144,6 +162,7 @@ async function hrAppend(k,obj,opts={}){
   const t=HR_TABS[k]; if(!t) return {ok:false,code:'BAD_TAB',message:'알 수 없는 탭입니다: '+k};
   const h=await hrHeader(k); if(!h.ok) return h;
   const rec={...obj}, idName=HEADERS[k][0], today=hrToday();
+  if(HR_CODE_SHEETS.includes(k)) hrApplyCodeCols(k,[rec],await hrCodeMap(),'codes');   // v3.4.0: 이름 → 코드
   if(t.id&&!rec[idName]){
     const n=await hrNextIds(k,1,opts.year||(rec.received_at?String(rec.received_at).slice(0,4):undefined));
     if(!n.ok) return n;
@@ -173,6 +192,7 @@ async function hrAppendMany(k,objs){
   if(!objs.length) return {ok:true,ids:[],rows:[]};
   const h=await hrHeader(k); if(!h.ok) return h;
   const idName=HEADERS[k][0], today=hrToday(); const recs=objs.map(o=>({...o}));
+  if(HR_CODE_SHEETS.includes(k)) hrApplyCodeCols(k,recs,await hrCodeMap(),'codes');   // v3.4.0: 이름 → 코드
   if(t.id){ const need=recs.filter(r=>!r[idName]); if(need.length){ const n=await hrNextIds(k,need.length); if(!n.ok) return n; need.forEach((r,i)=>{ r[idName]=n.ids[i]; }); } }
   recs.forEach(rec=>{
     if(HEADERS[k].includes('created_at')&&(rec.created_at===undefined||rec.created_at==='')) rec.created_at=today;
@@ -210,6 +230,7 @@ async function hrUpdate(k,id,changes,opts={}){
   if(cur===null) return {ok:false,code:'READ_FAIL',message:HR_MSG.read(t.tab)};
   if(hrConflict(k,cur,opts)) return {ok:false,code:'CONFLICT',message:HR_MSG.conflict};
   const upd={...changes}; if(hasUpd&&upd.updated_at===undefined) upd.updated_at=hrNow();
+  if(HR_CODE_SHEETS.includes(k)) hrApplyCodeCols(k,[upd],await hrCodeMap(),'codes');   // v3.4.0: 이름 → 코드
   Object.keys(upd).forEach(c=>{ if(!h.header.includes(c)) delete upd[c]; });   // 선택 열이 시트에 아직 없으면 그 값은 쓰지 않는다
   const data=Object.keys(upd).map(c=>{
     const col=colLetter(h.header.indexOf(c)+1);
@@ -253,6 +274,7 @@ async function hrDelete(k,id,opts={}){
 async function hrOverwrite(k,list){
   const t=HR_TABS[k]; if(!t) return {ok:false,code:'BAD_TAB',message:'알 수 없는 탭입니다: '+k};
   if(t.mode!=='full') return {ok:false,code:'NOT_ALLOWED',message:`${t.tab} 탭은 전체 덮어쓰기가 허용되지 않습니다. 행 단위로 저장해 주세요.`};
-  const ok=await clearAndWrite(...W[k],[HEADERS[k],...rowsFor(HEADERS[k],list)]);
+  const lst=(list||[]).map(o=>({...o})); if(HR_CODE_SHEETS.includes(k)) hrApplyCodeCols(k,lst,await hrCodeMap(),'codes');   // v3.4.0
+  const ok=await clearAndWrite(...W[k],[HEADERS[k],...rowsFor(HEADERS[k],lst)]);
   return ok?{ok:true}:{ok:false,code:'WRITE_FAIL',message:HR_MSG.write};
 }

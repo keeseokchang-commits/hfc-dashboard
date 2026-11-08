@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 시스템 설정</title>
-<link rel="stylesheet" href="css/common.css?v=3.3.0">
+<link rel="stylesheet" href="css/common.css?v=3.4.0">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -208,6 +208,9 @@
     <div style="font-size:12px;line-height:1.6;margin-bottom:8px">① 위 「코드 전체 저장」으로 코드를 시트에 먼저 기록합니다. ② 시트 사본을 만듭니다. ③ 「미리보기」로 바뀔 건수와 이름을 못 찾는 항목을 확인합니다. ④ 「이관 확정」을 누르면 거래(S08_DETAIL)에 <b>type_code</b>, 고정비 계획(S06)에 <b>item_code</b> 열만 채우고 기존 열은 건드리지 않습니다. 이미 코드가 있는 행은 그대로 둡니다. 여러 번 실행해도 안전합니다.</div>
     <button class="btn-mini" onclick="migPreview()">미리보기</button>
     <div id="migBox" style="margin-top:10px;font-size:12px"></div>
+    <div style="border-top:1px dashed var(--border);margin:14px 0 8px;padding-top:10px;font-size:12px;line-height:1.6"><b>인력 코드 이관 (v3.4)</b> — 인력 시트의 역할·업종·프로젝트 유형·실패 사유 칸에 저장된 이름을 코드(RL-001 등)로 바꿉니다. 새 열을 만들지 않고 <b>기존 칸의 값을 바꾸므로</b> 시트 사본이 꼭 필요합니다. 이름을 못 찾은 값은 건드리지 않습니다. 여러 번 실행해도 안전합니다.</div>
+    <button class="btn-mini" onclick="migHrPreview()">인력 코드 미리보기</button>
+    <div id="migHrBox" style="margin-top:10px;font-size:12px"></div>
   </div>
   <div class="card">
     <div class="card-title">🔔 알림 파라미터</div>
@@ -322,13 +325,13 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.3.0"></script>
-<script src="js/common.js?v=3.3.0"></script>
-<script src="js/auth.js?v=3.3.0"></script>
-<script src="js/cmn-sheet.js?v=3.3.0"></script>
-<script src="js/cmn-init.js?v=3.3.0"></script>
-<script src="js/calc.js?v=3.3.0"></script>
-<script src="js/nav.js?v=3.3.0"></script>
+<script src="js/schema.js?v=3.4.0"></script>
+<script src="js/common.js?v=3.4.0"></script>
+<script src="js/auth.js?v=3.4.0"></script>
+<script src="js/cmn-sheet.js?v=3.4.0"></script>
+<script src="js/cmn-init.js?v=3.4.0"></script>
+<script src="js/calc.js?v=3.4.0"></script>
+<script src="js/nav.js?v=3.4.0"></script>
 <script>
 let rateRows=[];      // S11 전체 행 (객체 배열)
 let currentSetId=null;
@@ -619,7 +622,7 @@ async function loadCodes(){
   // v3.0.0: 코드가 없는 행에 코드를 일괄 부여(메모리에서만 — 「코드 저장」을 눌러야 시트에 기록된다)
   const nAssigned=assignCodes(codeRows);
   const bn=document.getElementById('codeBanner');
-  if(bn){ bn.style.display='block'; bn.innerHTML=(nAssigned?`🆔 코드 ${nAssigned}건을 새로 부여했습니다. <b>아래 「코드 저장」을 눌러야 시트에 기록됩니다.</b><br>`:'')+'⚠ 이름을 바꿔도 코드는 그대로입니다. 다만 <b>이미 저장된 거래·고정비 계획의 이름은 이후 단계(v3.1·v3.2)에서 코드로 이관되기 전까지 옛 이름 그대로</b> 남아 있어, 그 전에는 이름 변경을 가급적 피해 주세요.'; }
+  if(bn){ bn.style.display='block'; bn.innerHTML=(nAssigned?`🆔 코드 ${nAssigned}건을 새로 부여했습니다. <b>아래 「코드 저장」을 눌러야 시트에 기록됩니다.</b><br>`:'')+'⚠ 이름을 바꿔도 코드는 그대로입니다. 다만 <b>이미 저장된 거래·고정비 계획·인력 시트의 이름은 「🔁 코드 이관」으로 코드로 바꾸기 전까지 옛 이름 그대로</b> 남아 있어, 이관 전에는 이름 변경을 가급적 피해 주세요.'; }
   renderCodes();
  }catch(e){}
 }
@@ -713,18 +716,20 @@ function addCode(c){
 }
 function reuseCode(c,i){ codeRows[c][i][4]='Y'; renderCodes(); toast('다시 사용으로 바꿨습니다. 「코드 저장」을 눌러야 반영됩니다.'); }
 // v2.9.73 SCR-12 — 코드 삭제 전 사용 건수 확인(설계서 R2: 사용 중이어도 확인 뒤 삭제 허용, 기존 기록에는 값만 남음)
-async function codeUsage(c,name){
+async function codeUsage(c,nameIn){
+  const names=(Array.isArray(nameIn)?nameIn:[nameIn]).map(x=>String(x||'').trim()).filter(Boolean);   // v3.4.0: 현재 이름과 시트에 저장된 이름(이름만 바꾸고 저장 전인 경우)
   const spec=S10_CODE_USAGE[c]||[]; const keys=[...new Set(spec.map(x=>x[0]))];
   const r=await hrReadMany(keys); let total=0;
   spec.forEach(([k,colName,multi])=>{ const t=r.tabs[k]; if(!t||!t.ok) return;
-    t.rows.forEach(row=>{ const v=String(row[colName]??''); const hit=multi?v.split(',').map(x=>x.trim()).includes(name):v.trim()===name; if(hit) total++; }); });
+    t.rows.forEach(row=>{ const v=String(row[colName]??''); const toks=multi?v.split(',').map(x=>x.trim()):[v.trim()]; if(toks.some(x=>names.includes(x))) total++; }); });
   return {total,unread:r.failed.map(k=>R[k][0])};
 }
 async function delCode(c,i){
   // v3.0.0: 쓰이지 않는 코드만 삭제. 사용 중(또는 사용 여부를 확인하지 못함)이면 삭제 대신 「사용 중지」 — 코드는 지우지 않는다(설계서 §3-4).
   const r=codeRows[c][i]; const name=String((r||[])[0]||'').trim();
   if(!name||!S10_CODE_USAGE[c]){ codeRows[c].splice(i,1); renderCodes(); return; }   // 이름이 비었거나 연결 데이터가 없는 코드군은 바로 삭제
-  const u=await codeUsage(c,name);
+  const fresh=await readS10Fresh(); const saved=fresh&&fresh.find(x=>x.category===c&&r[3]&&x.code_id===r[3]);
+  const u=await codeUsage(c,[name,saved&&saved.setting_key]);
   if(u.total===0&&!u.unread.length){ codeRows[c].splice(i,1); renderCodes(); return; }
   const why=u.total>0?`${u.total}건에서 사용 중이라 삭제할 수 없습니다.`:`사용 여부를 확인하지 못했습니다(읽지 못한 탭: ${u.unread.join(', ')}).`;
   if(!confirm(why+'\n대신 「사용 중지」로 바꿀까요? 새로 입력하는 목록에서는 빠지고, 이미 저장된 기록은 그대로 보입니다.')) return;
@@ -753,7 +758,7 @@ async function saveCodes(){
   S10_CODE_CATS.forEach(c=>codeRows[c].filter(r=>r[0]&&String(r[0]).trim()).forEach(r=>rows.push([S10_HR_CODE_CATS.includes(c)?String(r[0]).trim():r[0],r[1]||'',c,c==='txn_type'?(r[2]||''):(TXN_REF_CATS.includes(c)?(r[5]||txnCodeByName(c==='branch_rule'?r[1]:r[0])):''),today,r[3]||'',r[4]==='N'?'N':'Y'])));
   const ok=await clearAndWrite(...W.S10,[H,...rows]);
   toast(ok?'🗂 코드 저장 완료 ✓':'저장 실패 — 로그인 확인',!ok);
-  if(ok){ const bn=document.getElementById('codeBanner'); if(bn) bn.innerHTML='✅ 코드가 시트에 기록되었습니다. 이름을 바꿔도 코드는 그대로입니다.<br>⚠ 이미 저장된 거래·고정비 계획의 이름은 이후 단계(v3.1·v3.2)에서 코드로 이관되기 전까지 옛 이름 그대로 남습니다.'; renderCodes(); }
+  if(ok){ const bn=document.getElementById('codeBanner'); if(bn) bn.innerHTML='✅ 코드가 시트에 기록되었습니다. 이름을 바꿔도 코드는 그대로입니다.<br>⚠ 이미 저장된 거래·고정비 계획·인력 시트의 이름은 「🔁 코드 이관」을 하기 전까지 옛 이름 그대로 남습니다.'; renderCodes(); }
 }
 // v2.9.73 CMN-03 시트 준비 — 확인 창 → 신규 탭 18개·기본 행·기본 코드. 이미 있는 것은 건드리지 않는다.
 async function runSheetPrep(){
@@ -782,8 +787,9 @@ let mig={s10:[],vals:{},manual:{txn:{},fix:{}},plans:{}};
 const migHash=str=>{ let h=5381; for(let i=0;i<str.length;i++) h=((h<<5)+h+str.charCodeAt(i))|0; return h>>>0; };
 // 코드 열을 뺀 나머지 열의 요약(행 수·열별 합계·내용 해시) — 이관 전후 대조용
 function migDigest(values,codeCol,sums){
-  const hdr=(values[0]||[]).map(String), ci=hdr.indexOf(codeCol), n=hdr.length;
-  const keep=hdr.map((h,i)=>i).filter(i=>i!==ci);
+  const hdr=(values[0]||[]).map(String), n=hdr.length;
+  const exCols=Array.isArray(codeCol)?codeCol:[codeCol];   // v3.4.0: 여러 열을 뺄 수 있다(같은 시트의 코드 열들)
+  const keep=hdr.map((h,i)=>i).filter(i=>!exCols.includes(hdr[i]));
   let txt=''; const sm={}; sums.forEach(c=>sm[c]=0);
   for(let r=1;r<values.length;r++){ const row=values[r]||[]; txt+=keep.map(i=>String(row[i]??'')).join('\u0001')+'\u0002'; sums.forEach(c=>{ const x=hdr.indexOf(c); if(x>=0) sm[c]+=num(row[x]); }); }
   return {rows:Math.max(0,values.length-1),hash:migHash(txt),sums:sm};
@@ -860,6 +866,101 @@ async function migRun(){
     }
     res.innerHTML=`<div style="font-weight:700;margin-bottom:4px">${allOk?'이관 완료 — 대조 통과':'이관 결과에 확인이 필요한 항목이 있습니다'}</div>`+lines.join('');
     toast(allOk?'🔁 코드 이관 완료 ✓':'이관 대조 확인 필요',!allOk);
+  }catch(e){ res.innerHTML=`<div style="color:var(--red)">${escAttr(e.message)}</div>`; }
+}
+
+// ── v3.4.0 인력 코드 이관: 인력 시트 9개 열의 이름 → 코드 ──
+let migHr={s10:[],map:null,vals:{},manual:{role:{},industry:{},project_type:{},fail_reason:{}},plans:[]};
+async function migHrLoad(){
+  const s10=await readS10Fresh(); if(s10===null) throw new Error(s10ReadMsg||'설정을 읽을 수 없습니다.');
+  const miss=s10.filter(r=>S10_HR_CODE_CATS.includes(r.category)&&String(r.setting_key||'').trim()&&!r.code_id);
+  if(miss.length) throw new Error(`코드가 없는 인력 코드가 ${miss.length}건 있습니다(예: ${miss[0].setting_key}). 위 「코드 전체 저장」을 먼저 누르세요.`);
+  const vals={}, skipped=[];
+  for(const sh of [...new Set(HR_CODE_COLS.map(c=>c.sheet))]){
+    const v=await fetchSheetSafe(...R[sh]);
+    if(v===null||!v.length){ skipped.push(R[sh][0]); continue; }
+    const limit=parseInt(String(R[sh][1]).split(':')[1].replace(/\D/g,''),10);
+    if(v.length>=limit) throw new Error(`${R[sh][0]} 행이 읽기 범위(${limit}행)를 채워 이관을 중단했습니다.`);
+    vals[sh]=v;
+  }
+  return {s10,vals,skipped};
+}
+// 열마다 계획: 칸별 새 값(코드), 바뀌는 칸 수, 못 찾은 이름
+function migHrPlan(){
+  const map=hrCodeMapOf(migHr.s10); migHr.map=map; const plans=[];
+  HR_CODE_COLS.forEach(c=>{
+    const v=migHr.vals[c.sheet]; if(!v) return; const hdr=(v[0]||[]).map(String), ci=hdr.indexOf(c.col);
+    const p={...c,ci,out:[],changed:0,kept:0,unresolved:{},names:{}};
+    if(ci<0){ p.missing=true; plans.push(p); return; }
+    for(let i=1;i<v.length;i++){
+      const old=String((v[i]||[])[ci]??''); const nv=hrCellToCodes(map,c.cat,old,c.multi,migHr.manual[c.cat]);
+      const normOld=c.multi?old.split(',').map(x=>x.trim()).filter(Boolean).join(','):old.trim();
+      const isCh=nv!==normOld; p.out.push(isCh?nv:old);
+      // 항목별 집계(이름 표시용)
+      (c.multi?old.split(','):[old]).map(x=>x.trim()).filter(Boolean).forEach(x=>{
+        if(HR_CODE_RE.test(x)) return;
+        const one=hrCellToCodes(map,c.cat,x,false,migHr.manual[c.cat]);
+        p.names[x]=(p.names[x]||0)+1; if(!HR_CODE_RE.test(one)) p.unresolved[x]=(p.unresolved[x]||0)+1;
+      });
+      if(isCh) p.changed++; else if(nv) p.kept++;
+    }
+    plans.push(p);
+  });
+  migHr.plans=plans; return plans;
+}
+async function migHrPreview(){
+  const box=document.getElementById('migHrBox'); box.textContent='읽는 중…';
+  try{ const r=await migHrLoad(); migHr.s10=r.s10; migHr.vals=r.vals; migHr.skipped=r.skipped; migHr.manual={role:{},industry:{},project_type:{},fail_reason:{}}; migHrRender(); }
+  catch(e){ box.innerHTML=`<div style="color:var(--red)">${escAttr(e.message)}</div>`; }
+}
+function migHrSetManual(cat,name,code){ if(code) migHr.manual[cat][name]=code; else delete migHr.manual[cat][name]; migHrRender(); }
+function migHrRender(){
+  const box=document.getElementById('migHrBox'); const plans=migHrPlan(); let html='', total=0;
+  if(migHr.skipped&&migHr.skipped.length) html+=`<div style="color:#b45309">읽지 못한 탭(건너뜀): ${migHr.skipped.join(', ')}</div>`;
+  S10_HR_CODE_CATS.forEach(cat=>{
+    const ps=plans.filter(p=>p.cat===cat); if(!ps.length) return;
+    const names={}, unres={}; ps.forEach(p=>{ Object.entries(p.names).forEach(([n,k])=>names[n]=(names[n]||0)+k); Object.entries(p.unresolved).forEach(([n,k])=>unres[n]=(unres[n]||0)+k); });
+    const codes=migHr.s10.filter(r=>r.category===cat&&r.code_id&&String(r.setting_key||'').trim());
+    const ch=ps.reduce((s,p)=>s+p.changed,0); total+=ch;
+    html+=`<div style="font-weight:700;margin:10px 0 4px">${S10_CODE_LABEL[cat]} — ${ps.map(p=>p.sheet+'.'+p.col).join(', ')} · 바뀌는 칸 ${ch}개</div>`;
+    const ent=Object.entries(names).sort((a,b)=>b[1]-a[1]);
+    if(ent.length) html+=`<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:var(--bg)"><th style="text-align:center;padding:4px">이름</th><th style="text-align:center">건수</th><th style="text-align:center">코드</th></tr>`+ent.map(([n,k])=>{
+      const un=unres[n]&&!migHr.manual[cat][n]; const cell=un?`<select data-c="${cat}" data-n="${escAttr(n)}" onchange="migHrSetManual(this.dataset.c,this.dataset.n,this.value)"><option value="">못 찾음 — 선택…</option>${codes.map(c=>`<option value="${escAttr(c.code_id)}">${escAttr(c.setting_key)} (${c.code_id})</option>`).join('')}</select>`:escAttr(hrCellToCodes(migHr.map,cat,n,false,migHr.manual[cat]));
+      return `<tr style="border-top:1px solid var(--border)"><td style="padding:4px">${escAttr(n)}</td><td style="text-align:center">${k}</td><td style="text-align:center">${cell}</td></tr>`; }).join('')+`</table>`;
+    else html+='<div style="color:var(--text3)">바꿀 값이 없습니다.</div>';
+  });
+  html+=`<div style="margin-top:10px"><button class="btn btn-primary" onclick="migHrRun()" ${total?'':'disabled style="opacity:.4"'}>인력 코드 이관 확정 (바뀌는 칸 ${total}개)</button> <small style="color:var(--text3)">못 찾은 이름은 그대로 둡니다.</small></div><div id="migHrResult" style="margin-top:8px"></div>`;
+  box.innerHTML=html;
+}
+async function migHrWriteCol(sheet,ci,out){
+  if(!accessToken){ await signIn(); if(!accessToken) return false; }
+  const L=colLetter(ci+1); const rng=`${R[sheet][0]}!${L}2:${L}${out.length+1}`;
+  const r=await fetch(`${SHEETS_BASE}/values/${encodeURIComponent(rng)}?valueInputOption=RAW`,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:out.map(x=>[x])})});
+  return r.ok;
+}
+async function migHrRun(){
+  const res=document.getElementById('migHrResult');
+  if(!confirm('이 작업은 인력 시트의 역할·업종·프로젝트 유형·실패 사유 칸의 값을 이름에서 코드로 바꿉니다.\n시트 사본을 만들어 두셨나요? 진행할까요?')) return;
+  res.textContent='이관 중…';
+  try{
+    const r=await migHrLoad(); migHr.s10=r.s10; migHr.vals=r.vals; migHr.skipped=r.skipped;   // 확정 직전에 다시 읽는다
+    const plans=migHrPlan(); const lines=[]; let allOk=true;
+    for(const p of plans){
+      const label=`${p.sheet}.${p.col}`;
+      if(p.missing){ lines.push(`<div style="color:#b45309">${label}: 시트에 그 열이 없어 건너뜀</div>`); continue; }
+      if(!p.changed){ lines.push(`<div>✓ ${label}: 바꿀 칸 없음</div>`); continue; }
+      const sheetCols=HR_CODE_COLS.filter(c=>c.sheet===p.sheet).map(c=>c.col);
+      const beforeD=migDigest(migHr.vals[p.sheet],sheetCols,[]);
+      const ok=await migHrWriteCol(p.sheet,p.ci,p.out);
+      if(!ok){ allOk=false; lines.push(`<div style="color:var(--red)">✗ ${label}: 쓰기 실패 — 시트 사본으로 확인하세요.</div>`); continue; }
+      const after=await fetchSheetSafe(...R[p.sheet]); const d=migDigest(after,sheetCols,[]);
+      const got=after.slice(1).map(row=>String((row||[])[p.ci]??'')); const want=p.out;
+      const same=d.rows===beforeD.rows&&d.hash===beforeD.hash; const colOk=want.length===got.length&&want.every((w,i)=>String(w)===got[i]);
+      const good=same&&colOk; if(!good) allOk=false;
+      lines.push(`<div style="color:${good?'inherit':'var(--red)'}">${good?'✓':'✗'} ${label}: 바뀐 칸 ${p.changed}개 · 행 수 ${beforeD.rows}→${d.rows} · 다른 열 내용 ${same?'동일':'<b>다름</b>'} · 이 열 값 ${colOk?'계획과 일치':'<b>계획과 다름</b>'}</div>`);
+    }
+    res.innerHTML=`<div style="font-weight:700;margin-bottom:4px">${allOk?'인력 코드 이관 완료 — 대조 통과':'확인이 필요한 항목이 있습니다'}</div>`+lines.join('');
+    toast(allOk?'🔁 인력 코드 이관 완료 ✓':'이관 대조 확인 필요',!allOk);
   }catch(e){ res.innerHTML=`<div style="color:var(--red)">${escAttr(e.message)}</div>`; }
 }
 

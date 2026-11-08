@@ -324,3 +324,35 @@ function resolveCodeNames(s10rows,details,plans){
   (plans||[]).forEach(f=>{ const n=fx.get(String(f.item_code||'').trim()); if(n) f.category=n; });
   return tt.get('TT-S05')||'';
 }
+
+// ── v3.4.0 인력 코드: 역할·업종·프로젝트 유형·실패 사유 — 인력 시트 9개 열에 이름 대신 코드(RL-001 …)를 저장하고 읽을 때 현재 이름으로 해석한다 ──
+// 열 목록은 S10_CODE_USAGE(코드 삭제 때 사용 건수를 세는 위치)와 같다: [{cat,sheet,col,multi}]
+const HR_CODE_COLS=S10_HR_CODE_CATS.flatMap(cat=>(S10_CODE_USAGE[cat]||[]).map(([sheet,col,multi])=>({cat,sheet,col,multi})));
+const HR_CODE_RE=/^(RL|IN|PT|FR)-\d+$/;
+// S10 행 → {코드군:{byName,byCode}}. 사용 중지 코드도 포함(과거 기록 해석용). code_id 가 없는 행은 제외
+function hrCodeMapOf(s10rows){
+  const m={}; S10_HR_CODE_CATS.forEach(c=>m[c]={byName:new Map(),byCode:new Map()});
+  (s10rows||[]).forEach(r=>{ const e=m[r.category]; if(!e) return; const n=String(r.setting_key||'').trim(), id=String(r.code_id||'').trim(); if(n&&id){ e.byName.set(n,id); e.byCode.set(id,n); } });
+  return m;
+}
+// 한 칸(쉼표 목록일 수 있음)의 이름 → 코드. 이미 코드이거나 못 찾으면 그대로. manual: {이름:코드}
+function hrCellToCodes(map,cat,v,multi,manual){
+  const e=map&&map[cat]; if(!e) return v;
+  const one=x=>{ const n=String(x??'').trim(); if(!n||HR_CODE_RE.test(n)) return n; if(manual&&manual[n]) return manual[n];
+    const c=e.byName.get(n); if(c) return c; const z=n.replace(/\s+/g,''); for(const [k,id] of e.byName) if(k.replace(/\s+/g,'')===z) return id; return n; };
+  return multi?String(v??'').split(',').map(one).filter(x=>x!=='').join(','):one(v);
+}
+// 코드 → 현재 이름. 코드가 아니거나 못 찾으면 그대로
+function hrCellToNames(map,cat,v,multi){
+  const e=map&&map[cat]; if(!e) return v;
+  const one=x=>{ const n=String(x??'').trim(); return (HR_CODE_RE.test(n)&&e.byCode.get(n))||n; };
+  return multi?String(v??'').split(',').map(one).filter(x=>x!=='').join(','):one(v);
+}
+// 읽은 행 객체 목록/쓸 객체를 변환(제자리). dir: 'names'(읽기) | 'codes'(쓰기)
+function hrApplyCodeCols(sheet,rows,map,dir){
+  if(!map) return rows;
+  HR_CODE_COLS.filter(c=>c.sheet===sheet).forEach(c=>{
+    (rows||[]).forEach(r=>{ if(r[c.col]===undefined||r[c.col]==='') return; r[c.col]=dir==='codes'?hrCellToCodes(map,c.cat,r[c.col],c.multi):hrCellToNames(map,c.cat,r[c.col],c.multi); });
+  });
+  return rows;
+}
