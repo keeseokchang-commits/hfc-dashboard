@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HFC 고정비 계획</title>
-<link rel="stylesheet" href="css/common.css?v=3.2.0">
+<link rel="stylesheet" href="css/common.css?v=3.3.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -172,11 +172,11 @@
 </div></div>
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="js/schema.js?v=3.2.0"></script>
-<script src="js/common.js?v=3.2.0"></script>
-<script src="js/auth.js?v=3.2.0"></script>
-<script src="js/calc.js?v=3.2.0"></script>
-<script src="js/nav.js?v=3.2.0"></script>
+<script src="js/schema.js?v=3.3.0"></script>
+<script src="js/common.js?v=3.3.0"></script>
+<script src="js/auth.js?v=3.3.0"></script>
+<script src="js/calc.js?v=3.3.0"></script>
+<script src="js/nav.js?v=3.3.0"></script>
 <script>
 var fcv=v=>String(v).replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
 var unv=v=>parseInt(String(v).replace(/,/g,''))||0;
@@ -193,6 +193,7 @@ async function loadAll(){
   fixedAll=dedupe(toObj(fxR).filter(x=>x.fixed_id),'fixed_id');
   s10All=toObj(stR);
   detailAll=dedupe(toObj(dtR).filter(t=>t.txn_id),'txn_id');
+  resolveCodeNames(s10All,detailAll,fixedAll);   // v3.3.0: 코드 → 현재 이름
   // v2.9.40: 필드명 불일치 결함 수정 — S10은 setting_key/setting_value 헤더인데 r.key를 참조해
   // 코드 관리 화면(③고정비 항목)에서 등록한 항목이 이 자동완성 목록에 절대 반영되지 못하고
   // 항상 하드코딩 기본값만 보이던 결함(전수조사로 발견).

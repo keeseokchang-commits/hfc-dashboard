@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 월마감 리포트</title>
-<link rel="stylesheet" href="css/common.css?v=3.2.0">
+<link rel="stylesheet" href="css/common.css?v=3.3.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -151,12 +151,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.2.0"></script>
-<script src="js/common.js?v=3.2.0"></script>
-<script src="js/auth.js?v=3.2.0"></script>
-<script src="js/calc.js?v=3.2.0"></script>
-<script src="js/payout.js?v=3.2.0"></script>
-<script src="js/nav.js?v=3.2.0"></script>
+<script src="js/schema.js?v=3.3.0"></script>
+<script src="js/common.js?v=3.3.0"></script>
+<script src="js/auth.js?v=3.3.0"></script>
+<script src="js/calc.js?v=3.3.0"></script>
+<script src="js/payout.js?v=3.3.0"></script>
+<script src="js/nav.js?v=3.3.0"></script>
 <script>
 let cutoff='',showDone=false;
 let D={},s10=[],skips={},items=[],okPrj=new Set(),prjName={},csvBal=null,usedCsv=false;
@@ -175,7 +175,8 @@ async function loadAll(){
     D.cost=dedupe(toObj(csR).filter(c=>c.cost_id),'cost_id').filter(c=>okPrj.has(c.project_id));
     D.fix=toObj(fxR||[]).filter(f=>f.fixed_id); D.vat=toObj(vtR||[]).filter(v=>v.vat_id);
     D.detail=dedupe(toObj(dtR).filter(r=>r.txn_id),'txn_id');
-    s10=toObj(stR); const settings={}; s10.forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
+    s10=toObj(stR); { const cn=resolveCodeNames(s10,D.detail,D.fix); if(cn&&typeof calcSetCardName==='function') calcSetCardName(cn); }   // v3.3.0: 코드 → 현재 이름
+    const settings={}; s10.forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
     D.settings=settings; cutoff=(s10.find(r=>r.setting_key==='report_cutoff')||{}).setting_value||''; skips={}; s10.filter(r=>r.category==='report_skip').forEach(r=>skips[r.setting_key.replace(/^rskip:/,'')]=r.setting_value);
     const est=toObj(esR).filter(e=>e.estimate_id); D.po=poR?toObj(poR).filter(r=>r.payout_id):[];
     const plan=poBuildPlan(prjOk,est,D.po,okPrj); D.poCosts=plan.costs; D.fallback=plan.fallbackProjects;

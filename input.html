@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.2.0">
+<link rel="stylesheet" href="css/common.css?v=3.3.0">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -243,11 +243,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.2.0"></script>
-<script src="js/common.js?v=3.2.0"></script>
-<script src="js/auth.js?v=3.2.0"></script>
-<script src="js/calc.js?v=3.2.0"></script>
-<script src="js/nav.js?v=3.2.0"></script>
+<script src="js/schema.js?v=3.3.0"></script>
+<script src="js/common.js?v=3.3.0"></script>
+<script src="js/auth.js?v=3.3.0"></script>
+<script src="js/calc.js?v=3.3.0"></script>
+<script src="js/nav.js?v=3.3.0"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -284,6 +284,9 @@ async function loadAll(){
     pipelines=toObj(plR); allPrjs=toObj(prR);
     const pls=pipelines, prjs=allPrjs;
     revenues=dedupe(toObj(rvR),'revenue_id'); costs=dedupe(toObj(csR),'cost_id'); fixed=dedupe(toObj(fxR),'fixed_id');
+    { const s10x=toObj(s10R||[]); resolveCodeNames(s10x,[],fixed);   // v3.3.0: 코드 → 현재 이름, 항목 선택칸은 설정의 사용 중 항목
+      const names=s10x.filter(r=>r.category==='fixed_item'&&String(r.setting_key||'').trim()&&codeIsActive(r)).map(r=>String(r.setting_key).trim());
+      const sel=document.getElementById('fix_category'); if(sel&&names.length) sel.innerHTML=names.map(n=>`<option>${n.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join(''); }
     // 재무 반영 필터: S01 수주·계약·종료 → 연결 PRJ
     const okPl=new Set(pls.filter(p=>['수주','계약','종료'].includes(p.status)).map(p=>p.pipeline_id));
     financePrjs=prjs.filter(p=>okPl.has(p.pipeline_id));
@@ -390,7 +393,7 @@ const H4=['revenue_id','project_id','year_month','tax_invoice_amt','cash_recv_am
 const H5=['cost_id','project_id','year_month','cost_type','person_name','unit_price','mm','amount','payment_date','memo','vat_amt','invoice_plan_date','invoice_date','matched_txn_id','pay_actual_date'];
 function editFix(id){const f=fixed.find(x=>x.fixed_id===id);if(!f)return;
   document.getElementById('fix_id').value=id;document.getElementById('fix_ym').value=f.year_month;
-  document.getElementById('fix_category').value=f.category||'기타비용';document.getElementById('fix_amount').value=comma(f.amount);
+  document.getElementById('fix_category').value=f.category||'';document.getElementById('fix_amount').value=comma(f.amount);
   document.getElementById('fix_date').value=f.payment_date||'';document.getElementById('fix_memo').value=f.memo||'';
   window.scrollTo({top:0,behavior:'smooth'});}
 function resetFix(){['fix_id','fix_amount','fix_date','fix_memo'].forEach(i=>document.getElementById(i).value='');}

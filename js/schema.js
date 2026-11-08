@@ -306,5 +306,21 @@ function planCodeMigration(values,nameCol,codeCol,resolve,manual){
 }
 // 저장 직전, 이름이 코드로 풀리는 행의 코드를 이름에 맞춰 둔다(이름이 진실인 동안 — 3단계 전). 풀리지 않으면 기존 코드를 둔다.
 function syncCodes(list,nameField,codeField,s10rows,cat){
-  (list||[]).forEach(r=>{ const m=codeOfName(s10rows,cat,r[nameField]); if(m) r[codeField]=m.code; });
+  (list||[]).forEach(r=>{
+    const m=codeOfName(s10rows,cat,r[nameField]); if(m){ r[codeField]=m.code; return; }
+    // 이름이 풀리지 않을 때: 기존 코드의 현재 이름과 같으면(수동 지정 등) 유지, 다르면(사용자가 이름을 고쳐 쓴 것) 코드를 비운다
+    const c=String(r[codeField]||'').trim(); if(!c) return;
+    const cur=(s10rows||[]).find(x=>x.category===cat&&x.code_id===c);
+    if(!cur||String(cur.setting_key||'').trim()!==String(r[nameField]||'').trim()) r[codeField]='';
+  });
+}
+
+// v3.2/3.3: 데이터를 읽는 경계에서 코드를 설정의 현재 이름으로 해석한다(거래 type_code → 현재 유형 이름, 고정비 item_code → 현재 항목 이름).
+// 코드가 없거나 못 찾으면 이름 그대로. 반환: 법인카드(TT-S05)의 현재 이름(법인카드 월 예산 판별용).
+function resolveCodeNames(s10rows,details,plans){
+  const mp=cat=>new Map((s10rows||[]).filter(r=>r.category===cat&&r.code_id).map(r=>[r.code_id,String(r.setting_key||'').trim()]));
+  const tt=mp('txn_type'), fx=mp('fixed_item');
+  (details||[]).forEach(t=>{ const n=tt.get(String(t.type_code||'').trim()); if(n) t.category=n; });
+  (plans||[]).forEach(f=>{ const n=fx.get(String(f.item_code||'').trim()); if(n) f.category=n; });
+  return tt.get('TT-S05')||'';
 }
