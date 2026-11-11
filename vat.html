@@ -4,8 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.7.3">
+<link rel="stylesheet" href="css/common.css?v=3.8.0">
 <style>
+  @media(max-width:480px){#declBox .fr{grid-template-columns:1fr}}
+  #declBox .fi{height:38px;box-sizing:border-box}
+  #declBox .fl{white-space:normal}
+
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
@@ -86,6 +90,17 @@
     <table class="detail-table" id="salesTable"></table>
     <div style="font-size:12px;font-weight:600;color:var(--text2);margin:14px 0 6px">매입 부가세 내역</div>
     <table class="detail-table" id="purchaseTable"></table>
+    <div id="declBox" style="margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">신고서 입력 <span style="font-weight:400;color:var(--text3)">(홈택스 신고서 기준)</span></div>
+      <div class="fr">
+        <div id="dFilingWrap"><label class="fl">신고 방식 (예정)</label><select class="fi" id="dFiling"><option value="신고">직접 신고</option><option value="고지">예정고지(세무서 고지)</option></select></div>
+        <div><label class="fl">그 밖의 공제매입세액 (원)</label><input class="fi" id="dOther" inputmode="numeric" oninput="this.value=comma(this.value)"></div>
+        <div id="dCarryWrap"><label class="fl">예정 미환급·기납부 차감 (원)</label><input class="fi" id="dCarry" inputmode="numeric" oninput="this.value=comma(this.value)"></div>
+        <div><label class="fl">신고서 최종 납부세액 (원, 환급은 − 로 입력)</label><input class="fi" id="dDeclared" inputmode="numeric" oninput="fmtSigned(this)"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">그 밖의 공제매입세액은 신고서 (15)번 금액(카드·현금영수증 등)입니다. 예정고지는 7~9월 실적을 신고하지 않고 고지액만 내는 방식이며, 확정에서 반기 전체를 신고하고 이미 낸 고지액을 차감합니다. 비워 두면 자동 계산합니다.</div>
+      <div class="btn-row"><button class="btn btn-primary" id="btnSaveDecl" onclick="saveDecl()">신고서 입력 저장</button></div>
+    </div>
     <div style="margin-top:16px">
       <div class="fr">
         <div><label class="fl">실납부액 (원)</label><input class="fi" id="actualPay" inputmode="numeric" oninput="this.value=comma(this.value)"></div>
@@ -102,11 +117,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.7.3"></script>
-<script src="js/common.js?v=3.7.3"></script>
-<script src="js/auth.js?v=3.7.3"></script>
-<script src="js/calc.js?v=3.7.3"></script>
-<script src="js/nav.js?v=3.7.3"></script>
+<script src="js/schema.js?v=3.8.0"></script>
+<script src="js/common.js?v=3.8.0"></script>
+<script src="js/auth.js?v=3.8.0"></script>
+<script src="js/calc.js?v=3.8.0"></script>
+<script src="js/nav.js?v=3.8.0"></script>
 <script>
 let vats=[],revs=[],costs=[],fixedTax=[],prjMap={},selQ=null;
 let vatYear=Number(kstToday().slice(0,4));
@@ -118,7 +133,7 @@ function buildQ(y){
   '2F':{name:'2기 확정',months:[y+'-10',y+'-11',y+'-12'],due:n+'-01-25',payYm:n+'-01'}};
 }
 let QINFO=buildQ(vatYear);
-function findV(code){return vats.find(x=>x.quarter_code===code&&String(x.year||'2026')===String(vatYear));}
+function findV(code,y){y=y==null?vatYear:y;return vats.find(x=>x.quarter_code===code&&String(x.year||'2026')===String(y));}
 function lastDay(ym){const [y,m]=ym.split('-').map(Number);return ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');}
 function setVatYear(y){vatYear=Number(y);QINFO=buildQ(vatYear);selQ=null;document.getElementById('detailCard').style.display='none';renderQuarters();}
 
@@ -151,8 +166,15 @@ function vatOf(r,base){
   if(raw!=='') return num(r.vat_amt);
   return Math.round((parseInt(r[base])||0)*.1);
 }
-function calcQ(code){
-  const q=QINFO[code];
+// ── v3.8.0 부가세 신고 방식(신고/고지)·신고서 숫자 반영 (설계서 vat-declaration-design-v0.1) ─────────
+const QORD=['1P','1F','2P','2F'];
+function hasVal(x){return String(x??'').trim()!=='';}
+function isLocked(v){return !!v&&v.status==='납부완료';}
+// 예정 분기의 신고 방식. 확정 분기는 항상 직접 신고. 비어 있으면 「신고」(구 행 호환)
+function ftOf(code,y){ if(code[1]!=='P') return '신고'; const v=findV(code,y); return v&&v.filing_type==='고지'?'고지':'신고'; }
+// 분기 자체의 매출·매입(S04·S05·고정비) 집계 — 기존 계산 그대로
+function baseQ(code,y){
+  const q=buildQ(y)[code];
   const sRows=revs.filter(r=>q.months.includes(r.year_month));
   const pRows=costs.filter(c=>q.months.includes(c.year_month));
   // v2.9.22: 프로젝트 매입(S05)에 안 걸리는 기타경비(임대료·통신비 등) 중 세금계산서 수취분을 매입세액에 합산.
@@ -160,8 +182,53 @@ function calcQ(code){
   const sVat=sRows.reduce((s,r)=>s+vatOf(r,'tax_invoice_amt'),0);
   const pVatPrj=pRows.reduce((s,c)=>s+vatOf(c,'amount'),0);
   const pVatFx=fxRows.reduce((s,f)=>s+(num(f.vat_amt)||0),0);
-  const pVat=pVatPrj+pVatFx;
-  return {sVat,pVat,pVatPrj,pVatFx,pay:Math.max(0,sVat-pVat),sRows,pRows,fxRows};
+  return {sVat,pVat:pVatPrj+pVatFx,pVatPrj,pVatFx,sRows,pRows,fxRows};
+}
+// 그 밖의 공제매입세액(카드·현금영수증 등): 입력값 우선, 없으면 직전 분기 입력값으로 예상(납부완료 분기는 예상 안 함)
+function otherOf(code,y){
+  const v=findV(code,y);
+  if(v&&hasVal(v.other_deduct_vat)) return {val:num(v.other_deduct_vat),est:false};
+  if(isLocked(v)) return {val:0,est:false};
+  let i=QORD.indexOf(code),yy=y;
+  for(let k=0;k<4;k++){ i--; if(i<0){i=3;yy--;} const pv=findV(QORD[i],yy);
+    if(pv&&hasVal(pv.other_deduct_vat)&&num(pv.other_deduct_vat)>0) return {val:num(pv.other_deduct_vat),est:true}; }
+  return {val:0,est:false};
+}
+// 신고서 기준 분기 세액(매출−매입−카드 등). 납부완료 분기는 신고 시점 저장값 사용
+function effQ(code,y){
+  const v=findV(code,y),b=baseQ(code,y),o=otherOf(code,y),locked=isLocked(v);
+  const s=locked?(num(v.sales_vat)||0):b.sVat, p=locked?(num(v.purchase_vat)||0):b.pVat;
+  return {b,o,locked,s,p,net:s-p-o.val};
+}
+// 예정고지 예상액: 직전 반기 세액 합계의 1/2, 천원 미만 버림, 50만원 미만이면 소액부징수 0. 실제 고지액은 납부 입력으로 덮어쓴다
+function noticeEst(code,y){
+  const h=code[0];
+  const a=h==='1'?effQ('2P',y-1):effQ('1P',y), c=h==='1'?effQ('2F',y-1):effQ('1F',y);
+  const t=a.net+c.net; if(t<=0) return 0;
+  const e=Math.floor(t/2/1000)*1000; return e<500000?0:e;
+}
+function calcQ(code,y){
+  y=y==null?vatYear:y;
+  const e=effQ(code,y),b=e.b,o=e.o,v=findV(code,y)||{};
+  const isP=code[1]==='P',ft=ftOf(code,y);
+  let net=e.net,deduct=0,deductNote='',scope='분기',notice=0,pay=0,refund=0,carryAuto=0;
+  if(isP){
+    if(ft==='고지'){ notice=noticeEst(code,y); pay=notice; scope='고지'; }
+    else { pay=Math.max(0,net); refund=Math.max(0,-net); }
+  }else{
+    const pc=code[0]+'P',pft=ftOf(pc,y),pe=effQ(pc,y),pv=findV(pc,y)||{};
+    if(pft==='고지'){
+      scope='반기'; net=pe.net+e.net;
+      carryAuto=(isLocked(pv)&&num(pv.actual_payment))?num(pv.actual_payment):noticeEst(pc,y);
+      deductNote='예정고지 기납부';
+    }else{
+      carryAuto=Math.max(0,-pe.net); deductNote='예정신고 미환급';
+    }
+    deduct=hasVal(v.carry_offset)?num(v.carry_offset):carryAuto;
+    const r=net-deduct; pay=Math.max(0,r); refund=Math.max(0,-r);
+  }
+  return {sVat:b.sVat,pVat:b.pVat,pVatPrj:b.pVatPrj,pVatFx:b.pVatFx,sRows:b.sRows,pRows:b.pRows,fxRows:b.fxRows,
+    other:o.val,otherEst:o.est,net,deduct,deductNote,scope,ft,notice,pay,refund,carryAuto};
 }
 function renderQuarters(){
   const ys=document.getElementById('vatYearSel');
@@ -174,23 +241,27 @@ function renderQuarters(){
     // 부가세는 실제로 세무서에 신고·납부하는 금액이라, 확정 후 화면 숫자가 조용히 바뀌어 보이면
     // 신고 오류로 오인하거나 실제 오류를 놓칠 위험이 있어 자금수지보다 엄격하게 잠근다.
     const locked=v.status==='납부완료';
-    const dSVat=locked?(num(v.sales_vat)||0):c.sVat, dPVat=locked?(num(v.purchase_vat)||0):c.pVat;
+    const dSVat=locked?(num(v.sales_vat)||0):c.sVat, dPVatInv=locked?(num(v.purchase_vat)||0):c.pVat, dPVat=dPVatInv+c.other;
     // v2.9.70: 납부완료 분기는 "실납부액"과 "시스템 예상액(estimated_payment, 신고 시점 스냅샷)"을
     // 같이 보여준다 — 차이는 시스템에 등록되지 않은 세금계산서분을 가늠하는 지표.
     const dPay=locked?(num(v.actual_payment)||num(v.estimated_payment)||0):c.pay;
     const dEst=locked?(num(v.estimated_payment)||0):0;
     const dDiffAmt=locked&&dEst?dPay-dEst:0;
-    const diffLine=locked&&dEst?`<div style="font-size:10px;color:var(--text3);margin-top:2px">시스템 예상 ${wf(dEst)} · 차이 <b style="color:${dDiffAmt===0?'var(--text3)':'#B45309'}">${dDiffAmt>0?'+':''}${wf(dDiffAmt)}</b></div>`:'';
-    const changed=locked&&(dSVat!==c.sVat||dPVat!==c.pVat);
+    const decl=hasVal(v.declared_tax)?num(v.declared_tax):null;
+    const declLine=decl!==null?`<div style="font-size:10px;color:var(--text3);margin-top:2px">신고서 최종 ${decl<0?'환급 '+wf(-decl):'납부세액 '+wf(decl)}</div>`:'';
+    const ftBadge=q.name.includes('예정')&&c.ft==='고지'?' <span style="font-size:10px;font-weight:600;color:#B45309;background:#FEF3C7;border-radius:6px;padding:1px 6px">예정고지</span>':'';
+    const diffLine=locked&&dEst?`<div style="font-size:10px;color:var(--text3);margin-top:2px">시스템 예상 ${wf(dEst)} · 차이 <b style="color:${dDiffAmt===0?'var(--text3)':'#B45309'}">${dDiffAmt>0?'+':''}${wf(dDiffAmt)}</b></div>`+declLine:declLine;
+    const changed=locked&&(dSVat!==c.sVat||dPVatInv!==c.pVat);
+    const scopeLine=!locked&&code[1]==='F'&&c.scope==='반기'?`<div style="font-size:10px;color:var(--text3);margin-top:2px">${code[0]==='1'?'1~6월':'7~12월'} 합산 세액 ${wf(c.net)} − 고지 기납부 ${wf(c.deduct)}</div>`:(!locked&&code[1]==='F'&&c.deduct?`<div style="font-size:10px;color:var(--text3);margin-top:2px">${c.deductNote} ${wf(c.deduct)} 차감</div>`:'');
     const st=v.status==='납부완료'?'b-done':(c.sVat||c.pVat)?'b-wait':'b-calc';
     const stTxt=v.status==='납부완료'?'납부완료':(c.sVat||c.pVat)?'납부예정':'집계중';
     return `<div class="q-card ${selQ===code?'sel':''}" onclick="selectQ('${code}')">
-      <div class="q-head"><span class="q-name">${q.name} <span style="font-weight:400;font-size:11px;color:var(--text3)">(${q.months[0].slice(5)}~${q.months[2].slice(5)}월)</span></span>
+      <div class="q-head"><span class="q-name">${q.name} <span style="font-weight:400;font-size:11px;color:var(--text3)">(${q.months[0].slice(5)}~${q.months[2].slice(5)}월)</span>${ftBadge}</span>
         <span class="badge ${st}">${stTxt}</span></div>
       <div class="q-nums">
         <div><div class="lbl">매출 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dSVat)}</div></div>
-        <div><div class="lbl">매입 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dPVat)}</div>${!locked&&c.pVatFx?`<div style="font-size:10px;color:var(--text3);margin-top:2px">프로젝트 ${wf(c.pVatPrj)} + 기타경비 ${wf(c.pVatFx)}</div>`:''}</div>
-        <div><div class="lbl">${locked?'실납부액':'납부 예정액'}</div><div class="val pay">${wf(dPay)}</div>${diffLine}</div>
+        <div><div class="lbl">매입 부가세${locked?' (신고 확정)':''}</div><div class="val">${wf(dPVat)}</div>${!locked&&(c.pVatFx||c.other)?`<div style="font-size:10px;color:var(--text3);margin-top:2px">프로젝트 ${wf(c.pVatPrj)} + 기타경비 ${wf(c.pVatFx)}${c.other?` + 카드 등 ${wf(c.other)}${c.otherEst?'(직전 분기 기준 예상)':''}`:''}</div>`:(locked&&c.other?`<div style="font-size:10px;color:var(--text3);margin-top:2px">세금계산서 ${wf(dPVatInv)} + 카드 등 ${wf(c.other)}</div>`:'')}</div>
+        <div><div class="lbl">${locked?'실납부액':'납부 예정액'}</div><div class="val pay">${!locked&&!c.pay&&c.refund?`<span style="color:#059669">환급 ${wf(c.refund)}</span>`:wf(dPay)}</div>${scopeLine}${diffLine}</div>
       </div>
       <div class="q-due" style="margin-top:8px">신고·납부 기한 ${q.due}${v.paid_date?' · 납부일 '+v.paid_date:''}${v.cashflow_reflected==='Y'?' · 자금수지 반영 ✓':''}</div>
       ${changed?`<div style="margin-top:8px;padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:11px;color:#991B1B">⚠ 신고 이후 이 분기의 매출·매입 내역이 변경되었습니다(현재 기준 재계산 시 매출 ${wf(c.sVat)}·매입 ${wf(c.pVat)}). 실제 신고 내용과 다른 경우 수정신고 필요 여부를 확인하세요.</div>`:''}
@@ -205,10 +276,31 @@ function selectQ(code){
   const lockedD=vv.status==='납부완료';
   const estD=lockedD?(num(vv.estimated_payment)||c.pay):c.pay;
   const actD=lockedD?(num(vv.actual_payment)||0):0;
-  document.getElementById('payFormula').innerHTML=
-    `시스템 예상 납부액 = 매출 VAT ${wf(lockedD?num(vv.sales_vat):c.sVat)} − 매입 VAT ${wf(lockedD?num(vv.purchase_vat):c.pVat)} = <b>${wf(estD)}</b>`
-    +(lockedD&&actD?`<br>실납부액 <b>${wf(actD)}</b> · 차이 <b>${actD-estD>0?'+':''}${wf(actD-estD)}</b> (시스템에 등록되지 않은 세금계산서분 등)`:'')
+  const oTxt=c.other?` − 카드 등 공제매입 ${wf(c.other)}${c.otherEst?'(직전 분기 기준 예상)':''}`:'';
+  let f;
+  if(lockedD){
+    f=`시스템 예상 납부액 = 매출 VAT ${wf(num(vv.sales_vat))} − 매입 VAT ${wf(num(vv.purchase_vat))} = <b>${wf(estD)}</b>`
+     +(actD?`<br>실납부액 <b>${wf(actD)}</b> · 차이 <b>${actD-estD>0?'+':''}${wf(actD-estD)}</b> (카드 등 공제매입·예정 환급·미등록 세금계산서분 등)`:'');
+  }else if(code[1]==='P'&&c.ft==='고지'){
+    f=`예정고지 예상액 = 직전 반기 세액 합계 ÷ 2 (천원 미만 버림) = <b>${wf(c.notice)}</b><br><span style="color:var(--text3)">이 분기 실적 세액(참고): 매출 ${wf(c.sVat)} − 매입 ${wf(c.pVat)}${oTxt} = ${wf(c.net)}. 실제 고지서 금액은 아래 [실납부액]에 입력하세요.</span>`;
+  }else if(code[1]==='F'){
+    f=`${c.scope==='반기'?(code[0]==='1'?'1~6월':'7~12월')+' 합산 ':''}세액 = 매출 VAT − 매입 VAT${c.other?' − 카드 등 공제매입':''} = ${wf(c.net)}`
+     +(c.deduct?`<br>${c.deductNote} ${wf(c.deduct)} 차감`:'')+`<br>시스템 예상 납부액 = <b>${c.pay?wf(c.pay):(c.refund?'환급 '+wf(c.refund):wf(0))}</b>`;
+  }else{
+    f=`시스템 예상 납부액 = 매출 VAT ${wf(c.sVat)} − 매입 VAT ${wf(c.pVat)}${oTxt} = <b>${c.pay?wf(c.pay):(c.refund?'환급 '+wf(c.refund):wf(0))}</b>`;
+  }
+  document.getElementById('payFormula').innerHTML=f
     +`<br>자금수지 추정에는 <b>시스템 예상액</b>이 ${q.payYm} 현금 유출로 반영됩니다. 실제 납부액은 통장 CSV의 세금 출금으로 확인합니다.`;
+  // 신고서 입력 칸 채우기
+  const isP=code[1]==='P';
+  document.getElementById('dFilingWrap').style.display=isP?'':'none';
+  document.getElementById('dCarryWrap').style.display=isP?'none':'';
+  document.getElementById('dFiling').value=c.ft;
+  document.getElementById('dOther').value=hasVal(vv.other_deduct_vat)?comma(vv.other_deduct_vat):'';
+  document.getElementById('dOther').placeholder=c.otherEst?'비움 = 직전 분기 기준 예상 '+comma(c.other):'비움 = 0원(미입력)';
+  document.getElementById('dCarry').value=hasVal(vv.carry_offset)?comma(vv.carry_offset):'';
+  document.getElementById('dCarry').placeholder='비움 = 자동 '+comma(c.carryAuto)+(c.deductNote?' ('+c.deductNote+')':'');
+  document.getElementById('dDeclared').value=hasVal(vv.declared_tax)?(num(vv.declared_tax)<0?'-':'')+comma(Math.abs(num(vv.declared_tax))):'';
   const sT=document.getElementById('salesTable');
   sT.innerHTML='<tr><th>월 / 프로젝트</th><th>공급가액</th><th>부가세</th></tr>'+
     (c.sRows.length?c.sRows.map(r=>`<tr><td>${r.year_month.slice(5)}월 ${prjMap[r.project_id]||r.project_id}</td><td>${wf(r.tax_invoice_amt)}</td><td>${wf(vatOf(r,'tax_invoice_amt'))}</td></tr>`).join('')
@@ -224,7 +316,7 @@ function selectQ(code){
   document.getElementById('paidDate').value=v.paid_date||'';
   document.getElementById('detailCard').scrollIntoView({behavior:'smooth'});
 }
-const H13=['vat_id','year','quarter_code','period_start','period_end','due_date','sales_vat','purchase_vat','estimated_payment','actual_payment','paid_date','cashflow_reflected','status','memo'];
+const H13=['vat_id','year','quarter_code','period_start','period_end','due_date','sales_vat','purchase_vat','estimated_payment','actual_payment','paid_date','cashflow_reflected','status','memo','filing_type','other_deduct_vat','carry_offset','declared_tax']; // v3.8.0: O~R
 async function saveS13(){
   vats=dedupe(vats,'vat_id'); // PK 무결성 규칙
   const rows=rowsFor(H13,vats);
@@ -241,6 +333,22 @@ function upsertVat(code,patch){
   // 덮어써 "시스템 예상액"이 사라졌다.
   if(!(v.status==='납부완료'&&num(v.estimated_payment))){v.sales_vat=c.sVat;v.purchase_vat=c.pVat;v.estimated_payment=c.pay;}
   Object.assign(v,patch);return v;
+}
+function fmtSigned(el){const neg=/^\s*-/.test(el.value);const d=el.value.replace(/[^0-9]/g,'');el.value=d?(neg?'-':'')+Number(d).toLocaleString():(neg?'-':'');}
+async function saveDecl(){
+  if(!selQ){toast('분기를 선택하세요',true);return;}
+  const g=id=>document.getElementById(id).value.trim();
+  const sv=t=>t===''||t==='-'?'':(t.startsWith('-')?-1:1)*un(t.replace('-',''));
+  const patch={other_deduct_vat:g('dOther')===''?'':un(g('dOther')),declared_tax:sv(g('dDeclared'))};
+  if(selQ[1]==='P') patch.filing_type=document.getElementById('dFiling').value;
+  else patch.carry_offset=g('dCarry')===''?'':un(g('dCarry'));
+  const btn=document.getElementById('btnSaveDecl');btn.disabled=true;
+  // 저장 실패 시 화면의 로컬 상태를 되돌린다(저장 성공 시에만 반영)
+  const had=findV(selQ),copy=had?{...had}:null,len=vats.length;
+  upsertVat(selQ,patch);
+  const ok=await saveS13();btn.disabled=false;
+  if(ok){toast('✓ 신고서 입력 저장 완료');const k=selQ;renderQuarters();selectQ(k);}
+  else{ if(copy){Object.keys(had).forEach(k=>delete had[k]);Object.assign(had,copy);}else vats.length=len; toast('저장 실패',true); }
 }
 async function savePayment(){
   if(!selQ){toast('분기를 선택하세요',true);return;}

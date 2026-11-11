@@ -14,7 +14,7 @@ const R={ // 읽기 [시트명, 범위]
   S10:['S10_SETTINGS','A1:G300'],
   S11:['S11_GRADE_RATE','A1:H100'],
   S12:['S12_ESTIMATE','A1:W500'],
-  S13:['S13_VAT','A1:N60'],
+  S13:['S13_VAT','A1:R60'],
   S14:['S14_HISTORY','A1:H999'],
   S17:['S17_MILESTONE','A1:D300'],
   S15:['S15_PAYOUT','A1:R3000'],   // v2.9.111 지급 스케줄(계산서 없는 지급: 사업소득·급여·기타경비·원천세·4대보험)
@@ -34,7 +34,7 @@ const W={ // 쓰기 [시트명, 범위]
   S10:['S10_SETTINGS','A:G'],
   S11:['S11_GRADE_RATE','A:H'],
   S12:['S12_ESTIMATE','A:W'],
-  S13:['S13_VAT','A:N'],
+  S13:['S13_VAT','A:R'],
   S14:['S14_HISTORY','A:H'],
   S17:['S17_MILESTONE','A:D'],
   S15:['S15_PAYOUT','A:R'],
@@ -64,7 +64,7 @@ const HEADERS={
   S10:["setting_key", "setting_value", "description", "category", "updated_at", "code_id", "is_active"], // v3.0.0: code_id(F)·is_active(G) 추가 — 코드 기반 키 전환 1단계
   S11:["set_id","set_name","grade","sell_price","buy_price","description","is_default","updated_at"],
   S12:["estimate_id","pipeline_id","comp_type","item_name","grade","grade_set_id","qty","unit_price","buy_price","amount","mm","start_date","end_date","memo","created_at","mm_round","cut_unit","cut_mode","buy_mm_round","buy_cut_unit","buy_cut_mode","mm_mode","buy_mm_mode"],
-  S13:["vat_id","year","quarter_code","period_start","period_end","due_date","sales_vat","purchase_vat","estimated_payment","actual_payment","paid_date","cashflow_reflected","status","memo"],
+  S13:["vat_id","year","quarter_code","period_start","period_end","due_date","sales_vat","purchase_vat","estimated_payment","actual_payment","paid_date","cashflow_reflected","status","memo","filing_type","other_deduct_vat","carry_offset","declared_tax"], // v3.8.0: O~R 신고 방식·카드 등 공제매입세액·예정 미환급 차감·신고서 최종 납부세액
   S14:["hist_id","changed_at","pipeline_id","target","old_value","new_value","reason","source"],
 };
 const ST={PIPELINE:['기회','확정','수주','계약','종료','포기','실주'],FIN:['수주','계약','종료'],GEN:['확정','수주','계약','종료'],REV:['발행대기','발행완료','입금완료'],COST:['수취대기','수취완료','지급완료']};
@@ -78,6 +78,7 @@ const NUMERIC_COLS=new Set([
   'est_inflow','est_outflow','est_vat','est_balance','act_balance','act_inflow','act_outflow',
   'inflow_revenue','outflow_cost','outflow_fixed','outflow_tax','outflow_card','outflow_ai','outflow_etc','inflow_capital','inflow_etc',
   'inflow_amt','outflow_amt','balance','estimated_payment','actual_payment','sales_vat','purchase_vat','diff_amount',
+  'other_deduct_vat','carry_offset','declared_tax', // v3.8.0: 공백(미입력)과 0(입력)을 구분하므로 ZERO_DEFAULT에는 넣지 않는다
   'gross_amt','withheld_amt','ins_emp_amt','employer_amt','net_amt',
   // 수량·비율·순번류
   'probability','qty','mm','career_years','unclassified_cnt','accuracy_pct','sort','year',
