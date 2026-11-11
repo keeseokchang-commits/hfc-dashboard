@@ -17,6 +17,7 @@ const R={ // 읽기 [시트명, 범위]
   S13:['S13_VAT','A1:R60'],
   S14:['S14_HISTORY','A1:H999'],
   S17:['S17_MILESTONE','A1:D300'],
+  S18:['S18_PROJECT_CHANGE','A1:Q500'],   // v3.9.0 프로젝트 변경 건(철수·종료일 단축)
   S15:['S15_PAYOUT','A1:R3000'],   // v2.9.111 지급 스케줄(계산서 없는 지급: 사업소득·급여·기타경비·원천세·4대보험)
 };
 const W={ // 쓰기 [시트명, 범위]
@@ -38,6 +39,7 @@ const W={ // 쓰기 [시트명, 범위]
   S14:['S14_HISTORY','A:H'],
   S17:['S17_MILESTONE','A:D'],
   S15:['S15_PAYOUT','A:R'],
+  S18:['S18_PROJECT_CHANGE','A:Q'],
 };
 const HEADERS={
   // v2.9.12: 프로젝트별 마일스톤(회차) 설정 저장 — 1프로젝트=1행, rounds(회차 수)와 각 회차의 [항목명,비율,기준일]을
@@ -45,6 +47,8 @@ const HEADERS={
   S17:['project_id','rounds','items_json','updated_at'],
   // v2.9.111 지급 스케줄 S15 — 계산서 없는 지급을 월·사람별 행으로 저장(지급 스케줄 설계서 v0.3 §3). 원천세·4대보험 납부도 별도 행.
   S15:['payout_id','project_id','year_month','pay_type','person_name','est_item','gross_amt','withheld_amt','ins_emp_amt','employer_amt','net_amt','payment_date','est_status','date_edited','memo','matched_txn_id','pay_actual_date','updated_at'],
+  // v3.9.0 프로젝트 변경 건 S18 — 인력 철수·종료일 단축 한 건 = 한 행. impact_json 은 영향 행의 "변경 후 값"(다시 적용해도 같은 결과), amend_json 은 수정세금계산서 필요 목록.
+  S18:['change_id','project_id','pipeline_id','change_type','target_item','effective_date','reason_code','reason_memo','status','steps_done','impact_json','amend_json','sell_before','sell_after','buy_before','buy_after','created_at'],
   S07:['profile_id','name','birth','gender','career_years','grade','military','address','phone','email','skills','buy_price','last_price','source','resume_link','status','avail_date','memo','updated_at'],
   S16:['item_id','profile_id','section','title','org','role','start','end','detail','lang','dbms','tool','sort'],
   S01:["pipeline_id", "opportunity", "client", "end_client", "probability", "contract_amount", "expected_start", "expected_end", "payment_cycle", "status", "memo", "created_at", "biz_type"],
@@ -80,6 +84,7 @@ const NUMERIC_COLS=new Set([
   'inflow_amt','outflow_amt','balance','estimated_payment','actual_payment','sales_vat','purchase_vat','diff_amount',
   'other_deduct_vat','carry_offset','declared_tax', // v3.8.0: 공백(미입력)과 0(입력)을 구분하므로 ZERO_DEFAULT에는 넣지 않는다
   'gross_amt','withheld_amt','ins_emp_amt','employer_amt','net_amt',
+  'sell_before','sell_after','buy_before','buy_after', // v3.9.0 S18 변경 전후 합계
   // 수량·비율·순번류
   'probability','qty','mm','career_years','unclassified_cnt','accuracy_pct','sort','year',
 ]);
@@ -201,7 +206,7 @@ Object.assign(ST,{STAGE8,GRADE4,
   PERSON_LEVEL:['주력','가능','보조']});
 // 코드 관리(S10) 카테고리 — 설정 저장·코드 저장이 함께 쓰는 단일 목록(SCR-12: 두 곳으로 흩어져 있던 목록을 한 곳으로 합침)
 const S10_LEGACY_CODE_CATS=['txn_type','branch_rule','fixed_item','skill_tag','balance_item','recon_exclude'];          // 기존 코드 카테고리(balance_item: 자금수지 유형별 누적 잔액 대상 — key=거래유형명, value=기준 방향 출금/입금; recon_exclude: 통장 대사 목록에서 뺄 유형 — key=거래유형명)
-const S10_HR_CODE_CATS=['role','industry','project_type','fail_reason'];                  // 인력 모듈 코드 카테고리
+const S10_HR_CODE_CATS=['role','industry','project_type','fail_reason','change_reason'];                  // 인력 모듈 코드 카테고리
 const S10_CODE_CATS=[...S10_LEGACY_CODE_CATS,...S10_HR_CODE_CATS];                         // 코드 관리 화면이 관리하는 카테고리
 const S10_HR_SETTING_CAT='hr_setting';                                                     // 인력 설정값 카테고리(코드 저장·키워드 저장 모두 보존)
 const S10_KP_CATS=['keyword','parameter',''];                                              // 키워드·파라미터(설정 저장이 관리)
@@ -217,6 +222,7 @@ const HR_SEED_CODES={ // S10 category → 코드 이름(순서가 저장 순서)
   industry:['증권','보험','은행','카드','공공','제조','통신','유통','기타','신협','새마을금고','우체국'],
   project_type:['FDS','차세대','DW','마이그레이션','유지보수','신규 개발'],
   fail_reason:['후보 부족','시기 불일치','단가 불일치','서류 탈락','인터뷰 탈락','타사 선정','고객 취소','응답 지연','기타'],
+  change_reason:['고객 요청','성과 사유','본인 사정','예산 축소','기타'],   // v3.9.0 프로젝트 변경 사유
 };
 // 인력 설정값(category=hr_setting). agent_interval·order_msg_template·claude_prompt_template 은 해당 기능을 만드는 단계(②·①·④)에서 값을 정하면서 추가한다.
 // grade_rule — 등급 기준표(claude/grade-estimation-rule-v0.1, 사용자 승인 2026-10-10). 기준표에 없는 조합(null)은 "기준없음". 형식은 개발 단계 ②에서 판정 로직과 함께 확정한다.
@@ -238,12 +244,13 @@ const S10_CODE_USAGE={
   industry:[['S23','industry',false],['S33','industry',false]],
   project_type:[['S23','project_type',true],['S33','project_type',false]],
   fail_reason:[['S31','fail_reason_code',false],['S32','fail_reason_code',false]], // S32 추가: 변경 003
+  change_reason:[['S18','reason_code',false]],   // v3.9.0
   txn_type:[['S08_DETAIL','category',false]],   // v3.0.0: 거래 유형은 아직 이름(category)으로 연결 — 3단계에서 코드로 전환
   fixed_item:[['S06','category',false]],        // v3.0.0: 고정비 항목은 S06.category 이름으로 연결
 };
-const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유',txn_type:'거래 유형',fixed_item:'고정비 항목',branch_rule:'거래점 규칙',skill_tag:'기술 태그',balance_item:'누적 잔액 항목',recon_exclude:'대사 제외 유형'};
+const S10_CODE_LABEL={role:'역할',industry:'업종',project_type:'프로젝트 유형',fail_reason:'실패 사유',change_reason:'변경 사유',txn_type:'거래 유형',fixed_item:'고정비 항목',branch_rule:'거래점 규칙',skill_tag:'기술 태그',balance_item:'누적 잔액 항목',recon_exclude:'대사 제외 유형'};
 // v3.0.0 코드 기반 키: 코드군별 접두어. 코드는 '접두어-숫자'(자동 채번), 한 번 만들면 바뀌지 않는다.
-const S10_CODE_PREFIX={txn_type:'TT',fixed_item:'FX',balance_item:'BL',recon_exclude:'RX',branch_rule:'BR',skill_tag:'SK',role:'RL',industry:'IN',project_type:'PT',fail_reason:'FR'};
+const S10_CODE_PREFIX={txn_type:'TT',fixed_item:'FX',balance_item:'BL',recon_exclude:'RX',branch_rule:'BR',skill_tag:'SK',role:'RL',industry:'IN',project_type:'PT',fail_reason:'FR',change_reason:'CR'};
 // 내장 거래 유형 9종의 시스템 코드(이름은 바꿀 수 있고 코드는 고정 · 삭제·사용 중지 불가)
 const S10_SYS_TXN=[['TT-S01','매출입금'],['TT-S02','매입지급'],['TT-S03','고정비'],['TT-S04','세금'],['TT-S05','법인카드'],['TT-S06','AI사용료'],['TT-S07','자본납입'],['TT-S08','기타비용'],['TT-S09','기타입금']];
 const isSysCode=c=>/^TT-S\d+$/.test(String(c||''));

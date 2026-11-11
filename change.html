@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HFC 프로젝트 변경</title>
+<link rel="stylesheet" href="css/common.css?v=3.9.0">
+<style>
+  :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  .app-header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;gap:10px}
+  .app-logo{font-weight:700;font-size:15px;color:var(--blue);flex:1}
+  .app-logo span{color:var(--text3);font-weight:400;font-size:13px;margin-left:4px}
+  .btn-icon{width:36px;height:36px;border-radius:8px;border:none;background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2)}
+  .main{padding:14px 14px 80px}
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+  .q-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+  .q-card:hover{border-color:var(--blue)}
+  .q-card.sel{border-color:var(--blue);background:var(--blue-lt)}
+  .q-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .q-name{font-size:14px;font-weight:700}
+  .q-due{font-size:11px;color:var(--text3)}
+  .badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px}
+  .b-wait{background:var(--amber-lt);color:var(--amber)}
+  .b-done{background:var(--green-lt);color:var(--green)}
+  .b-calc{background:#F1F5F9;color:#64748B}
+  .q-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px}
+  .q-nums .lbl{color:var(--text3);margin-bottom:2px}
+  .q-nums .val{font-weight:700;font-size:13px}
+  .q-nums .val.pay{color:var(--red)}
+  .detail-table{width:100%;border-collapse:collapse;font-size:12px}
+  .detail-table th{font-size:11px;color:var(--text3);text-align:right;padding:6px;border-bottom:2px solid var(--border)}
+  .detail-table th:first-child,.detail-table td:first-child{text-align:left}
+  .detail-table td{padding:7px 6px;border-bottom:1px solid var(--border);text-align:right}
+  .detail-table tr.sum td{font-weight:700;color:var(--blue);border-bottom:none}
+  .fi{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+  .fi:focus{border-color:var(--blue)}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .fl{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+  .btn{padding:11px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;flex:1}
+  .btn-primary{background:var(--blue);color:#fff}.btn-primary:disabled{background:var(--text3)}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-row{display:flex;gap:8px;margin-top:12px}
+  .pay-formula{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:12px;font-size:13px;color:#92400E;margin-bottom:12px;line-height:1.6}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+  .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+  .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;border:none;background:none;padding:4px 0}
+  .tab-item.active{color:var(--blue)}.tab-item .tab-icon{font-size:20px}
+  @media(min-width:768px){
+    body{display:grid;grid-template-columns:220px 1fr}
+    .app-header{grid-column:1/-1}
+    .side-nav{background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;height:calc(100dvh - 52px);position:sticky;top:52px}
+    .side-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left}
+    .side-nav-item.active{background:var(--blue-lt);color:var(--blue);font-weight:600}
+    .side-nav-item .sn-icon{font-size:18px}
+    .tab-bar{display:none}
+    .main{max-width:760px;padding:20px 24px 24px}
+  }
+  @media(max-width:767px){.side-nav{display:none}}
+
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);outline:none}
+  .po-wrap{overflow-x:auto}
+  .po-t{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:1080px;table-layout:fixed}
+  .po-t th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;white-space:nowrap}
+  .po-t td{padding:6px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .po-t td.l{text-align:left;padding-left:8px;line-height:1.4}
+  .po-t td.c{text-align:center;white-space:nowrap}.po-t td.n{text-align:right;white-space:nowrap}
+  .po-t input.fi{padding:6px 8px;font-size:12px;text-align:right;min-width:0}
+  .po-t input.fi.d{text-align:center}
+  .po-t tr.remit td{background:var(--surface2);color:var(--text2)}
+  .po-t tr.lock td{opacity:.75}
+  .tag{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap}
+  .tag-est{background:var(--amber-lt);color:var(--amber)}.tag-ok{background:var(--green-lt);color:var(--green)}.tag-old{background:var(--red-lt);color:var(--red)}.tag-n{background:var(--blue-lt);color:var(--blue)}
+  .po-note{background:var(--amber-lt);border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:10px;line-height:1.6}
+  .po-info{background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;font-size:12px;color:#1E40AF;margin-bottom:10px;line-height:1.6}
+  .po-sum{width:100%;border-collapse:collapse;font-size:12px}
+  .po-sum th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center}
+  .po-sum td{padding:6px 4px;border-bottom:1px solid var(--border);text-align:right}.po-sum td:first-child{text-align:center}
+
+  .ch-t{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed}
+  .ch-t th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center}
+  .ch-t td{padding:6px 4px;border-bottom:1px solid var(--border);vertical-align:middle;word-break:keep-all}
+  .ch-t td.c{text-align:center}.ch-t td.n{text-align:right;white-space:nowrap}.ch-t td.l{text-align:left;padding-left:8px;line-height:1.4}
+  .ch-t input.fi{padding:6px 8px;font-size:12px;text-align:right;min-width:0}
+  .ch-wrap{overflow-x:auto;margin-bottom:10px}
+  .ch-h{font-size:12px;font-weight:600;color:var(--text2);margin:12px 0 6px}
+  .ch-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .ch-sum div{background:var(--surface2);border-radius:8px;padding:10px;text-align:center;font-size:11px;color:var(--text3)}
+  .ch-sum b{display:block;font-size:14px;color:var(--text);margin-top:4px}
+  .ch-help{font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5}
+  .ch-err{background:var(--red-lt);border:1px solid #FECACA;border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);margin-bottom:10px;line-height:1.6}
+  .ch-opt{display:flex;gap:8px;margin-bottom:10px}
+  .ch-opt label{flex:1;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;text-align:center}
+  .ch-opt label.on{border-color:var(--blue);background:var(--blue-lt);color:var(--blue);font-weight:600}
+  .ch-opt input{display:none}
+  .fr .fg{display:flex;flex-direction:column;justify-content:flex-end}
+  @media(max-width:767px){.fr{grid-template-columns:1fr}.ch-sum{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-page="change">
+<header class="app-header">
+  <div class="app-logo">HFC 경영관리 <span>프로젝트 변경</span></div>
+  <button class="btn-icon" onclick="location.href='project.html'">📁</button>
+  <button class="btn-icon" onclick="location.href='index.html'">🏠</button>
+</header>
+<nav class="side-nav"></nav>
+
+<main class="main">
+  <div class="card">
+    <div class="card-title">프로젝트 선택 <span style="font-size:11px;color:var(--text3);font-weight:400">수주·계약 프로젝트 중 인건비가 있는 건 (용역·턴키 제외)</span></div>
+    <select class="fi" id="prjSel" onchange="selectProject(this.value)"><option value="">불러오는 중…</option></select>
+  </div>
+
+  <div class="card" id="inCard" style="display:none">
+    <div class="card-title"><span id="inTitle">변경 내용</span></div>
+    <div class="ch-opt" id="typeOpt">
+      <label id="lbT1" onclick="setType('인력철수')"><input type="radio" name="ctype">인력 철수</label>
+      <label id="lbT2" onclick="setType('종료일단축')"><input type="radio" name="ctype">종료일 단축</label>
+    </div>
+    <div class="fr" id="rowTarget">
+      <div class="fg"><label class="fl" for="selWho">철수 인력</label><select class="fi" id="selWho" onchange="onWho()"></select></div>
+      <div class="fg"><label class="fl" for="effDate" id="lblEff">마지막 근무일 (이 날까지 일한 것으로 봅니다)</label><input class="fi" id="effDate" type="date" onchange="onEff()"></div>
+    </div>
+    <div class="fr" id="rowEnd" style="display:none">
+      <div class="fg"><label class="fl" for="newEnd">새 종료일 (이 날까지 일한 것으로 봅니다)</label><input class="fi" id="newEnd" type="date" onchange="onEff()"><div class="ch-help" id="curEndHelp"></div></div>
+      <div></div>
+    </div>
+    <div id="salBox" style="display:none">
+      <div class="ch-h">급여형 인력의 마지막 달 급여 (급여대장 값으로 고쳐 주세요 · 금액 단위: 원)</div>
+      <div class="ch-wrap"><table class="ch-t" style="min-width:640px"><colgroup><col style="width:120px"><col style="width:112px"><col style="width:96px"><col style="width:96px"><col style="width:96px"><col style="width:84px"></colgroup>
+        <thead><tr><th>인력</th><th>세전 급여</th><th>원천세</th><th>근로자 4대보험</th><th>회사 부담</th><th>상태</th></tr></thead><tbody id="salBody"></tbody></table></div>
+      <div class="ch-help">기본값은 기존 금액을 마지막 근무일 기준으로 일할 계산한 추정값입니다. 급여대장이 있으면 그 값으로 고치고 상태를 「확정」으로 바꿔 주세요.</div>
+    </div>
+    <div class="fr" style="margin-top:10px">
+      <div class="fg"><label class="fl" for="selReason">변경 사유</label><select class="fi" id="selReason"></select></div>
+      <div class="fg"><label class="fl" for="memo">메모 (선택)</label><input class="fi" id="memo" type="text" maxlength="200" placeholder="예: 고객사 요청으로 11/15 종료"></div>
+    </div>
+    <div id="errBox"></div>
+    <div class="btn-row"><button class="btn btn-primary" id="btnPrev" onclick="preview()">영향 미리보기</button></div>
+  </div>
+
+  <div class="card" id="pvCard" style="display:none">
+    <div class="card-title"><span>영향 미리보기</span><span style="font-size:11px;color:var(--text3);font-weight:400">아직 아무것도 저장되지 않았습니다</span></div>
+    <div id="pvBody"></div>
+    <div class="btn-row"><button class="btn btn-green" id="btnApply" onclick="applyChange()">변경 적용</button></div>
+    <div class="ch-help">변경 건은 이력으로 남으며 삭제할 수 없습니다(감사 추적). 이미 발행·입금·지급된 실적은 바꾸지 않습니다.</div>
+  </div>
+
+  <div class="card" id="hsCard" style="display:none">
+    <div class="card-title"><span>변경 이력</span><span style="font-size:11px;color:var(--text3);font-weight:400">이 프로젝트의 변경 건과 수정세금계산서 발급 확인</span></div>
+    <div id="hsBody"></div>
+  </div>
+</main>
+
+<nav class="tab-bar"></nav>
+<div class="toast" id="toast"></div>
+
+<script src="js/schema.js?v=3.9.0"></script>
+<script src="js/common.js?v=3.9.0"></script>
+<script src="js/auth.js?v=3.9.0"></script>
+<script src="js/calc.js?v=3.9.0"></script>
+<script src="js/payout.js?v=3.9.0"></script>
+<script src="js/change.js?v=3.9.0"></script>
+<script src="js/nav.js?v=3.9.0"></script>
+<script>
+let pls=[],prjs=[],ests=[],settings={},reasons=[],hist=[],sel=null,ctype='인력철수',plan=null,busy=false;
+const wf=n=>comma(n);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pay2=e=>chgIsSal(e)?'급여형':(String(e.memo||'').startsWith('사업소득형')?'사업소득형':'세금계산서형');
+function plOf(p){ return pls.find(x=>x.pipeline_id===p.pipeline_id)||{}; }
+function spanOf(p){ const pl=plOf(p); return {start_date:pl.expected_start||p.start_date||'',end_date:pl.expected_end||p.end_date||''}; }
+function laborOf(p){ return ests.filter(e=>e.pipeline_id===p.pipeline_id&&e.comp_type==='인건비'); }
+async function loadAll(){
+  try{
+    const [plR,prR,esR,stR]=await Promise.all([fetchSheet(...R.S01),fetchSheet(...R.S03),fetchSheet(...R.S12),fetchSheetSafe(...R.S10).catch(()=>null)]);
+    pls=toObj(plR); const s10=toObj(stR||[]); calcApplySettings(s10);
+    settings={}; s10.forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
+    reasons=s10.filter(r=>r.category==='change_reason'&&r.is_active!=='N'&&r.setting_key).map(r=>r.setting_key);
+    if(!reasons.length) reasons=CHG_REASONS_DEFAULT.slice();
+    const okPl=new Set(pls.filter(p=>['수주','계약'].includes(p.status)&&p.biz_type!=='용역턴키').map(p=>p.pipeline_id));
+    ests=toObj(esR).filter(e=>e.pipeline_id);
+    prjs=toObj(prR).filter(p=>p.project_id&&okPl.has(p.pipeline_id));
+    const opt=prjs.filter(p=>laborOf(p).length).map(p=>`<option value="${esc(p.project_id)}">${esc(p.project_name||p.project_id)}</option>`).join('');
+    document.getElementById('prjSel').innerHTML='<option value="">'+(opt?'프로젝트를 선택하세요':'변경할 수 있는 프로젝트가 없습니다')+'</option>'+opt;
+    document.getElementById('selReason').innerHTML=reasons.map(r=>`<option>${esc(r)}</option>`).join('');
+    const q=new URLSearchParams(location.search).get('project'); if(q&&prjs.some(p=>p.project_id===q)){ document.getElementById('prjSel').value=q; selectProject(q); }
+  }catch(e){ toast('로드 실패: '+e.message,true); }
+}
+function selectProject(pid){
+  sel=prjs.find(p=>p.project_id===pid)||null; plan=null;
+  ['inCard','hsCard'].forEach(i=>document.getElementById(i).style.display=sel?'block':'none');
+  document.getElementById('pvCard').style.display='none'; document.getElementById('errBox').innerHTML='';
+  if(!sel) return;
+  const sp=spanOf(sel);
+  document.getElementById('inTitle').textContent=`${sel.project_name||sel.project_id} · ${sp.start_date||'?'} ~ ${sp.end_date||'?'}`;
+  document.getElementById('selWho').innerHTML=laborOf(sel).map(e=>`<option value="${esc(e.estimate_id)}">${esc(e.item_name)} (${pay2(e)})</option>`).join('');
+  document.getElementById('curEndHelp').textContent='현재 종료일: '+(sp.end_date||'없음');
+  document.getElementById('effDate').value=''; document.getElementById('newEnd').value=''; document.getElementById('memo').value='';
+  setType('인력철수'); loadHist();
+}
+function setType(t){
+  ctype=t; plan=null; document.getElementById('pvCard').style.display='none';
+  document.getElementById('lbT1').classList.toggle('on',t==='인력철수'); document.getElementById('lbT2').classList.toggle('on',t==='종료일단축');
+  document.getElementById('rowTarget').style.display=t==='인력철수'?'grid':'none'; document.getElementById('rowEnd').style.display=t==='종료일단축'?'grid':'none';
+  renderSal();
+}
+function onWho(){ plan=null; document.getElementById('pvCard').style.display='none'; renderSal(); }
+function onEff(){ plan=null; document.getElementById('pvCard').style.display='none'; renderSal(); }
+function effVal(){ return document.getElementById(ctype==='인력철수'?'effDate':'newEnd').value; }
+function salTargets(){
+  if(!sel) return []; const eff=effVal(); if(!chgIsDate(eff)) return []; const sp=spanOf(sel);
+  const rows=laborOf(sel).filter(chgIsSal);
+  if(ctype==='인력철수'){ const id=document.getElementById('selWho').value; return rows.filter(e=>e.estimate_id===id); }
+  return rows.filter(e=>{ const en=e.end_date||sp.end_date, st=e.start_date||sp.start_date; return en>eff&&!(st&&st>eff); });
+}
+function renderSal(){
+  const t=salTargets(), box=document.getElementById('salBox');
+  box.style.display=t.length?'block':'none';
+  document.getElementById('salBody').innerHTML=t.map(e=>{ const s=chgSalarySuggest(e,effVal()), id=esc(e.estimate_id);
+    const inp=k=>`<td><input class="fi" inputmode="numeric" data-k="${k}" data-id="${id}" value="${wf(s[k])}" oninput="fc(this)" aria-label="${esc(e.item_name)} ${k}"></td>`;
+    return `<tr><td class="c">${esc(e.item_name)}</td>${inp('g')}${inp('w')}${inp('i')}${inp('e')}<td class="c"><select class="fi" style="text-align:center" data-k="s" data-id="${id}"><option>추정</option><option>확정</option></select></td></tr>`; }).join('');
+}
+function readSal(){
+  const o={}; document.querySelectorAll('#salBody [data-k]').forEach(el=>{ const id=el.dataset.id; o[id]=o[id]||{}; o[id][el.dataset.k]=el.dataset.k==='s'?el.value:un(el.value); }); return o;
+}
+async function readFresh(){
+  const [s4,s5]=await Promise.all([fetchSheetSafe(...R.S04).catch(()=>null),fetchSheetSafe(...R.S05).catch(()=>null)]);
+  const s15=await fetchSheetSafe(...R.S15).catch(()=>null);
+  return {s04:toObj(s4||[]).filter(r=>r.revenue_id),s05:toObj(s5||[]).filter(r=>r.cost_id),s15:toObj(s15||[]).filter(r=>r.payout_id&&r.project_id===sel.project_id)};
+}
+async function preview(){
+  if(busy||!sel) return; const eb=document.getElementById('errBox'); eb.innerHTML='';
+  const eff=effVal(); const sal=readSal();
+  for(const id of Object.keys(sal)){ const s=sal[id]; if([s.g,s.w,s.i,s.e].some(v=>v>1e9)){ eb.innerHTML='<div class="ch-err">급여 금액이 너무 큽니다(10억 원 초과). 원 단위로 입력했는지 확인해 주세요.</div>'; return; } }
+  const btn=document.getElementById('btnPrev'); btn.disabled=true; busy=true;
+  try{
+    const fr=await readFresh(), sp=spanOf(sel);
+    plan=chgPlan({type:ctype,estimate_id:document.getElementById('selWho').value,effective:eff,newEnd:eff,salary:sal,span:sp,project_id:sel.project_id,
+      items:ests.filter(e=>e.pipeline_id===sel.pipeline_id),s04:fr.s04,s05:fr.s05,s15:fr.s15,settings});
+    if(!plan.ok){ eb.innerHTML=`<div class="ch-err">${esc(plan.error)}${plan.blocks.length?'<br>'+plan.blocks.map(esc).join('<br>'):''}</div>`; document.getElementById('pvCard').style.display='none'; plan=null; }
+    else { renderPreview(); document.getElementById('pvCard').style.display='block'; document.getElementById('pvCard').scrollIntoView({behavior:'smooth'}); }
+  }catch(e){ eb.innerHTML=`<div class="ch-err">미리보기 실패: ${esc(e.message)}</div>`; }
+  btn.disabled=false; busy=false;
+}
+function tbl(heads,rows,al){ // al: 'l'|'c'|'n'
+  if(!rows.length) return '<div class="ch-help">해당 없음</div>';
+  return `<div class="ch-wrap"><table class="ch-t" style="min-width:560px"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${al[i]}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function renderPreview(){
+  const p=plan, t=p.totals, m=(a,b)=>b-a, sg=n=>(n>0?'+':'')+wf(n);
+  let h=`<div class="ch-sum"><div>매출 합계<b>${wf(t.sell_before)} → ${wf(t.sell_after)}</b>${sg(m(t.sell_before,t.sell_after))}</div><div>매입 합계<b>${wf(t.buy_before)} → ${wf(t.buy_after)}</b>${sg(m(t.buy_before,t.buy_after))}</div><div>마진(매출-매입)<b>${wf(t.sell_before-t.buy_before)} → ${wf(t.sell_after-t.buy_after)}</b>${sg((t.sell_after-t.buy_after)-(t.sell_before-t.buy_before))}</div></div>`;
+  h+=`<div class="ch-h">① 견적 (효력일 ${esc(p.effective)})</div>`+tbl(['인력','지급 방식','매출','매입'],p.estChanges.map(c=>[esc(c.item_name),c.pay,`${wf(c.sell_before)} → ${wf(c.sell_after)}`,`${wf(c.buy_before)} → ${wf(c.buy_after)}`]),['l','c','n','n']);
+  const po=p.payout.impacts;
+  h+=`<div class="ch-h">② 지급 스케줄 (${po.length}건${p.payout.confirmed?` · 이 중 확정된 행 ${p.payout.confirmed}건`:''})</div>`+tbl(['지급월','구분','대상','처리','변경 전','변경 후'],po.map(i=>[i.month,i.pay_type,esc(i.person||''),i.action+(i.confirmed?' (확정 행)':''),wf(i.before),wf(i.after)]),['c','c','l','c','n','n']);
+  if(p.payout.settle.length) h+=`<div class="po-note"><b>정산 필요</b> — 이미 지급·대사된 행은 바꾸지 않았습니다. 실제 정산(환수 또는 추가 지급)을 별도로 처리해 주세요.</div>`+tbl(['지급월','구분','대상','지급 금액','변경 후 금액'],p.payout.settle.map(i=>[i.month,i.pay_type,esc(i.person||''),wf(i.amount),wf(i.new_amount)]),['c','c','l','n','n']);
+  const bl=(arr,k)=>arr.map(i=>[i.month,k,i.action,wf(i.before),wf(i.after)]);
+  h+=`<div class="ch-h">③ 매출·매입 청구 스케줄 (미발행 행만 줄입니다)</div>`+tbl(['귀속월','구분','처리','변경 전(공급가)','변경 후'],[...bl(p.rev.impacts,'매출'),...bl(p.cost.impacts,'매입')],['c','c','c','n','n']);
+  if(p.amends.length) h+=`<div class="po-note"><b>수정세금계산서 필요</b> — 이미 발행·수취된 계산서는 바꾸지 않았습니다. 홈택스에서 발급한 뒤 변경 이력에서 「발급 완료」를 체크하세요. 작성일·기한은 일반 기준의 참고값이며 세무사 확인이 필요합니다.</div>`+
+    tbl(['구분','귀속월','감액 공급가액','작성일(참고)','발급 기한(참고)','입금·지급'],p.amends.map(a=>[a.kind,a.month,wf(a.cut_amount),a.write_date,a.due_date,a.paid?'완료':'미완료']),['c','c','n','c','c','c']);
+  const nts=[...p.notes,...p.rev.notes,...p.cost.notes];
+  if(nts.length) h+=`<div class="po-info">${nts.map(esc).join('<br>')}</div>`;
+  if(p.prj) h+=`<div class="ch-h">④ 프로젝트 종료일</div><div class="ch-help" style="font-size:12px">사업기회·프로젝트 종료일을 ${esc(p.prj.newEnd)}로 바꿉니다.</div>`;
+  document.getElementById('pvBody').innerHTML=h;
+}
+// ── 적용 ─────────────────────────────────────────────────────────────
+async function readS18(){ const r=await fetchSheetSafe(...R.S18).catch(()=>{ throw new Error('변경 이력을 읽지 못했습니다'); }); return r?toObj(r).filter(x=>x.change_id):[]; }
+async function writeS18(rows){ return clearAndWrite(...W.S18,[HEADERS.S18,...rowsFor(HEADERS.S18,dedupe(rows,'change_id'))]); }
+async function saveRec(rec){ const rows=await readS18(); const i=rows.findIndex(r=>r.change_id===rec.change_id); if(i>=0) rows[i]=rec; else rows.push(rec); if(!(await writeS18(rows))) throw new Error('변경 이력(S18) 저장 실패 — 로그인 상태와 권한을 확인해 주세요'); }
+async function applyChange(){
+  if(busy||!plan) return;
+  if(!confirm(`${sel.project_name||sel.project_id}\n${ctype==='인력철수'?'인력 철수':'종료일 단축'} (효력일 ${plan.effective})를 적용합니다.\n견적·지급 스케줄·청구 스케줄이 함께 바뀌며 변경 이력은 삭제할 수 없습니다. 진행할까요?`)) return;
+  busy=true; const btn=document.getElementById('btnApply'); btn.disabled=true;
+  try{
+    if(!(await ensureSheet(R.S18[0],HEADERS.S18))) throw new Error('변경 이력 탭(S18)을 준비하지 못했습니다');
+    const rows=await readS18(), now=kstNow16();
+    const rec=chgRecord(plan,{change_id:chgNextId(rows,kstToday().slice(0,4)),project_id:sel.project_id,pipeline_id:sel.pipeline_id,type:ctype,
+      reason_code:document.getElementById('selReason').value,reason_memo:document.getElementById('memo').value.trim(),created_at:now});
+    rows.push(rec); if(!(await writeS18(rows))) throw new Error('변경 이력(S18) 저장 실패');
+    await runSteps(rec);
+  }catch(e){ toast(e.message,true); }
+  busy=false; btn.disabled=false;
+}
+async function resumeChange(id){
+  if(busy) return; busy=true;
+  try{ const rec=(await readS18()).find(r=>r.change_id===id); if(!rec) throw new Error('변경 건을 찾지 못했습니다'); await runSteps(rec); }catch(e){ toast(e.message,true); }
+  busy=false;
+}
+async function runSteps(rec){
+  const imp=JSON.parse(rec.impact_json||'{}'); const done=new Set(String(rec.steps_done||'').split(',').filter(Boolean)); const bad=[];
+  const writeAll=async(R_,W_,H,rows,key)=>{ if(!(await clearAndWrite(...W_,[H,...rowsFor(H,dedupe(rows,key))]))) throw new Error(W_[0]+' 저장 실패'); };
+  const steps={
+    '견적':async()=>{ const rows=toObj(await fetchSheet(...R.S12)).filter(r=>r.estimate_id); const r=chgApplyEstimate(rows,imp.est); bad.push(...r.conflicts); await writeAll(R.S12,W.S12,HEADERS.S12,r.rows,'estimate_id'); },
+    '지급스케줄':async()=>{ if(!(imp.payout||[]).length) return; const raw=await fetchSheetSafe(...R.S15); if(!raw) return; const r=chgApplyPayout(toObj(raw).filter(x=>x.payout_id),imp.payout); bad.push(...r.conflicts); await writeAll(R.S15,W.S15,HEADERS.S15,r.rows,'payout_id'); },
+    '매출':async()=>{ if(!(imp.rev||[]).length) return; const raw=await fetchSheetSafe(...R.S04); if(!raw) return; const r=chgApplyBilling(toObj(raw).filter(x=>x.revenue_id),'S04',imp.rev); bad.push(...r.conflicts); await writeAll(R.S04,W.S04,HEADERS.S04,r.rows,'revenue_id'); },
+    '매입':async()=>{ if(!(imp.cost||[]).length) return; const raw=await fetchSheetSafe(...R.S05); if(!raw) return; const r=chgApplyBilling(toObj(raw).filter(x=>x.cost_id),'S05',imp.cost); bad.push(...r.conflicts); await writeAll(R.S05,W.S05,HEADERS.S05,r.rows,'cost_id'); },
+    '프로젝트':async()=>{ if(!imp.prj) return; const p1=toObj(await fetchSheet(...R.S01)).filter(x=>x.pipeline_id), p3=toObj(await fetchSheet(...R.S03)).filter(x=>x.project_id);
+      const r=chgApplyProject(p1,p3,rec.pipeline_id,rec.project_id,imp.prj.newEnd); await writeAll(R.S01,W.S01,HEADERS.S01,r.pls,'pipeline_id'); await writeAll(R.S03,W.S03,HEADERS.S03,r.prjs,'project_id'); },
+    '이력':async()=>{ const raw=await fetchSheetSafe(...R.S14); const list=raw?toObj(raw):[]; const H=['hist_id','changed_at','pipeline_id','target','old_value','new_value','reason','source'];
+      let n=list.reduce((m,h)=>Math.max(m,parseInt((h.hist_id||'').replace(/\D/g,''))||0),0)+1;
+      list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:kstNow16(),pipeline_id:rec.pipeline_id,target:'프로젝트 변경',old_value:`${rec.change_type} ${rec.target_item||''}`.trim()+` (효력일 ${rec.effective_date})`,new_value:`매출 ${wf(rec.sell_before)}→${wf(rec.sell_after)} / 매입 ${wf(rec.buy_before)}→${wf(rec.buy_after)}`,reason:rec.reason_code+(rec.reason_memo?' · '+rec.reason_memo:''),source:rec.change_id});
+      await writeAll(R.S14,W.S14,H,list,'hist_id'); }
+  };
+  let failed='';
+  for(const s of CHG_STEPS){
+    if(done.has(s)) continue;
+    try{ await steps[s](); done.add(s); rec.steps_done=CHG_STEPS.filter(x=>done.has(x)).join(','); await saveRec(rec); }
+    catch(e){ failed=`${s} 단계 실패: ${e.message}`; break; }
+  }
+  rec.status=failed?'부분실패':'적용완료';
+  if(bad.length) rec.reason_memo=(String(rec.reason_memo||'')+' [건너뜀: '+bad.join(' / ')+']').slice(0,900);
+  await saveRec(rec).catch(()=>{});
+  document.getElementById('pvCard').style.display='none'; plan=null;
+  if(failed) toast(failed+' — 변경 이력에서 「이어서 적용」을 눌러 주세요',true);
+  else if(bad.length) toast('일부 행은 바뀌어 건너뛰었습니다: '+bad[0],true);
+  else toast('✓ 변경이 적용되었습니다 ('+rec.change_id+')');
+  // 견적이 바뀌었으므로 화면 데이터 갱신
+  try{ ests=toObj(await fetchSheet(...R.S12)).filter(e=>e.pipeline_id); }catch(e){}
+  await loadHist(bad);
+}
+// ── 이력 ─────────────────────────────────────────────────────────────
+async function loadHist(extra){
+  try{ hist=(await readS18()).filter(r=>r.project_id===sel.project_id).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))); }catch(e){ hist=[]; }
+  const rows=hist.map(r=>{ const am=safeJ(r.amend_json); const open=am.filter(a=>!a.done).length;
+    const stc=r.status==='적용완료'?'tag-ok':r.status==='부분실패'?'tag-old':'tag-est';
+    return [r.change_id,esc(r.change_type),esc(r.target_item||'─'),r.effective_date,esc(r.reason_code||''),`<span class="tag ${stc}">${esc(r.status)}</span>`+(r.status!=='적용완료'?` <button class="btn btn-primary" style="flex:none;padding:3px 8px;font-size:11px" onclick="resumeChange('${esc(r.change_id)}')">이어서 적용</button>`:''),
+      `${wf(r.sell_before)}→${wf(r.sell_after)}`,open?`<span class="tag tag-old">미발급 ${open}건</span>`:(am.length?'<span class="tag tag-ok">완료</span>':'─')]; });
+  let h=rows.length?`<div class="ch-wrap"><table class="ch-t" style="min-width:760px"><thead><tr><th>번호</th><th>유형</th><th>대상</th><th>효력일</th><th>사유</th><th>상태</th><th>매출 변화</th><th>수정계산서</th></tr></thead><tbody>${rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===6?'n':i===2||i===4?'l':'c'}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="ch-help">아직 변경 이력이 없습니다.</div>';
+  const todo=[]; hist.forEach(r=>safeJ(r.amend_json).forEach((a,i)=>todo.push({r,a,i})));
+  if(todo.length) h+=`<div class="ch-h">수정세금계산서 발급 확인</div>`+`<div class="ch-wrap"><table class="ch-t" style="min-width:560px"><thead><tr><th>변경 건</th><th>구분</th><th>귀속월</th><th>감액 공급가액</th><th>발급 기한(참고)</th><th>발급 완료</th></tr></thead><tbody>${todo.map(({r,a,i})=>`<tr><td class="c">${r.change_id}</td><td class="c">${a.kind}</td><td class="c">${a.month}</td><td class="n">${wf(a.cut_amount)}</td><td class="c">${a.due_date}</td><td class="c"><input type="checkbox" ${a.done?'checked':''} onchange="toggleAmend('${esc(r.change_id)}',${i},this.checked)" aria-label="발급 완료"></td></tr>`).join('')}</tbody></table></div>`;
+  if(extra&&extra.length) h+=`<div class="po-note">${extra.map(esc).join('<br>')}</div>`;
+  document.getElementById('hsBody').innerHTML=h;
+}
+function safeJ(s){ try{ const v=JSON.parse(s||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+async function toggleAmend(id,i,on){
+  try{ const rows=await readS18(); const r=rows.find(x=>x.change_id===id); if(!r) throw new Error('변경 건을 찾지 못했습니다');
+    const am=safeJ(r.amend_json); if(!am[i]) throw new Error('항목을 찾지 못했습니다'); am[i].done=!!on; r.amend_json=JSON.stringify(am);
+    if(!(await writeS18(rows))) throw new Error('저장 실패'); toast('✓ 저장했습니다'); await loadHist();
+  }catch(e){ toast(e.message,true); await loadHist(); }
+}
+window.addEventListener('load',loadAll);
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initOAuth()"></script>
+</body>
+</html>
