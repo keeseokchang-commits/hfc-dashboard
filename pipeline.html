@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 사업기회 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.7.1">
+<link rel="stylesheet" href="css/common.css?v=3.7.3">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -30,7 +30,7 @@
   .filter-chip .cnt{font-size:10px;opacity:.7;margin-left:3px}
 
   /* 상단 액션 */
-  .top-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .top-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
   .btn{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}
   .btn-primary{background:var(--blue);color:#fff}
   .btn-primary:disabled{background:var(--text3)}
@@ -81,7 +81,7 @@
   .empty-state{text-align:center;padding:32px;color:var(--text3);font-size:13px}
   /* 간트 */
   .view-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-  .view-toggle button{padding:8px 14px;font-size:12px;border:none;background:var(--surface);color:var(--text2);cursor:pointer}
+  .view-toggle button{white-space:nowrap;padding:8px 14px;font-size:12px;border:none;background:var(--surface);color:var(--text2);cursor:pointer}
   .view-toggle button.active{background:var(--blue);color:#fff}
   .gantt-wrap{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);overflow-x:auto}
   .gantt-grid{min-width:720px}
@@ -132,13 +132,13 @@
 
 <main class="main">
   <div class="top-actions">
-    <span style="font-size:15px;font-weight:600">사업기회 관리</span>
-    <div style="display:flex;gap:8px;align-items:center">
+    <span style="font-size:15px;font-weight:600;white-space:nowrap">사업기회 관리</span>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <select id="yearFilter" onchange="renderFilter();renderList()" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface);color:var(--text2);outline:none">
         <option>전체</option>
       </select>
       <div class="view-toggle"><button id="vList" class="active" onclick="setView('list')">목록</button><button id="vGantt" onclick="setView('gantt')">간트</button></div>
-      <button class="btn btn-primary" onclick="openNewForm()">+ 새 기회 등록</button>
+      <button class="btn btn-primary" style="white-space:nowrap" onclick="openNewForm()">+ 새 기회 등록</button>
     </div>
   </div>
 
@@ -241,11 +241,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.7.1"></script>
-<script src="js/common.js?v=3.7.1"></script>
-<script src="js/auth.js?v=3.7.1"></script>
-<script src="js/calc.js?v=3.7.1"></script>
-<script src="js/nav.js?v=3.7.1"></script>
+<script src="js/schema.js?v=3.7.3"></script>
+<script src="js/common.js?v=3.7.3"></script>
+<script src="js/auth.js?v=3.7.3"></script>
+<script src="js/calc.js?v=3.7.3"></script>
+<script src="js/nav.js?v=3.7.3"></script>
 <script>
 let opps=[];
 let knownPl=new Set();   // v3.5.1(#9)

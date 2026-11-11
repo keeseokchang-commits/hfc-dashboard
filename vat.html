@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 부가세 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.7.1">
+<link rel="stylesheet" href="css/common.css?v=3.7.3">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -75,7 +75,7 @@
 
 <main class="main">
   <div class="card">
-    <div class="card-title"><select id="vatYearSel" onchange="setVatYear(this.value)" style="font-size:13px;padding:2px 6px"></select>년 분기별 부가세 <span style="font-size:11px;color:var(--text3)">재무 반영: 수주·계약·종료 프로젝트</span></div>
+    <div class="card-title"><span style="display:inline-flex;align-items:center;gap:6px"><select id="vatYearSel" onchange="setVatYear(this.value)" style="font-size:13px;height:30px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)"></select><span>년 분기별 부가세</span></span> <span style="font-size:11px;color:var(--text3)">재무 반영: 수주·계약·종료 프로젝트</span></div>
     <div id="qList"><div class="loading-wrap"><div class="spinner"></div></div></div>
   </div>
 
@@ -102,11 +102,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.7.1"></script>
-<script src="js/common.js?v=3.7.1"></script>
-<script src="js/auth.js?v=3.7.1"></script>
-<script src="js/calc.js?v=3.7.1"></script>
-<script src="js/nav.js?v=3.7.1"></script>
+<script src="js/schema.js?v=3.7.3"></script>
+<script src="js/common.js?v=3.7.3"></script>
+<script src="js/auth.js?v=3.7.3"></script>
+<script src="js/calc.js?v=3.7.3"></script>
+<script src="js/nav.js?v=3.7.3"></script>
 <script>
 let vats=[],revs=[],costs=[],fixedTax=[],prjMap={},selQ=null;
 let vatYear=Number(kstToday().slice(0,4));
