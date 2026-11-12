@@ -88,14 +88,16 @@ function renderList(){
   box.innerHTML=`<div class="hr-scroll"><table class="hr-table auto" style="min-width:${cols.reduce((s,c)=>s+c[1],0)}px"><thead><tr>${cols.map(([l,w],i)=>`<th class="${i===3?'r':''}" style="width:${w}px">${l}</th>`).join('')}</tr></thead><tbody>${list.slice(0,shown).map(row).join('')}</tbody></table></div>`
     +(list.length>shown?`<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary" id="btnMore">더 보기 (남은 ${list.length-shown}명)</button></div>`:'');
 }
+// v3.10.1 설정(S10)에 등록된 코드값(사용 중지 제외) — 새 역할·업종·유형을 등록하면 후보가 없어도 필터에 바로 나온다
+function s10Codes(cat){ return (D.S10||[]).filter(s=>String(s.category??'').trim()===cat&&String(s.setting_key??'').trim()&&String(s.is_active??'Y').trim().toUpperCase()!=='N').map(s=>String(s.setting_key).trim()); }
 function renderRoleChips(){
-  const codes=[...new Set(VIEWS.flatMap(v=>v.roles.map(r=>r.code)))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const codes=[...new Set([...s10Codes('role'),...VIEWS.flatMap(v=>v.roles.map(r=>r.code))])].sort((a,b)=>a.localeCompare(b,'ko'));
   hrQ('roleChips').innerHTML=codes.length?codes.map(c=>`<span class="hr-chip${roleSel.has(c)?' on':''}" data-role="${hrEsc(c)}">${hrEsc(c)}</span>`).join(''):'<span class="hr-sub">등록된 역할이 없습니다.</span>';
 }
 function fillSelects(){
   const keep=['fGrade','fInd','fType'].map(i=>hrQ(i).value);
   hrQ('fGrade').innerHTML='<option value="">전체 등급</option>'+['특급','고급','중급','초급'].map(x=>`<option>${x}</option>`).join('');
-  const inds=[...new Set(VIEWS.flatMap(v=>[...v.inds]))].sort((a,b)=>a.localeCompare(b,'ko')), tys=[...new Set(VIEWS.flatMap(v=>[...v.types]))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const inds=[...new Set([...s10Codes('industry'),...VIEWS.flatMap(v=>[...v.inds])])].sort((a,b)=>a.localeCompare(b,'ko')), tys=[...new Set([...s10Codes('project_type'),...VIEWS.flatMap(v=>[...v.types])])].sort((a,b)=>a.localeCompare(b,'ko'));
   hrQ('fInd').innerHTML='<option value="">전체</option>'+inds.map(x=>`<option>${hrEsc(x)}</option>`).join('');
   hrQ('fType').innerHTML='<option value="">전체</option>'+tys.map(x=>`<option>${hrEsc(x)}</option>`).join('');
   ['fGrade','fInd','fType'].forEach((i,n)=>{ hrQ(i).value=keep[n]; });

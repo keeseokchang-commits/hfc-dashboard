@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 세금계산서 관리</title>
-<link rel="stylesheet" href="css/common.css?v=3.10.0">
+<link rel="stylesheet" href="css/common.css?v=3.10.2">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -221,6 +221,12 @@
      사라져 있었다(고정비에는 editFix가 대칭으로 있었는데 매출·매입에만 없던 결함).
      확정된 값(발행일·입금일·지급일 등 실제로 이미 일어난 사실)은 이 팝업에서 건드리지 않고
      읽기 전용으로만 보여준다 — "확정된 데이터는 재수정 경로에서 필터로 원천 차단하라" 원칙. -->
+<div class="modal-overlay" id="dateAskModal"><div class="modal">
+  <div class="modal-title"><span id="dateAskTitle"></span> <button onclick="dateAskDone(null)" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
+  <div id="dateAskInfo" style="font-size:12px;color:var(--text3);margin-bottom:10px"></div>
+  <div class="form-row"><label class="form-label" id="dateAskLabel">발행일</label><input class="form-input" type="date" id="dateAskIn"><div class="hr-err" id="dateAskErr" style="color:var(--red,#dc2626);font-size:12px;margin-top:4px"></div></div>
+  <button onclick="dateAskOk()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px">확인</button>
+</div></div>
 <div class="modal-overlay" id="revEditModal"><div class="modal">
   <div class="modal-title">매출 청구 건 수정 <button onclick="closeRevEdit()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button></div>
   <div id="revEditLocked" style="display:none;font-size:12px;color:var(--text3);background:var(--surface2);border-radius:8px;padding:8px 10px;margin-bottom:12px"></div>
@@ -243,11 +249,11 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.10.0"></script>
-<script src="js/common.js?v=3.10.0"></script>
-<script src="js/auth.js?v=3.10.0"></script>
-<script src="js/calc.js?v=3.10.0"></script>
-<script src="js/nav.js?v=3.10.0"></script>
+<script src="js/schema.js?v=3.10.2"></script>
+<script src="js/common.js?v=3.10.2"></script>
+<script src="js/auth.js?v=3.10.2"></script>
+<script src="js/calc.js?v=3.10.2"></script>
+<script src="js/nav.js?v=3.10.2"></script>
 <script>
 let revenues=[],costs=[],fixed=[],financePrjs=[],pipelines=[],allPrjs=[],estAll=[],milestones=[];
 // v2.9.37: S10 사고와 동일한 패턴(읽기 실패를 "원래 비어있음"으로 오인해 다른 프로젝트의 기존
@@ -908,10 +914,17 @@ async function unmarkPay(id){
   const ok=await clearAndWrite(...W.S05,[H5,...rowsFor(H5,dedupe(next,'cost_id'))]);
   if(ok){costs=dedupe(next,'cost_id');toast('지급확인 해제 ✓');renderLists();}else toast('저장 실패',true);
 }
+// v3.10.2 발행일·수취일을 오늘로 고정하지 않고 사용자가 입력(기본값 오늘)
+let _dateAskRes=null;
+function askDate(title,label,info,def){
+  return new Promise(res=>{ _dateAskRes=res; document.getElementById('dateAskTitle').textContent=title; document.getElementById('dateAskLabel').textContent=label; document.getElementById('dateAskInfo').textContent=info||''; document.getElementById('dateAskIn').value=def; document.getElementById('dateAskErr').textContent=''; document.getElementById('dateAskModal').classList.add('open'); setTimeout(()=>document.getElementById('dateAskIn').focus(),50); });
+}
+function dateAskDone(v){ document.getElementById('dateAskModal').classList.remove('open'); const r=_dateAskRes; _dateAskRes=null; if(r) r(v); }
+function dateAskOk(){ const v=document.getElementById('dateAskIn').value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ document.getElementById('dateAskErr').textContent='날짜를 입력해 주세요.'; return; } dateAskDone(v); }
 async function markInvoiced(id){
   const r=revenues.find(x=>x.revenue_id===id); if(!r)return;
-  const today=kstToday();
-  if(!confirm(`${r.year_month} · ${r.project_id} 건을 오늘(${today}) 발행 완료 처리할까요?`))return;
+  const today=await askDate('발행 완료 처리','발행일',`${r.year_month} · ${r.project_id} 건 — 세금계산서를 실제로 발행한 날짜를 입력하세요.`,kstToday());
+  if(!today)return;
   const prj=allPrjs.find(p=>p.project_id===r.project_id);
   const pl=prj?pipelines.find(p=>p.pipeline_id===prj.pipeline_id):null;
   genPl=pl;
@@ -923,8 +936,8 @@ async function markInvoiced(id){
 }
 async function markCostInvoiced(id){
   const c=costs.find(x=>x.cost_id===id); if(!c)return;
-  const today=kstToday();
-  if(!confirm(`${c.year_month} · ${c.cost_type} 건을 오늘(${today}) 수취 완료 처리할까요?`))return;
+  const today=await askDate('수취 완료 처리','수취일',`${c.year_month} · ${c.cost_type} 건 — 세금계산서를 받은 날짜를 입력하세요.`,kstToday());
+  if(!today)return;
   // v2.9.33: 매출의 markInvoiced(발행 완료)는 입금예정일이 비어있으면 자동 계산해 채우는데, 매입의
   // 수취 완료 처리는 지급예정일을 전혀 건드리지 않아 방치되던 비대칭(사용자 지적으로 발견) — 매출과
   // 동일하게 지급예정일이 비어있으면 익월말로 자동 계산해 채운다.

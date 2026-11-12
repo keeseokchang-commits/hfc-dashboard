@@ -16,7 +16,7 @@ const RATE_MAX_MAN=5000;
 const MSG={none:'조건에 맞는 후보가 없습니다. 조건을 넓히거나 이력서를 먼저 등록해 주세요.',dup:'이미 이 라인에 같은 경로로 등록된 후보입니다.',black:'블랙 구분 후보입니다. 그래도 등록하시겠습니까?'};
 const GRADES=['특급','고급','중급','초급'];
 let PRE=null;   // v2.12.0: 의뢰 상세의 「후보로 등록」에서 온 미리 채움 {person,via,order} — 처음 한 번만 적용
-let D={}, LINE=null, REQ=null, VIEWS=[], PM=new Map(), ASOF='', CODES={industry:[],project_type:[]}, PROMPT_TPL='', SEL=null, roleSel=new Set(), shown=50, SKILLS=new Map(), CAREERS=new Map(), done=null, askText=null;
+let D={}, LINE=null, REQ=null, VIEWS=[], PM=new Map(), ASOF='', CODES={role:[],industry:[],project_type:[]}, PROMPT_TPL='', SEL=null, roleSel=new Set(), shown=50, SKILLS=new Map(), CAREERS=new Map(), done=null, askText=null;
 const q=hrQ;
 const sel$=(items,cur,blank)=>(blank!==undefined?`<option value="">${hrEsc(blank)}</option>`:'')+items.map(x=>`<option${x===cur?' selected':''}>${hrEsc(x)}</option>`).join('');
 const F=(id,label,html,req)=>`<div class="hr-field"><label for="${id}"${req?' class="hr-req"':''}>${hrEsc(label)}</label>${html}<div class="hr-err" id="${id}Err"></div></div>`;
@@ -33,7 +33,7 @@ async function loadAll(){
   if(!LINE||!REQ){ q('screen').style.display='none'; box.innerHTML='<div class="hr-notice err">해당 요청 라인을 찾을 수 없습니다. <a href="request.html" style="color:inherit;font-weight:600">의뢰 대장으로 돌아가기</a></div>'; return; }
   if(cmnYes(LINE.is_cancelled)){ q('screen').style.display='none'; box.innerHTML='<div class="hr-notice warn">취소된 라인에는 후보를 등록할 수 없습니다. <a href="request-detail.html?id='+encodeURIComponent(REQ.request_id)+'" style="color:inherit;font-weight:600">의뢰 상세로</a></div>'; return; }
   box.innerHTML=''; q('screen').style.display='';
-  CODES={industry:[],project_type:[]}; PROMPT_TPL='';
+  CODES={role:[],industry:[],project_type:[]}; PROMPT_TPL='';
   D.S10.forEach(s=>{ const cat=String(s.category??'').trim(), key=String(s.setting_key??'').trim(); if(CODES[cat]&&key){ if(String(s.is_active??'Y').trim().toUpperCase()!=='N') CODES[cat].push(key); } else if(cat===S10_HR_SETTING_CAT&&key==='claude_prompt_template') PROMPT_TPL=String(s.setting_value??''); });
   q('btnBack').href='request-detail.html?id='+encodeURIComponent(REQ.request_id);
   q('title').innerHTML=`${hrEsc(REQ.alias||REQ.request_id)} <span class="hr-sub">${hrEsc(REQ.request_id)}</span>`;
@@ -101,7 +101,7 @@ function renderList(){
     +(list.length>shown?`<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary" id="btnMore">더 보기 (남은 ${list.length-shown}명)</button></div>`:'');
 }
 function renderRoleChips(){
-  const codes=[...new Set([...hrSplit(LINE.role_codes),...VIEWS.flatMap(v=>v.roles.map(r=>r.code))])].sort((a,b)=>a.localeCompare(b,'ko'));
+  const codes=[...new Set([...CODES.role,...hrSplit(LINE.role_codes),...VIEWS.flatMap(v=>v.roles.map(r=>r.code))])].sort((a,b)=>a.localeCompare(b,'ko'));
   q('roleChips').innerHTML=codes.map(c=>`<span class="hr-chip${roleSel.has(c)?' on':''}" data-role="${hrEsc(c)}">${hrEsc(c)}</span>`).join('')||'<span class="hr-sub">등록된 역할이 없습니다.</span>';
 }
 function render(){ renderRoleChips(); renderList(); renderForm(); }
