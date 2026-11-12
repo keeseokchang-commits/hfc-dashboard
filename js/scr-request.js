@@ -40,6 +40,22 @@ function kpiDefs(){
     {key:'due',label:'마감 임박 의뢰',value:open.filter(r=>r.dueSoon).length,unit:'건',cls:'amber',sub:`요청자 회신 기한 ${DUE_SOON_DAYS}일 이내`,test:r=>r.dueSoon},
   ];
 }
+// v3.10.0 「오늘 할 일」(설계서 v0.2 AT-SP-07): 매일 열어 볼 이유가 되는 4가지를 맨 위에 모은다. 누르면 아래 목록이 그 조건으로 걸러진다.
+//   회신 지연 = 서치업체 회신 기한이 지났는데 이력서가 없는 발송이 있는 진행 의뢰 / 추천 대기 = 업체에 보냈지만 아직 후보가 없는 의뢰
+//   인터뷰 결과 대기 = 후보가 인터뷰 단계인 의뢰 / 연락처 요청 필요 = 기존 알림 규칙 그대로
+function todayDefs(){
+  const crIds=contactRequestIds(), open=ROWS.filter(isOpen), has=v=>Array.isArray(v)?v.length>0:!!v;
+  return [
+    {key:'t_delay',label:'회신 지연',test:r=>isOpen(r)&&has(r.delayed)},
+    {key:'t_wait',label:'추천 대기',test:r=>isOpen(r)&&r.status==='탐색'},
+    {key:'t_iv',label:'인터뷰 결과 대기',test:r=>isOpen(r)&&r.status==='인터뷰'},
+    {key:'t_contact',label:'연락처 요청 필요',test:r=>crIds.has(r.id)},
+  ].map(d=>({...d,count:ROWS.filter(d.test).length}));
+}
+function renderToday(){
+  const el=hrQ('todayBox'); if(!el) return; const defs=todayDefs();
+  el.innerHTML=`<div class="hr-lbl" style="margin-bottom:6px">오늘 할 일</div><div class="hr-today">${defs.map(d=>`<button type="button" class="hr-chip${quick===d.key?' on':''}${d.count?'':' disabled'}" data-today="${d.key}" onclick="toggleQuick('${d.key}')">${hrEsc(d.label)} <b>${d.count}</b></button>`).join('')}</div>${defs.every(d=>!d.count)?'<div class="hr-help" style="margin-top:6px">지금 챙길 일이 없습니다.</div>':''}`;
+}
 function renderKpis(){
   hrQ('kpis').innerHTML=kpiDefs().map(k=>`<button class="hr-kpi ${k.cls}${quick===k.key?' on':''}" data-kpi="${k.key}" onclick="toggleQuick('${k.key}')"><div class="l">${hrEsc(k.label)}</div><div class="v">${hrEsc(k.value)}<span style="font-size:12px;font-weight:500"> ${hrEsc(k.unit)}</span></div><div class="s">${hrEsc(k.sub||(quick===k.key?'다시 누르면 해제':'누르면 목록을 걸러 봅니다'))}</div></button>`).join('');
 }
@@ -48,7 +64,7 @@ function toggleQuick(k){ quick=quick===k?'':k; shown=PAGE_SIZE; render(); }
 // 필터 — 연도와 월은 서로 독립이며 모두 AND (의뢰일 기준)
 function filtered(){
   const y=hrQ('fYear').value, m=hrQ('fMonth').value, st=hrQ('fStatus').value, cl=hrQ('fClient').value, q=hrQ('fSearch').value.trim().toLowerCase();
-  const kp=quick?kpiDefs().find(k=>k.key===quick):null;
+  const kp=quick?[...kpiDefs(),...todayDefs()].find(k=>k.key===quick):null;
   return ROWS.filter(r=>{
     if(y&&r.received.slice(0,4)!==y) return false;
     if(m&&r.received.slice(5,7)!==m.padStart(2,'0')) return false;
@@ -127,7 +143,7 @@ function fillFilters(){
   hrQ('fClient').innerHTML='<option value="">전체 고객사</option>'+cl.map(c=>`<option>${hrEsc(c)}</option>`).join('');
   ['fYear','fMonth','fStatus','fClient'].forEach((i,n)=>{ hrQ(i).value=keep[n]; });
 }
-function render(){ renderKpis(); renderList(); }
+function render(){ renderToday(); renderKpis(); renderList(); }
 
 async function loadAll(){
   const box=hrQ('loadBox'); box.innerHTML='<div class="hr-empty"><span class="spinner"></span></div>';

@@ -48,6 +48,8 @@ function renderCandBox(){
         <span class="hr-sub">경로 ${hrEsc(c.via_party_id?hrPartyLabel(pm,c.via_party_id):'-')}${c.rate_buy!==''&&c.rate_buy!==undefined?` · 매입 ${hrEsc(hrFmtMan(c.rate_buy))}만원`:''}</span></div>
       ${c.pitch_points?`<div class="hr-sub" style="white-space:pre-line;margin-bottom:6px">${hrEsc(c.pitch_points)}</div>`:''}
       ${dups.length?`<div class="hr-notice warn" data-dup="1">중복 추천: ${dups.map(x=>`${hrEsc(x.via_party_id?hrPartyName(pm,x.via_party_id):'-')}${x.rate_buy!==''&&x.rate_buy!==undefined?` (${hrEsc(hrFmtMan(x.rate_buy))}만원)`:''}`).join(', ')} 에서도 들어왔습니다. ${cmnYes(c.is_adopted)?'':'<button class="btn btn-secondary btn-sm" data-cact="adopt">이 경로를 채택</button>'}</div>`:''}
+      ${(()=>{ const nx=cmnNextStage(stage); return closed?'':`<div class="hr-row" style="margin-bottom:8px;align-items:center"><span class="hr-badge blue" data-curstage>현재 ${hrEsc(stage)}</span>${nx?`<button class="btn btn-primary btn-sm" data-cact="next" data-next="${hrEsc(nx)}">다음 단계: ${hrEsc(nx)} ▶</button>`:''}${['탈락','철회'].includes(stage)?'':'<button class="btn btn-secondary btn-sm" data-cact="drop">탈락</button>'}</div>`; })()}
+      <details class="hr-more" data-cdet><summary>다른 단계로 변경 · 단계일 · 메모 · 인터뷰 정보</summary>
       <div class="hr-row">
         <div class="hr-field fixed" style="min-width:140px"><label>단계</label><select class="hr-select cc-stage">${optList(ST.STAGE8.map(s=>({v:s,t:s})),stage)}</select></div>
         <div class="hr-field fixed" style="min-width:160px"><label>단계일</label><input class="hr-input cc-date" type="date" value="${hrToday()}"><div class="hr-sub">직전 ${hrEsc(lastLog||'-')}</div></div>
@@ -55,8 +57,8 @@ function renderCandBox(){
         <div class="hr-field fixed cc-ivbox" style="min-width:300px;${stage==='인터뷰'?'':'display:none'}"><label>인터뷰</label><div class="hr-row"><select class="hr-select cc-ivtype" style="width:110px">${optList([{v:'대면',t:'대면'},{v:'비대면',t:'비대면'}],c.interview_type||'','유형')}</select><input class="hr-input cc-ivat" type="date" value="${hrEsc(c.interview_at||'')}"></div></div>
         <div class="hr-field"><label>메모</label><input class="hr-input cc-memo"></div>
       </div>
-      <div class="hr-err cc-msg"></div>
-      <div class="hr-row" style="margin-top:6px"><button class="btn btn-primary btn-sm" data-cact="stage">단계 저장</button></div></div>`;
+      <div class="hr-row" style="margin-top:6px"><button class="btn btn-primary btn-sm" data-cact="stage">단계 저장</button></div></details>
+      <div class="hr-err cc-msg"></div></div>`;
   }).join(''):'<div class="hr-empty" id="candEmpty">아직 이 라인에 등록된 후보가 없습니다.</div>';
   box.innerHTML=`<div class="hr-chips" id="candLines" style="margin-bottom:8px">${chips}</div>
     <div class="hr-row" style="margin-bottom:8px"><a class="btn btn-primary btn-sm" id="btnPick" href="candidate-add.html?line=${encodeURIComponent(candLine)}">후보 선택</a>${PV_FAIL?'<span class="hr-sub">후보 이름을 읽지 못해 번호로 표시합니다.</span>':''}</div>${body}`;
@@ -68,6 +70,12 @@ async function candAction(b){
     for(const x of peers){ const want=x.cand_id===cur.cand_id?'Y':'N'; if(String(x.is_adopted||'N')===want) continue;
       const r=await hrUpdate('S31',x.cand_id,{is_adopted:want},{readUpdatedAt:x.updated_at}); if(!r.ok){ msg.textContent=hrSaveFailText(r); await loadAll(); return; } }
     toast('✓ 채택 경로를 지정했습니다'); await loadAll(); return;
+  }
+  if(b.dataset.cact==='drop'){ const dt=card.querySelector('[data-cdet]'); dt.open=true; const st=card.querySelector('.cc-stage'); st.value='탈락'; st.dispatchEvent(new Event('change',{bubbles:true})); card.querySelector('.cc-fail').focus(); msg.textContent='탈락 사유를 고르고 「단계 저장」을 눌러 주세요.'; return; }
+  if(b.dataset.cact==='next'){
+    const r=await cmnChangeStage({cand_id:cur.cand_id,stage:b.dataset.next,stage_date:hrToday(),readUpdatedAt:cur.updated_at});
+    if(!r.ok){ msg.textContent=r.message||hrSaveFailText(r); if(r.partial) await loadAll(); return; }
+    toast(`✓ ${b.dataset.next} 단계로 올렸습니다`+(b.dataset.next==='인터뷰'?' (인터뷰 유형·일시는 「다른 단계로 변경」에서 입력)':'')); await loadAll(); return;
   }
   const stage=card.querySelector('.cc-stage').value, date=card.querySelector('.cc-date').value, fail=card.querySelector('.cc-fail').value;
   if(stage==='탈락'&&!fail){ msg.textContent=CMN_STAGE_MSG.needReason; return; }

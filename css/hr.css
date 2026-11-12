@@ -113,3 +113,14 @@
 .btn-spin{width:12px;height:12px;border-width:2px;vertical-align:-2px}
 .prog{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--blue-lt,#EFF6FF);color:var(--blue,#2563EB);font-size:12px}
 .prog .spinner{width:14px;height:14px;border-width:2px}
+/* v3.10.0 원스톱 등록 모달(hr-quick.js) */
+.hr-modal-ov{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
+.hr-modal{background:var(--surface,#fff);border-radius:12px;padding:18px;width:100%;max-width:440px;box-shadow:0 10px 40px rgba(0,0,0,.25);max-height:90vh;overflow:auto}
+.hr-modal-title{font-weight:700;font-size:15px;margin-bottom:10px}
+.hr-modal .hr-field{margin-bottom:22px;position:relative}
+.hr-modal .hr-field>.hr-err{position:absolute;top:100%;left:0;margin-top:2px;line-height:14px}
+.hr-chip.hr-chip-add{border-style:dashed;background:transparent;color:var(--blue)}
+.hr-quick-line{background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:6px}
+details.hr-more>summary{cursor:pointer;font-size:12px;color:var(--blue);margin:6px 0 10px}
+.hr-today{display:flex;gap:8px;flex-wrap:wrap}
+.hr-today .hr-chip b{margin-left:4px}

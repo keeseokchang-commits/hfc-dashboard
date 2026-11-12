@@ -56,3 +56,7 @@ async function cmnChangeStage(p){
   if(!u.ok) return {ok:false,code:'SYNC',message:CMN_STAGE_MSG.sync,partial:!repair,logId,cause:u.code};
   return {ok:true,stage,logId,repaired:repair,canPromote:stage==='인터뷰',updated_at:u.updated_at};
 }
+
+// v3.10.0 「다음 단계」 버튼용(순수): 정상 진행 순서에서 한 칸 뒤. 마지막(계약)이거나 탈락·철회이면 null
+const CMN_STAGE_FLOW=['추천수령','회신','서류통과','인터뷰','선정','계약'];
+function cmnNextStage(stage){ const i=CMN_STAGE_FLOW.indexOf(String(stage||CMN_STAGE_FLOW[0]).trim()); return i>=0&&i<CMN_STAGE_FLOW.length-1?CMN_STAGE_FLOW[i+1]:null; }

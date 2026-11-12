@@ -57,6 +57,17 @@ async function renderResumes(){
   if(!RS.hasOrderCol) h+=`<div class="hr-notice warn" style="margin-bottom:8px" id="rsNoCol">구글 시트 S28_PERSON_FILE 탭의 1행 맨 오른쪽 빈 칸(P1)에 <b>order_id</b> 를 입력해 주세요. 그때까지 「받은 이력서 올리기」는 쓸 수 없습니다.</div>`;
   if(n) n.innerHTML=h;
   boxes.forEach(b=>{ const o=ORDERS.find(x=>x.order_id===b.dataset.resume); b.innerHTML=o?rsBlock(o):''; });
+  rsAutoReply();
+}
+// v3.10.0 회신 상태 자동 판정(설계서 v0.2 AT-SP-04): 「대기」인데 그 발송으로 받은 이력서가 있으면 「후보 추천」+회신일 오늘로 자동 저장한다.
+// 종결된 의뢰·예전에 「그대로 두기」를 누른 발송 건은 건드리지 않는다. 한 화면에서 같은 건은 한 번만 시도한다(실패해도 반복하지 않음).
+const RS_AUTO=new Set();
+async function rsAutoReply(){
+  if(DER&&DER.closed) return;
+  const o=ORDERS.find(x=>x.reply_state==='대기'&&!RS_AUTO.has(x.order_id)&&!rsSkipped(x.order_id)&&(()=>{ const st=rsStatus(x); return st.pend.length||st.files.length; })());
+  if(!o) return; RS_AUTO.add(o.order_id);
+  const r=await hrUpdate('S34',o.order_id,{reply_state:'후보 추천',replied_at:hrToday()},{readUpdatedAt:o.updated_at});
+  if(r.ok){ toast('✓ 이력서를 받아 회신 상태를 자동으로 「후보 추천」으로 바꿨습니다'); await loadAll(); }
 }
 function rsProg(orderId,t){ const c=document.querySelector(`[data-resume="${CSS.escape(orderId)}"]`); if(!c) return; const e=c.querySelector('[data-rs-prog]'); if(!e) return; e.style.display=t?'':'none'; c.querySelector('[data-rs-progtxt]').textContent=t||''; }
 async function rsUpload(orderId,files){

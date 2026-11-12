@@ -108,8 +108,9 @@ function render(){ renderRoleChips(); renderList(); renderForm(); }
 
 // ── ②③④ 추천 정보 · 적합 평가 · 연락처 ──────────────────────────────────────
 const STATUS_TXT={ok:['green','맞음'],warn:['amber','확인'],bad:['red','불일치'],unknown:['gray','자료 없음'],none:['gray','조건 없음']};
+const EXTRA_VIA=[];   // v3.10.0: 이 화면에서 새로 등록한 경로 업체(목록을 다시 그려도 남기기 위함)
 function viaOptions(){
-  const ids=new Set(D.S34.filter(o=>o.request_id===REQ.request_id).map(o=>o.party_id)); ['PTY-001','PTY-002'].forEach(i=>{ if(PM.has(i)) ids.add(i); });
+  const ids=new Set(D.S34.filter(o=>o.request_id===REQ.request_id).map(o=>o.party_id)); ['PTY-001','PTY-002',...EXTRA_VIA].forEach(i=>{ if(PM.has(i)) ids.add(i); });
   return [...ids].filter(i=>PM.has(i)).map(i=>({v:i,t:hrPartyLabel(PM,i)}));
 }
 function prevRoutes(pid){
@@ -130,7 +131,7 @@ function renderForm(){
     ${on.length?`<div class="hr-notice warn" id="dupWarn">이미 이 라인에 등록된 후보입니다 (경로: ${on.map(c=>hrEsc(c.via_party_id?hrPartyLabel(PM,c.via_party_id):'-')).join(', ')}). 다른 경로로 들어온 중복 추천이면 계속 등록할 수 있습니다.</div>`:''}
     ${v.pending?`<div class="hr-notice warn" id="pendWarn">이력서 변경 검토 대기 ${v.pending}건이 있습니다. <a href="candidate-detail.html?id=${encodeURIComponent(v.id)}&tab=career" style="color:inherit;font-weight:600">경력 탭에서 확인</a></div>`:''}
     <div class="hr-row">
-      ${F('fVia','경로 (추천한 곳)',`<select class="hr-select" id="fVia"><option value="">선택</option>${via.map(x=>`<option value="${hrEsc(x.v)}">${hrEsc(x.t)}</option>`).join('')}</select>`,true)}
+      ${F('fVia','경로 (추천한 곳)',`<select class="hr-select" id="fVia"><option value="">선택</option>${via.map(x=>`<option value="${hrEsc(x.v)}">${hrEsc(x.t)}</option>`).join('')}<option value="${HQ_NEW}">+ 새 업체 등록…</option></select>`,true)}
       ${F('fRecv','추천 수령일',`<input class="hr-input" type="date" id="fRecv" value="${hrEsc(ASOF)}">`,true)}
       <div class="hr-field"><label>가용 시기</label><div class="hr-sub" style="padding:8px 0" id="availTxt">${hrEsc(v.avail.text)}${v.person.avail_text?` · ${hrEsc(v.person.avail_text)}`:''}</div></div>
     </div>
@@ -142,18 +143,19 @@ function renderForm(){
     <div class="hr-row">${F('fResume','사용할 이력서',`<select class="hr-select" id="fResume">${files.map((f,i)=>`<option value="${hrEsc(f.file_id)}"${i===0?' selected':''}>v${hrEsc(f.version_no||'?')} · ${hrEsc(f.file_name||f.file_id)}${i===0?' (기준)':''}</option>`).join('')||'<option value="">등록된 이력서 없음</option>'}</select>`)}</div>
     <div class="hr-sub" id="prevRoutes" style="margin-bottom:6px">${prev.length?'이전 경로 이력: '+prev.map(hrEsc).join(' / '):'이전 경로 이력 없음'}</div>
   </div>
-  <div class="card" id="secFit"><div class="card-title"><span><span class="hr-block-no">3</span>적합 평가</span><span class="hr-badge amber">초안 — 검토 필요</span></div>
+  <div class="card" id="secFit"><div class="card-title"><span><span class="hr-block-no">3</span>적합 평가</span><span class="hr-badge amber">선택 사항</span></div>
+    <details class="hr-more" id="fitDet"><summary>펼쳐서 적합 평가를 입력합니다 — 요청자에게 보낼 추천 포인트가 필요할 때만 쓰세요 (건너뛰어도 등록됩니다)</summary>
     <div class="hr-sub" style="margin-bottom:6px">저장된 자료를 규칙으로 비교한 사실 판정입니다. 등록은 막지 않으며, 아래 항목은 확인하고 직접 고쳐 저장합니다.</div>
     <div class="hr-scroll"><table class="hr-table auto" id="fitTable" style="min-width:560px"><thead><tr><th style="width:150px">항목</th><th style="width:90px">판정</th><th>내용</th></tr></thead><tbody>${fit.items.map(i=>`<tr data-fit="${i.key}"><td>${hrEsc(i.label)}</td><td><span class="hr-badge ${STATUS_TXT[i.status][0]}">${STATUS_TXT[i.status][1]}</span></td><td style="white-space:normal;${i.status==='bad'?'color:var(--red);':''}">${hrEsc(i.text)}</td></tr>`).join('')}</tbody></table></div>
     <div class="hr-row" style="margin-top:10px">
-      ${F('fLevel','적합도',`<select class="hr-select" id="fLevel" style="width:120px">${sel$(['상','중','하'],'','선택')}</select>`,true)}
+      ${F('fLevel','적합도',`<select class="hr-select" id="fLevel" style="width:120px">${sel$(['상','중','하'],'','선택 안 함')}</select>`)}
       ${exp('client_exp','고객사 경험')}${exp('industry_exp','업종 경험')}${exp('type_exp','프로젝트 유형 경험')}</div>
     ${F('fReason','적합 이유','<textarea class="hr-input" id="fReason" rows="2" style="width:100%"></textarea>')}
     ${F('fPitch','추천 포인트 (2~4줄)','<textarea class="hr-input" id="fPitch" rows="3" style="width:100%"></textarea>')}
     ${F('fConcern','우려 사항 (내부용 — 요청자 출력·Claude 질문에는 넣지 않습니다)','<textarea class="hr-input" id="fConcern" rows="2" style="width:100%"></textarea>')}
     <div class="hr-row"><button class="btn btn-secondary btn-sm" data-act="ask">Claude 질문 문구 만들기 (이 후보)</button></div>
     <div id="askBox"></div>
-  </div>
+  </details></div>
   <div class="card" id="secContact"><div class="card-title"><span><span class="hr-block-no">4</span>연락처 (필요할 때만)</span></div>
     <div class="hr-sub" style="margin-bottom:6px">입력한 값은 시트에만 저장되고 이 화면의 목록에는 나오지 않습니다.</div>
     <div class="hr-row">${F('fMobile','휴대전화','<input class="hr-input" id="fMobile">')}${F('fEmail','이메일','<input class="hr-input" id="fEmail">')}
@@ -186,7 +188,7 @@ async function register(btn){
   ['fVia','fRecv','fBuy','fSell','fLevel'].forEach(i=>{ const e=q(i+'Err'); if(e) e.textContent=''; });
   let bad=false; const err=(id,m)=>{ q(id+'Err').textContent=m; bad=true; };
   const via=q('fVia').value, recv=q('fRecv').value, lvl=q('fLevel').value;
-  if(!via) err('fVia','경로를 선택해 주세요.'); if(!recv) err('fRecv','추천 수령일을 입력해 주세요.'); if(!lvl) err('fLevel','적합도를 선택해 주세요.');
+  if(!via) err('fVia','경로를 선택해 주세요.'); if(!recv) err('fRecv','추천 수령일을 입력해 주세요.');
   const buy=hrManToWon(q('fBuy').value), sell=hrManToWon(q('fSell').value);
   if(typeof buy==='number'&&isNaN(buy)) err('fBuy','단가는 숫자로 입력해 주세요.'); else if(typeof buy==='number'&&buy>RATE_MAX_MAN*10000) err('fBuy',`단가는 만원 단위입니다. 월 ${RATE_MAX_MAN.toLocaleString('ko-KR')}만원 이하로 입력해 주세요.`);
   if(typeof sell==='number'&&isNaN(sell)) err('fSell','단가는 숫자로 입력해 주세요.'); else if(typeof sell==='number'&&sell>RATE_MAX_MAN*10000) err('fSell',`단가는 만원 단위입니다. 월 ${RATE_MAX_MAN.toLocaleString('ko-KR')}만원 이하로 입력해 주세요.`);
@@ -198,7 +200,7 @@ async function register(btn){
     if(cur.tabs.S31.rows.some(c=>c.line_id===LINE.line_id&&c.person_id===v.id&&c.via_party_id===via)){ q('fViaErr').textContent=MSG.dup; return; }
     const ord=D.S34.find(o=>o.request_id===REQ.request_id&&o.line_id===LINE.line_id&&o.party_id===via)||D.S34.find(o=>o.request_id===REQ.request_id&&o.party_id===via);
     const rec={line_id:LINE.line_id,person_id:v.id,via_party_id:via,order_id:ord?ord.order_id:'',stage:START_STAGE,rate_buy:typeof buy==='number'?buy:'',rate_sell:typeof sell==='number'?sell:'',resume_file_id:q('fResume').value||'',
-      fit_state:'확정',fit_level:lvl,fit_reason:q('fReason').value.trim(),pitch_points:q('fPitch').value.trim(),concern_note:q('fConcern').value.trim(),
+      fit_state:lvl?'확정':'초안',fit_level:lvl,fit_reason:q('fReason').value.trim(),pitch_points:q('fPitch').value.trim(),concern_note:q('fConcern').value.trim(),
       client_exp:q('client_exp').value,client_exp_note:q('client_exp_note').value.trim(),industry_exp:q('industry_exp').value,industry_exp_note:q('industry_exp_note').value.trim(),type_exp:q('type_exp').value,type_exp_note:q('type_exp_note').value.trim()};
     const a=await hrAppend('S31',rec); if(!a.ok){ msg.textContent=hrSaveFailText(a); return; }
     const notes=[];
@@ -238,3 +240,13 @@ document.addEventListener('input',ev=>{ const id=ev.target.id;
   if(['fSearch','fSkills','fAgeMin','fAgeMax'].includes(id)){ shown=50; renderList(); } else if(id==='fBuy'||id==='fSell') marginUpdate(); });
 document.addEventListener('change',ev=>{ const id=ev.target.id; if(['fGrade','fRoleMode','fMulti','fAvail','fInd','fType','fNoBlack'].includes(id)){ shown=50; renderList(); } });
 window.addEventListener('load',loadAll);
+
+// v3.10.0 경로(추천한 곳) 선택 목록의 「+ 새 업체 등록」 — 이 의뢰로 발송하지 않은 업체도 화면을 떠나지 않고 만들어 바로 고른다
+document.addEventListener('change',async ev=>{
+  const t=ev.target; if(t.id!=='fVia') return;
+  if(t.value!==HQ_NEW){ t.dataset.prev=t.value; return; }
+  t.value=t.dataset.prev||'';
+  const p=await hqNewParty({roles:['서치업체']}); if(!p) return;
+  PM.set(p.party_id,p); EXTRA_VIA.push(p.party_id); const o=document.createElement('option'); o.value=p.party_id; o.textContent=`${p.name} (${p.party_id})`; t.insertBefore(o,t.querySelector(`option[value="${HQ_NEW}"]`));
+  t.value=p.party_id; t.dataset.prev=p.party_id; toast(`✓ 거래처 ‘${p.name}’을(를) 등록했습니다 (${p.party_id})`);
+});
