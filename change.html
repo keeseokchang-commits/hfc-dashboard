@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 프로젝트 변경</title>
-<link rel="stylesheet" href="css/common.css?v=3.10.2">
+<link rel="stylesheet" href="css/common.css?v=3.11.1">
 <style>
   :root{--bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;--border:#E2E8F0;--text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;--blue:#2563EB;--blue-lt:#EBF4FF;--green:#059669;--green-lt:#ECFDF5;--amber:#D97706;--amber-lt:#FFFBEB;--red:#DC2626;--red-lt:#FEF2F2;--nav-h:56px;--radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -103,6 +103,32 @@
   .ch-opt input{display:none}
   .fr .fg{display:flex;flex-direction:column;justify-content:flex-end}
   @media(max-width:767px){.fr{grid-template-columns:1fr}.ch-sum{grid-template-columns:1fr}}
+
+  .ch-rows{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed;min-width:1020px}
+  .ch-rows th{font-size:11px;color:var(--text3);padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;white-space:nowrap}
+  .ch-rows td{padding:6px 4px;border-bottom:1px solid var(--border);vertical-align:middle;word-break:keep-all}
+  .ch-rows td.c{text-align:center}.ch-rows td.n{text-align:right;white-space:nowrap}.ch-rows td.l{text-align:left;padding-left:8px;line-height:1.4}
+  .ch-rows input.fi,.ch-rows select.fi{padding:6px 6px;font-size:12px;min-width:0}
+  .ch-rows input[type=date].fi{padding:5px 4px;font-size:11px}
+  .ch-rows input.fi.n{text-align:right}.ch-rows input.fi.d{text-align:center}
+  .ch-rows tr.ex td{opacity:.5;text-decoration:line-through}.ch-rows tr.ex td.keep{text-decoration:none;opacity:1}
+  .ch-rows tr.dt td{background:var(--surface2);text-decoration:none}
+  .ch-rows tr.new td.st{color:var(--green)}.ch-rows tr.mod td.st{color:var(--amber)}
+  .st{font-weight:600}
+  .ch-bef{display:block;font-size:10px;color:var(--text3);margin-top:2px;white-space:nowrap}
+  .ch-lock{font-size:10px;color:var(--red);display:block;margin-top:2px}
+  .ch-btn{border:1px solid var(--border);background:var(--surface);border-radius:6px;font-size:11px;padding:4px 8px;cursor:pointer;color:var(--text2);white-space:nowrap}
+  .ch-btn:hover{border-color:var(--blue);color:var(--blue)}
+  .ch-ops{display:flex;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .ch-sal{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+  .ch-sal th{font-size:11px;color:var(--text3);padding:4px;text-align:center;border-bottom:1px solid var(--border)}
+  .ch-sal td{padding:4px;text-align:center}
+  .ch-sal input.fi,.ch-sal select.fi{padding:5px 6px;font-size:12px;text-align:right}
+  .ch-sal select.fi{text-align:center}
+  .ch-sal input:disabled{background:var(--surface2);color:var(--text3)}
+  .ch-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+  textarea.fi{resize:vertical;min-height:56px;font-family:inherit}
+
 </style>
 </head>
 <body data-page="change">
@@ -113,49 +139,44 @@
 </header>
 <nav class="side-nav"></nav>
 
-<main class="main">
+<main class="main" style="max-width:1100px">
   <div class="card">
     <div class="card-title">프로젝트 선택 <span style="font-size:11px;color:var(--text3);font-weight:400">수주·계약 프로젝트 중 인건비가 있는 건 (용역·턴키 제외)</span></div>
     <select class="fi" id="prjSel" onchange="selectProject(this.value)"><option value="">불러오는 중…</option></select>
   </div>
 
   <div class="card" id="inCard" style="display:none">
-    <div class="card-title"><span id="inTitle">변경 내용</span></div>
-    <div class="ch-opt" id="typeOpt">
-      <label id="lbT1" onclick="setType('인력철수')"><input type="radio" name="ctype">인력 철수</label>
-      <label id="lbT2" onclick="setType('종료일단축')"><input type="radio" name="ctype">종료일 단축</label>
+    <div class="card-title"><span id="inTitle">변경 내용</span><span style="font-size:11px;color:var(--text3);font-weight:400">바뀐 뒤의 모습으로 고쳐 주세요 · 금액 단위: 원</span></div>
+    <div class="ch-h" style="margin-top:0">① 인력별 구성 (견적의 인건비 행)</div>
+    <div class="ch-wrap"><table class="ch-rows" id="rowsTbl"><colgroup><col style="width:44px"><col style="width:100px"><col style="width:56px"><col style="width:84px"><col style="width:128px"><col style="width:128px"><col style="width:96px"><col style="width:96px"><col style="width:40px"><col style="width:100px"><col style="width:144px"></colgroup>
+      <thead><tr><th>상태</th><th>항목명(인력)</th><th>등급</th><th>지급 형태</th><th>시작일</th><th>종료일</th><th>판매 단가(월)</th><th>매입 단가(월)</th><th>MM</th><th>판매·매입 합계</th><th>조작</th></tr></thead>
+      <tbody id="rowsBody"></tbody></table></div>
+    <div class="btn-row" style="margin-top:6px"><button class="btn" style="flex:none;background:var(--surface2);border:1px solid var(--border);color:var(--text2)" id="btnAdd" onclick="addRow()">＋ 인력 추가</button></div>
+    <div class="ch-help">종료일을 바꾸면 연장·단축 모두 반영됩니다. 「마지막 근무일」을 넣으면 종료일을 그 날로 하고 마지막 달 금액을 일할로 제안합니다(고쳐 쓸 수 있음). 「제외」는 줄 전체를 뺍니다 — 이미 일한 사람은 제외 대신 마지막 근무일을 쓰세요. 🔒는 이미 지급·대사된 달입니다.</div>
+    <div id="otherBox"></div>
+
+    <div class="ch-h">② 프로젝트 기간</div>
+    <div class="ch-two">
+      <div class="fg"><label class="fl" for="pStart">시작일</label><input class="fi" id="pStart" type="date" onchange="onPeriod()"></div>
+      <div class="fg"><label class="fl" for="pEnd">종료일</label><input class="fi" id="pEnd" type="date" onchange="onPeriod()"></div>
     </div>
-    <div class="fr" id="rowTarget">
-      <div class="fg"><label class="fl" for="selWho">철수 인력</label><select class="fi" id="selWho" onchange="onWho()"></select></div>
-      <div class="fg"><label class="fl" for="effDate" id="lblEff">마지막 근무일 (이 날까지 일한 것으로 봅니다)</label><input class="fi" id="effDate" type="date" onchange="onEff()"></div>
-    </div>
-    <div class="fr" id="rowEnd" style="display:none">
-      <div class="fg"><label class="fl" for="newEnd">새 종료일 (이 날까지 일한 것으로 봅니다)</label><input class="fi" id="newEnd" type="date" onchange="onEff()"><div class="ch-help" id="curEndHelp"></div></div>
-      <div></div>
-    </div>
-    <div id="salBox" style="display:none">
-      <div class="ch-h">급여형 인력의 마지막 달 급여 (급여대장 값으로 고쳐 주세요 · 금액 단위: 원)</div>
-      <div class="ch-wrap"><table class="ch-t" style="min-width:640px"><colgroup><col style="width:120px"><col style="width:112px"><col style="width:96px"><col style="width:96px"><col style="width:96px"><col style="width:84px"></colgroup>
-        <thead><tr><th>인력</th><th>세전 급여</th><th>원천세</th><th>근로자 4대보험</th><th>회사 부담</th><th>상태</th></tr></thead><tbody id="salBody"></tbody></table></div>
-      <div class="ch-help">기본값은 기존 금액을 마지막 근무일 기준으로 일할 계산한 추정값입니다. 급여대장이 있으면 그 값으로 고치고 상태를 「확정」으로 바꿔 주세요.</div>
-    </div>
-    <div class="fr" style="margin-top:10px">
-      <div class="fg"><label class="fl" for="selReason">변경 사유</label><select class="fi" id="selReason"></select></div>
-      <div class="fg"><label class="fl" for="memo">메모 (선택)</label><input class="fi" id="memo" type="text" maxlength="200" placeholder="예: 고객사 요청으로 11/15 종료"></div>
-    </div>
-    <div id="errBox"></div>
+    <div class="ch-help" id="periodHelp"></div>
+
+    <div class="ch-h">③ 변경 사유 (자유롭게 적어 주세요)</div>
+    <textarea class="fi" id="reason" maxlength="300" placeholder="예: 고객사 요청으로 3명→1명 축소, 12월부터 적용"></textarea>
+    <div id="errBox" style="margin-top:10px"></div>
     <div class="btn-row"><button class="btn btn-primary" id="btnPrev" onclick="preview()">영향 미리보기</button></div>
   </div>
 
   <div class="card" id="pvCard" style="display:none">
-    <div class="card-title"><span>영향 미리보기</span><span style="font-size:11px;color:var(--text3);font-weight:400">아직 아무것도 저장되지 않았습니다</span></div>
+    <div class="card-title"><span>④ 영향 미리보기</span><span style="font-size:11px;color:var(--text3);font-weight:400">아직 아무것도 저장되지 않았습니다</span></div>
     <div id="pvBody"></div>
-    <div class="btn-row"><button class="btn btn-green" id="btnApply" onclick="applyChange()">변경 적용</button></div>
+    <div class="btn-row"><button class="btn btn-green" id="btnApply" onclick="applyChange()">⑤ 변경 적용</button></div>
     <div class="ch-help">변경 건은 이력으로 남으며 삭제할 수 없습니다(감사 추적). 이미 발행·입금·지급된 실적은 바꾸지 않습니다.</div>
   </div>
 
   <div class="card" id="hsCard" style="display:none">
-    <div class="card-title"><span>변경 이력</span><span style="font-size:11px;color:var(--text3);font-weight:400">이 프로젝트의 변경 건과 수정세금계산서 발급 확인</span></div>
+    <div class="card-title"><span>⑥ 변경 이력</span><span style="font-size:11px;color:var(--text3);font-weight:400">이 프로젝트의 변경 건과 수정세금계산서 발급 확인</span></div>
     <div id="hsBody"></div>
   </div>
 </main>
@@ -163,18 +184,18 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.10.2"></script>
-<script src="js/common.js?v=3.10.2"></script>
-<script src="js/auth.js?v=3.10.2"></script>
-<script src="js/calc.js?v=3.10.2"></script>
-<script src="js/payout.js?v=3.10.2"></script>
-<script src="js/change.js?v=3.10.2"></script>
-<script src="js/nav.js?v=3.10.2"></script>
+<script src="js/schema.js?v=3.11.1"></script>
+<script src="js/common.js?v=3.11.1"></script>
+<script src="js/auth.js?v=3.11.1"></script>
+<script src="js/calc.js?v=3.11.1"></script>
+<script src="js/payout.js?v=3.11.1"></script>
+<script src="js/change.js?v=3.11.1"></script>
+<script src="js/nav.js?v=3.11.1"></script>
 <script>
-let pls=[],prjs=[],ests=[],settings={},reasons=[],hist=[],sel=null,ctype='인력철수',plan=null,busy=false;
+let pls=[],prjs=[],ests=[],settings={},hist=[],sel=null,rows=[],locks={},plan=null,busy=false,kseq=0,periodAuto=true,cycle='';
 const wf=n=>comma(n);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const pay2=e=>chgIsSal(e)?'급여형':(String(e.memo||'').startsWith('사업소득형')?'사업소득형':'세금계산서형');
+const $=id=>document.getElementById(id);
 function plOf(p){ return pls.find(x=>x.pipeline_id===p.pipeline_id)||{}; }
 function spanOf(p){ const pl=plOf(p); return {start_date:pl.expected_start||p.start_date||'',end_date:pl.expected_end||p.end_date||''}; }
 function laborOf(p){ return ests.filter(e=>e.pipeline_id===p.pipeline_id&&e.comp_type==='인건비'); }
@@ -183,107 +204,180 @@ async function loadAll(){
     const [plR,prR,esR,stR]=await Promise.all([fetchSheet(...R.S01),fetchSheet(...R.S03),fetchSheet(...R.S12),fetchSheetSafe(...R.S10).catch(()=>null)]);
     pls=toObj(plR); const s10=toObj(stR||[]); calcApplySettings(s10);
     settings={}; s10.forEach(r=>{ if(r.setting_key) settings[r.setting_key]=r.setting_value; });
-    reasons=s10.filter(r=>r.category==='change_reason'&&r.is_active!=='N'&&r.setting_key).map(r=>r.setting_key);
-    if(!reasons.length) reasons=CHG_REASONS_DEFAULT.slice();
     const okPl=new Set(pls.filter(p=>['수주','계약'].includes(p.status)&&p.biz_type!=='용역턴키').map(p=>p.pipeline_id));
     ests=toObj(esR).filter(e=>e.pipeline_id);
     prjs=toObj(prR).filter(p=>p.project_id&&okPl.has(p.pipeline_id));
     const opt=prjs.filter(p=>laborOf(p).length).map(p=>`<option value="${esc(p.project_id)}">${esc(p.project_name||p.project_id)}</option>`).join('');
-    document.getElementById('prjSel').innerHTML='<option value="">'+(opt?'프로젝트를 선택하세요':'변경할 수 있는 프로젝트가 없습니다')+'</option>'+opt;
-    document.getElementById('selReason').innerHTML=reasons.map(r=>`<option>${esc(r)}</option>`).join('');
-    const q=new URLSearchParams(location.search).get('project'); if(q&&prjs.some(p=>p.project_id===q)){ document.getElementById('prjSel').value=q; selectProject(q); }
+    $('prjSel').innerHTML='<option value="">'+(opt?'프로젝트를 선택하세요':'변경할 수 있는 프로젝트가 없습니다')+'</option>'+opt;
+    const q=new URLSearchParams(location.search).get('project'); if(q&&prjs.some(p=>p.project_id===q)){ $('prjSel').value=q; selectProject(q); }
   }catch(e){ toast('로드 실패: '+e.message,true); }
 }
-function selectProject(pid){
-  sel=prjs.find(p=>p.project_id===pid)||null; plan=null;
-  ['inCard','hsCard'].forEach(i=>document.getElementById(i).style.display=sel?'block':'none');
-  document.getElementById('pvCard').style.display='none'; document.getElementById('errBox').innerHTML='';
+async function selectProject(pid){
+  sel=prjs.find(p=>p.project_id===pid)||null; plan=null; rows=[]; locks={};
+  ['inCard','hsCard'].forEach(i=>$(i).style.display=sel?'block':'none');
+  $('pvCard').style.display='none'; $('errBox').innerHTML='';
   if(!sel) return;
-  const sp=spanOf(sel);
-  document.getElementById('inTitle').textContent=`${sel.project_name||sel.project_id} · ${sp.start_date||'?'} ~ ${sp.end_date||'?'}`;
-  document.getElementById('selWho').innerHTML=laborOf(sel).map(e=>`<option value="${esc(e.estimate_id)}">${esc(e.item_name)} (${pay2(e)})</option>`).join('');
-  document.getElementById('curEndHelp').textContent='현재 종료일: '+(sp.end_date||'없음');
-  document.getElementById('effDate').value=''; document.getElementById('newEnd').value=''; document.getElementById('memo').value='';
-  setType('인력철수'); loadHist();
+  const sp=spanOf(sel), pl=plOf(sel); cycle=pl.payment_cycle||'';
+  $('inTitle').textContent=`${sel.project_name||sel.project_id} · ${sp.start_date||'?'} ~ ${sp.end_date||'?'}`;
+  $('reason').value=''; periodAuto=true;
+  try{ const raw=await fetchSheetSafe(...R.S15); locks=chgLockedMonths(toObj(raw||[]).filter(r=>r.payout_id&&r.project_id===sel.project_id)); }catch(e){ locks={}; }
+  rows=laborOf(sel).map(e=>({k:++kseq,id:e.estimate_id,base:e,name:e.item_name||'',grade:e.grade||'',payType:chgPayType(e),start:e.start_date||sp.start_date,end:e.end_date||sp.end_date,
+    sell:poN(e.unit_price),buy:chgIsSal(e)?0:poN(e.buy_price),sal:chgIsSal(e)?chgSalMap(e):null,orig:chgIsSal(e)?chgSalMap(e):null,excluded:false,isNew:false,open:false}));
+  renderOther(); renderRows(); syncPeriod(true); loadHist();
 }
-function setType(t){
-  ctype=t; plan=null; document.getElementById('pvCard').style.display='none';
-  document.getElementById('lbT1').classList.toggle('on',t==='인력철수'); document.getElementById('lbT2').classList.toggle('on',t==='종료일단축');
-  document.getElementById('rowTarget').style.display=t==='인력철수'?'grid':'none'; document.getElementById('rowEnd').style.display=t==='종료일단축'?'grid':'none';
-  renderSal();
+// ── 인력 줄 ───────────────────────────────────────────────────────
+const rowOf=k=>rows.find(r=>r.k===k);
+function buildOf(r){ return chgBuildRow(r.base,{name:r.name,grade:r.grade,payType:r.payType,start:r.start,end:r.end,sell:r.sell,buy:r.buy,sal:r.sal}); }
+function statusOf(r){
+  if(r.excluded) return '제외'; if(r.isNew) return '추가';
+  const sp=spanOf(sel), b=r.base; return chgSame(buildOf(r),{...b,start_date:b.start_date||sp.start_date,end_date:b.end_date||sp.end_date})?'기존':'수정';
 }
-function onWho(){ plan=null; document.getElementById('pvCard').style.display='none'; renderSal(); }
-function onEff(){ plan=null; document.getElementById('pvCard').style.display='none'; renderSal(); }
-function effVal(){ return document.getElementById(ctype==='인력철수'?'effDate':'newEnd').value; }
-function salTargets(){
-  if(!sel) return []; const eff=effVal(); if(!chgIsDate(eff)) return []; const sp=spanOf(sel);
-  const rows=laborOf(sel).filter(chgIsSal);
-  if(ctype==='인력철수'){ const id=document.getElementById('selWho').value; return rows.filter(e=>e.estimate_id===id); }
-  return rows.filter(e=>{ const en=e.end_date||sp.end_date, st=e.start_date||sp.start_date; return en>eff&&!(st&&st>eff); });
+function lockNote(r){ const m=locks[r.name]; if(!m||r.isNew) return ''; return `<span class="ch-lock">🔒 ${Object.keys(m).sort().map(k=>k+' '+m[k]).join(', ')}</span>`; }
+function renderRows(){
+  $('rowsBody').innerHTML=rows.map(r=>{
+    const st=statusOf(r), k=r.k, cls=(r.excluded?'ex ':'')+(st==='추가'?'new ':'')+(st==='수정'?'mod ':'');
+    const b=r.base, isSal=r.payType==='급여형', can=!r.excluded;
+    const bef=(f,v)=>(b&&!r.isNew&&String(b[f]??'')!==String(v??'')?`<span class="ch-bef">전 ${esc(b[f])}</span>`:'');
+    const nameCell=r.isNew?`<input class="fi" style="text-align:left" value="${esc(r.name)}" oninput="onF(${k},'name',this)" aria-label="항목명" placeholder="예: 홍길동">`:esc(r.name)+lockNote(r);
+    const payCell=r.isNew?`<select class="fi" style="text-align:center" onchange="onPay(${k},this.value)" aria-label="지급 형태"><option ${r.payType==='세금계산서형'?'selected':''}>세금계산서형</option><option ${r.payType==='사업소득형'?'selected':''}>사업소득형</option><option ${r.payType==='급여형'?'selected':''}>급여형</option></select>`:r.payType;
+    const buyCell=isSal?`<span class="ch-bef" style="color:var(--text2)">월별 입력</span>`:`<input class="fi n" inputmode="numeric" value="${wf(r.buy)}" oninput="onF(${k},'buy',this)" aria-label="매입 단가" ${can?'':'disabled'}>${b&&!r.isNew&&!chgIsSal(b)&&poN(b.buy_price)!==r.buy?`<span class="ch-bef">전 ${wf(b.buy_price)}</span>`:''}`;
+    const row=`<tr class="${cls}" id="tr${k}"><td class="c st keep">${st}</td><td class="l keep">${nameCell}</td>
+      <td class="c"><input class="fi d" value="${esc(r.grade)}" oninput="onF(${k},'grade',this)" aria-label="등급" ${can?'':'disabled'}></td>
+      <td class="c">${payCell}</td>
+      <td class="c"><input class="fi d" type="date" value="${esc(r.start)}" onchange="onF(${k},'start',this)" aria-label="시작일" ${can?'':'disabled'}>${bef('start_date',r.start)}</td>
+      <td class="c"><input class="fi d" type="date" value="${esc(r.end)}" onchange="onF(${k},'end',this)" aria-label="종료일" ${can?'':'disabled'}>${bef('end_date',r.end)}</td>
+      <td class="n"><input class="fi n" inputmode="numeric" value="${wf(r.sell)}" oninput="onF(${k},'sell',this)" aria-label="판매 단가" ${can?'':'disabled'}>${b&&!r.isNew&&poN(b.unit_price)!==r.sell?`<span class="ch-bef">전 ${wf(b.unit_price)}</span>`:''}</td>
+      <td class="n">${buyCell}</td>
+      <td class="c" id="mm${k}"></td><td class="n" id="tt${k}"></td>
+      <td class="c keep"><div class="ch-ops" style="flex-direction:column;gap:3px">
+        ${r.excluded?`<button class="ch-btn" onclick="toggleEx(${k})">되돌리기</button>`:`<span class="ch-bef" style="margin:0 0 2px">마지막 근무일</span><input class="fi d" type="date" style="width:128px" title="마지막 근무일" aria-label="마지막 근무일" onchange="lastDay(${k},this.value)">
+        <button class="ch-btn" onclick="toggleEx(${k})">${r.isNew?'삭제':'제외'}</button>${isSal?`<button class="ch-btn" onclick="toggleOpen(${k})">${r.open?'접기':'월별 급여'}</button>`:''}`}</div></td></tr>`;
+    return row+(isSal&&r.open&&can?salDetail(r):'');
+  }).join('')||'<tr><td colspan="11" class="c" style="color:var(--text3);padding:14px">인력이 없습니다. 「＋ 인력 추가」로 넣어 주세요.</td></tr>';
+  rows.forEach(r=>calcRow(r.k));
 }
-function renderSal(){
-  const t=salTargets(), box=document.getElementById('salBox');
-  box.style.display=t.length?'block':'none';
-  document.getElementById('salBody').innerHTML=t.map(e=>{ const s=chgSalarySuggest(e,effVal()), id=esc(e.estimate_id);
-    const inp=k=>`<td><input class="fi" inputmode="numeric" data-k="${k}" data-id="${id}" value="${wf(s[k])}" oninput="fc(this)" aria-label="${esc(e.item_name)} ${k}"></td>`;
-    return `<tr><td class="c">${esc(e.item_name)}</td>${inp('g')}${inp('w')}${inp('i')}${inp('e')}<td class="c"><select class="fi" style="text-align:center" data-k="s" data-id="${id}"><option>추정</option><option>확정</option></select></td></tr>`; }).join('');
+function calcRow(k){
+  const r=rowOf(k); if(!r) return; const mm=$('mm'+k); if(!mm) return;
+  const ok=chgIsDate(r.start)&&chgIsDate(r.end)&&r.end>=r.start;
+  if(!ok){ mm.textContent='─'; $('tt'+k).textContent='─'; return; }
+  const n=buildOf(r); mm.textContent=n.mm; $('tt'+k).innerHTML=`${wf(laborAmt(n,'unit_price'))}<span class="ch-bef" style="color:var(--text2)">${wf(laborAmt(n,'buy_price'))}</span>`;
 }
-function readSal(){
-  const o={}; document.querySelectorAll('#salBody [data-k]').forEach(el=>{ const id=el.dataset.id; o[id]=o[id]||{}; o[id][el.dataset.k]=el.dataset.k==='s'?el.value:un(el.value); }); return o;
+function salDetail(r){
+  const yms=(chgIsDate(r.start)&&chgIsDate(r.end)&&r.end>=r.start)?Object.keys(r.sal||{}).sort():[], lk=locks[r.name]||{};
+  const inp=(ym,f,v,dis)=>`<td><input class="fi" inputmode="numeric" value="${wf(v)}" oninput="onSal(${r.k},'${ym}','${f}',this)" aria-label="${esc(r.name)} ${ym} ${f}" ${dis?'disabled':''}></td>`;
+  return `<tr class="dt" id="dt${r.k}"><td colspan="11" style="padding:8px 12px"><table class="ch-sal"><colgroup><col style="width:110px"><col><col><col><col><col style="width:84px"></colgroup>
+    <thead><tr><th>귀속월</th><th>세전 급여</th><th>원천세</th><th>근로자 4대보험</th><th>회사 부담</th><th>상태</th></tr></thead><tbody>
+    ${yms.map(ym=>{ const x=r.sal[ym], dis=!!lk[ym]; return `<tr><td>${dis?'🔒 ':''}${ym}${dis?` <span style="font-size:10px;color:var(--red)">${lk[ym]}</span>`:''}</td>${inp(ym,'g',x.g,dis)}${inp(ym,'w',x.w,dis)}${inp(ym,'i',x.i,dis)}${inp(ym,'e',x.e,dis)}<td><select class="fi" onchange="onSal(${r.k},'${ym}','s',this)" ${dis?'disabled':''}><option ${x.s!=='확정'?'selected':''}>추정</option><option ${x.s==='확정'?'selected':''}>확정</option></select></td></tr>`; }).join('')||'<tr><td colspan="6" style="color:var(--text3)">시작일·종료일을 먼저 입력해 주세요.</td></tr>'}
+    </tbody></table></td></tr>`;
 }
+function dirty(){ plan=null; $('pvCard').style.display='none'; }
+function onF(k,f,el){
+  const r=rowOf(k); if(!r) return; dirty();
+  if(f==='sell'||f==='buy'){ fc(el); r[f]=un(el.value); if(r[f]>1e9){ toast('금액이 너무 큽니다(10억 원 초과). 원 단위로 입력했는지 확인해 주세요.',true); } }
+  else r[f]=el.value;
+  if((f==='start'||f==='end')&&r.payType==='급여형'&&chgIsDate(r.start)&&chgIsDate(r.end)){ r.sal=chgSalFit(r.sal||{},r.start,r.end,null,r.orig); renderRows(); }
+  else if(f==='start'||f==='end'||f==='sell'||f==='buy') { calcRow(k); }
+  if(f==='start'||f==='end') syncPeriod();
+  const st=$('tr'+k); if(st){ const s=statusOf(r); st.querySelector('.st').textContent=s; st.className=(r.excluded?'ex ':'')+(s==='추가'?'new ':'')+(s==='수정'?'mod ':''); }
+}
+function onSal(k,ym,f,el){ const r=rowOf(k); if(!r||!r.sal[ym]) return; dirty(); if(f==='s') r.sal[ym].s=el.value; else { fc(el); r.sal[ym][f]=un(el.value); } calcRow(k);
+  const st=$('tr'+k); if(st){ const s=statusOf(r); st.querySelector('.st').textContent=s; st.className=(r.excluded?'ex ':'')+(s==='추가'?'new ':'')+(s==='수정'?'mod ':''); } }
+function onPay(k,v){ const r=rowOf(k); if(!r) return; dirty(); r.payType=v; r.buy=v==='급여형'?0:r.buy;
+  r.sal=v==='급여형'?(chgIsDate(r.start)&&chgIsDate(r.end)?chgSalFit({},r.start,r.end):{}):null; r.orig=null; r.open=v==='급여형'; renderRows(); }
+function toggleOpen(k){ const r=rowOf(k); r.open=!r.open; renderRows(); }
+function toggleEx(k){ const r=rowOf(k); dirty(); if(r.isNew){ rows=rows.filter(x=>x.k!==k); } else r.excluded=!r.excluded; renderRows(); syncPeriod(); }
+function addRow(){ dirty(); const sp=spanOf(sel);
+  rows.push({k:++kseq,id:null,base:null,name:'',grade:'',payType:'사업소득형',start:sp.start_date,end:sp.end_date,sell:0,buy:0,sal:null,orig:null,excluded:false,isNew:true,open:false}); renderRows(); syncPeriod();
+}
+function lastDay(k,d){
+  const r=rowOf(k); if(!r||!d) return; dirty();
+  if(!chgIsDate(d)||d<r.start){ toast(`마지막 근무일은 시작일(${r.start}) 이후여야 합니다`,true); renderRows(); return; }
+  r.end=d; if(r.payType==='급여형') r.sal=chgSalFit(r.sal||{},r.start,d,d,r.orig);
+  renderRows(); syncPeriod();
+  toast(r.payType==='급여형'?'종료일을 바꾸고 마지막 달 급여를 일할로 제안했습니다. 「월별 급여」에서 확인해 주세요':'종료일을 마지막 근무일로 바꿨습니다');
+}
+function renderOther(){
+  const o=ests.filter(e=>e.pipeline_id===sel.pipeline_id&&e.comp_type&&e.comp_type!=='_EMPTY'&&e.comp_type!=='인건비');
+  $('otherBox').innerHTML=o.length?`<div class="ch-h">그 밖의 구성 (읽기 전용 · 고칠 때는 견적 화면에서)</div><div class="ch-wrap"><table class="ch-t" style="min-width:520px"><colgroup><col style="width:80px"><col><col style="width:130px"><col style="width:130px"></colgroup><thead><tr><th>구분</th><th>항목</th><th>매출</th><th>매입</th></tr></thead><tbody>${o.map(e=>`<tr><td class="c">${esc(e.comp_type)}</td><td class="l">${esc(e.item_name)}</td><td class="n">${wf((poN(e.qty)||1)*poN(e.unit_price))}</td><td class="n">${wf((poN(e.qty)||1)*poN(e.buy_price))}</td></tr>`).join('')}</tbody></table></div>`:'';
+}
+// ── 프로젝트 기간 ─────────────────────────────────────────────────
+function afterLaborRows(){ return rows.filter(r=>!r.excluded&&chgIsDate(r.start)&&chgIsDate(r.end)&&r.end>=r.start).map(r=>{ const n=buildOf(r); if(r.isNew) n._new=true; return n; }); }
+function syncPeriod(init){
+  if(!sel) return; const sp=spanOf(sel);
+  if(init) periodAuto=true;
+  if(periodAuto){ const other=ests.filter(e=>e.pipeline_id===sel.pipeline_id&&e.comp_type&&e.comp_type!=='_EMPTY'&&e.comp_type!=='인건비');
+    const sg=chgSuggestSpan([...other,...afterLaborRows()],sp); $('pStart').value=sg.start_date||sp.start_date; $('pEnd').value=sg.end_date||sp.end_date; }
+  const ch=$('pStart').value!==sp.start_date||$('pEnd').value!==sp.end_date;
+  $('periodHelp').textContent=`현재 ${sp.start_date||'?'} ~ ${sp.end_date||'?'}`+(ch?` → 변경 후 ${$('pStart').value} ~ ${$('pEnd').value} (적용할 때 한 번 더 확인합니다)`:' · 변경 없음')+(periodAuto?' · 인력 줄에 맞춰 자동으로 제안한 값입니다':'');
+}
+function onPeriod(){ periodAuto=false; dirty(); syncPeriod(); }
+// ── 미리보기 ──────────────────────────────────────────────────────
 async function readFresh(){
-  const [s4,s5]=await Promise.all([fetchSheetSafe(...R.S04).catch(()=>null),fetchSheetSafe(...R.S05).catch(()=>null)]);
-  const s15=await fetchSheetSafe(...R.S15).catch(()=>null);
-  return {s04:toObj(s4||[]).filter(r=>r.revenue_id),s05:toObj(s5||[]).filter(r=>r.cost_id),s15:toObj(s15||[]).filter(r=>r.payout_id&&r.project_id===sel.project_id)};
+  const [s4,s5,s15,s12]=await Promise.all([fetchSheetSafe(...R.S04).catch(()=>null),fetchSheetSafe(...R.S05).catch(()=>null),fetchSheetSafe(...R.S15).catch(()=>null),fetchSheet(...R.S12)]);
+  return {s04:toObj(s4||[]).filter(r=>r.revenue_id),s05:toObj(s5||[]).filter(r=>r.cost_id),s15:toObj(s15||[]).filter(r=>r.payout_id&&r.project_id===sel.project_id),s12:toObj(s12).filter(r=>r.estimate_id)};
+}
+function checkRows(){
+  const msgs=[]; rows.filter(r=>!r.excluded).forEach(r=>{ chgCheckRow({name:r.name,start:r.start,end:r.end,sell:r.sell,buy:r.buy,payType:r.payType,sal:r.sal}).forEach(m=>msgs.push(m));
+    if([r.sell,r.buy].some(v=>v>1e9)) msgs.push(`「${r.name||'새 줄'}」의 금액이 너무 큽니다(10억 원 초과). 원 단위인지 확인해 주세요.`); });
+  const names=rows.filter(r=>!r.excluded&&r.name.trim()).map(r=>r.name.trim()); names.forEach((n,i)=>{ if(names.indexOf(n)!==i) msgs.push(`항목명 「${n}」이 겹칩니다. 지급 스케줄에서 구분할 수 있게 다른 이름으로 해 주세요.`); });
+  return [...new Set(msgs)];
 }
 async function preview(){
-  if(busy||!sel) return; const eb=document.getElementById('errBox'); eb.innerHTML='';
-  const eff=effVal(); const sal=readSal();
-  for(const id of Object.keys(sal)){ const s=sal[id]; if([s.g,s.w,s.i,s.e].some(v=>v>1e9)){ eb.innerHTML='<div class="ch-err">급여 금액이 너무 큽니다(10억 원 초과). 원 단위로 입력했는지 확인해 주세요.</div>'; return; } }
-  const btn=document.getElementById('btnPrev'); btn.disabled=true; busy=true;
+  if(busy||!sel) return; const eb=$('errBox'); eb.innerHTML='';
+  const msgs=checkRows(); if(!$('reason').value.trim()) msgs.push('변경 사유를 적어 주세요.');
+  const ps=$('pStart').value, pe=$('pEnd').value; if(!chgIsDate(ps)||!chgIsDate(pe)||pe<ps) msgs.push('프로젝트 기간의 시작일·종료일을 확인해 주세요.');
+  if(msgs.length){ eb.innerHTML=`<div class="ch-err">${msgs.map(esc).join('<br>')}</div>`; return; }
+  const btn=$('btnPrev'); btn.disabled=true; busy=true;
   try{
     const fr=await readFresh(), sp=spanOf(sel);
-    plan=chgPlan({type:ctype,estimate_id:document.getElementById('selWho').value,effective:eff,newEnd:eff,salary:sal,span:sp,project_id:sel.project_id,
-      items:ests.filter(e=>e.pipeline_id===sel.pipeline_id),s04:fr.s04,s05:fr.s05,s15:fr.s15,settings});
-    if(!plan.ok){ eb.innerHTML=`<div class="ch-err">${esc(plan.error)}${plan.blocks.length?'<br>'+plan.blocks.map(esc).join('<br>'):''}</div>`; document.getElementById('pvCard').style.display='none'; plan=null; }
-    else { renderPreview(); document.getElementById('pvCard').style.display='block'; document.getElementById('pvCard').scrollIntoView({behavior:'smooth'}); }
+    const items=fr.s12.filter(e=>e.pipeline_id===sel.pipeline_id);
+    const lost=rows.filter(r=>!r.isNew&&!items.some(e=>e.estimate_id===r.id));
+    if(lost.length){ eb.innerHTML=`<div class="ch-err">견적이 이 화면을 연 뒤 다른 곳에서 바뀌었습니다(${lost.map(r=>esc(r.name)).join(', ')}). 프로젝트를 다시 선택해 처음부터 입력해 주세요.</div>`; busy=false; btn.disabled=false; return; }
+    plan=chgPlan({project_id:sel.project_id,pipeline_id:sel.pipeline_id,span:sp,items,afterLabor:afterLaborRows(),allEstIds:fr.s12.map(e=>e.estimate_id),today:kstToday(),
+      newSpan:{start_date:ps,end_date:pe},s04:fr.s04,s05:fr.s05,s15:fr.s15,settings,cycle});
+    if(!plan.ok){ eb.innerHTML=`<div class="ch-err">${esc(plan.error)}</div>`; $('pvCard').style.display='none'; plan=null; }
+    else { renderPreview(); $('pvCard').style.display='block'; $('pvCard').scrollIntoView({behavior:'smooth'}); }
   }catch(e){ eb.innerHTML=`<div class="ch-err">미리보기 실패: ${esc(e.message)}</div>`; }
   btn.disabled=false; busy=false;
 }
-function tbl(heads,rows,al){ // al: 'l'|'c'|'n'
-  if(!rows.length) return '<div class="ch-help">해당 없음</div>';
-  return `<div class="ch-wrap"><table class="ch-t" style="min-width:560px"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${al[i]}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+function tbl(heads,body,al,widths){
+  if(!body.length) return '<div class="ch-help">해당 없음</div>';
+  return `<div class="ch-wrap"><table class="ch-t" style="min-width:560px">${widths?`<colgroup>${widths.map(w=>`<col${w?` style="width:${w}px"`:''}>`).join('')}</colgroup>`:''}<thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body.map(r=>`<tr>${r.map((v,i)=>`<td class="${al[i]}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 function renderPreview(){
-  const p=plan, t=p.totals, m=(a,b)=>b-a, sg=n=>(n>0?'+':'')+wf(n);
-  let h=`<div class="ch-sum"><div>매출 합계<b>${wf(t.sell_before)} → ${wf(t.sell_after)}</b>${sg(m(t.sell_before,t.sell_after))}</div><div>매입 합계<b>${wf(t.buy_before)} → ${wf(t.buy_after)}</b>${sg(m(t.buy_before,t.buy_after))}</div><div>마진(매출-매입)<b>${wf(t.sell_before-t.buy_before)} → ${wf(t.sell_after-t.buy_after)}</b>${sg((t.sell_after-t.buy_after)-(t.sell_before-t.buy_before))}</div></div>`;
-  h+=`<div class="ch-h">① 견적 (효력일 ${esc(p.effective)})</div>`+tbl(['인력','지급 방식','매출','매입'],p.estChanges.map(c=>[esc(c.item_name),c.pay,`${wf(c.sell_before)} → ${wf(c.sell_after)}`,`${wf(c.buy_before)} → ${wf(c.buy_after)}`]),['l','c','n','n']);
+  const p=plan, t=p.totals, sg=n=>(n>0?'+':'')+wf(n);
+  let h=`<div class="ch-sum"><div>매출 합계<b>${wf(t.sell_before)} → ${wf(t.sell_after)}</b>${sg(t.sell_after-t.sell_before)}</div><div>매입 합계<b>${wf(t.buy_before)} → ${wf(t.buy_after)}</b>${sg(t.buy_after-t.buy_before)}</div><div>마진(매출-매입)<b>${wf(t.sell_before-t.buy_before)} → ${wf(t.sell_after-t.buy_after)}</b>${sg((t.sell_after-t.buy_after)-(t.sell_before-t.buy_before))}</div></div>`;
+  h+=`<div class="ch-help" style="margin:-4px 0 8px">인력 ${t.n_before}명 → ${t.n_after}명 · 변경이 처음 닿는 달: ${esc(p.effective.slice(0,7))}</div>`;
+  const opLabel={add:'추가',update:'수정',delete:'제외'};
+  h+=`<div class="ch-h">견적 (${p.ops.length}건)</div>`+tbl(['처리','인력','지급 방식','매출','매입'],p.ops.map(o=>[opLabel[o.op],esc(o.item_name),o.pay,`${wf(o.sell_before)} → ${wf(o.sell_after)}`,`${wf(o.buy_before)} → ${wf(o.buy_after)}`]),['c','l','c','n','n'],[60,0,100,200,200]);
   const po=p.payout.impacts;
-  h+=`<div class="ch-h">② 지급 스케줄 (${po.length}건${p.payout.confirmed?` · 이 중 확정된 행 ${p.payout.confirmed}건`:''})</div>`+tbl(['지급월','구분','대상','처리','변경 전','변경 후'],po.map(i=>[i.month,i.pay_type,esc(i.person||''),i.action+(i.confirmed?' (확정 행)':''),wf(i.before),wf(i.after)]),['c','c','l','c','n','n']);
-  if(p.payout.settle.length) h+=`<div class="po-note"><b>정산 필요</b> — 이미 지급·대사된 행은 바꾸지 않았습니다. 실제 정산(환수 또는 추가 지급)을 별도로 처리해 주세요.</div>`+tbl(['지급월','구분','대상','지급 금액','변경 후 금액'],p.payout.settle.map(i=>[i.month,i.pay_type,esc(i.person||''),wf(i.amount),wf(i.new_amount)]),['c','c','l','n','n']);
+  h+=`<div class="ch-h">지급 스케줄 (${po.length}건${p.payout.confirmed?` · 이 중 확정된 행 ${p.payout.confirmed}건도 바뀝니다`:''})</div>`+tbl(['지급월','구분','대상','처리','변경 전','변경 후'],po.map(i=>[i.month,i.pay_type,esc(i.person||''),i.action+(i.confirmed?' (확정)':''),wf(i.before),wf(i.after)]),['c','c','l','c','n','n'],[80,80,0,100,120,120]);
+  if(p.payout.settle.length) h+=`<div class="po-note"><b>정산 필요</b> — 이미 지급·대사된 행은 바꾸지 않았습니다. 실제 정산(환수 또는 추가 지급)을 별도로 처리해 주세요.</div>`+tbl(['지급월','구분','대상','지급 금액','변경 후 금액'],p.payout.settle.map(s=>[s.month,s.pay_type,esc(s.person||''),wf(s.amount),wf(s.new_amount)]),['c','c','l','n','n'],[80,80,0,130,130]);
   const bl=(arr,k)=>arr.map(i=>[i.month,k,i.action,wf(i.before),wf(i.after)]);
-  h+=`<div class="ch-h">③ 매출·매입 청구 스케줄 (미발행 행만 줄입니다)</div>`+tbl(['귀속월','구분','처리','변경 전(공급가)','변경 후'],[...bl(p.rev.impacts,'매출'),...bl(p.cost.impacts,'매입')],['c','c','c','n','n']);
+  h+=`<div class="ch-h">매출·매입 청구 스케줄 (발행·수취된 행은 바꾸지 않습니다)</div>`+tbl(['귀속월','구분','처리','변경 전(공급가)','변경 후'],[...bl(p.rev.impacts,'매출'),...bl(p.cost.impacts,'매입')],['c','c','c','n','n'],[90,80,100,0,0]);
   if(p.amends.length) h+=`<div class="po-note"><b>수정세금계산서 필요</b> — 이미 발행·수취된 계산서는 바꾸지 않았습니다. 홈택스에서 발급한 뒤 변경 이력에서 「발급 완료」를 체크하세요. 작성일·기한은 일반 기준의 참고값이며 세무사 확인이 필요합니다.</div>`+
     tbl(['구분','귀속월','감액 공급가액','작성일(참고)','발급 기한(참고)','입금·지급'],p.amends.map(a=>[a.kind,a.month,wf(a.cut_amount),a.write_date,a.due_date,a.paid?'완료':'미완료']),['c','c','n','c','c','c']);
   const nts=[...p.notes,...p.rev.notes,...p.cost.notes];
   if(nts.length) h+=`<div class="po-info">${nts.map(esc).join('<br>')}</div>`;
-  if(p.prj) h+=`<div class="ch-h">④ 프로젝트 종료일</div><div class="ch-help" style="font-size:12px">사업기회·프로젝트 종료일을 ${esc(p.prj.newEnd)}로 바꿉니다.</div>`;
-  document.getElementById('pvBody').innerHTML=h;
+  if(p.prj) h+=`<div class="ch-h">프로젝트 기간</div><div class="ch-help" style="font-size:12px">${esc(p.prj.oldStart)} ~ ${esc(p.prj.oldEnd)} → <b>${esc(p.prj.newStart)} ~ ${esc(p.prj.newEnd)}</b> (사업기회·프로젝트에 함께 반영)</div>`;
+  h+=`<div class="ch-h">자금수지 영향 월</div><div class="ch-help" style="font-size:12px">${p.months.length?p.months.map(esc).join(' · '):'없음'} — 자금수지는 견적·지급 스케줄·청구 스케줄을 직접 읽으므로 적용하면 바로 반영됩니다.</div>`;
+  $('pvBody').innerHTML=h;
 }
 // ── 적용 ─────────────────────────────────────────────────────────────
 async function readS18(){ const r=await fetchSheetSafe(...R.S18).catch(()=>{ throw new Error('변경 이력을 읽지 못했습니다'); }); return r?toObj(r).filter(x=>x.change_id):[]; }
-async function writeS18(rows){ return clearAndWrite(...W.S18,[HEADERS.S18,...rowsFor(HEADERS.S18,dedupe(rows,'change_id'))]); }
-async function saveRec(rec){ const rows=await readS18(); const i=rows.findIndex(r=>r.change_id===rec.change_id); if(i>=0) rows[i]=rec; else rows.push(rec); if(!(await writeS18(rows))) throw new Error('변경 이력(S18) 저장 실패 — 로그인 상태와 권한을 확인해 주세요'); }
+async function writeS18(rs){ return clearAndWrite(...W.S18,[HEADERS.S18,...rowsFor(HEADERS.S18,dedupe(rs,'change_id'))]); }
+async function saveRec(rec){ const rs=await readS18(); const i=rs.findIndex(r=>r.change_id===rec.change_id); if(i>=0) rs[i]=rec; else rs.push(rec); if(!(await writeS18(rs))) throw new Error('변경 이력(S18) 저장 실패 — 로그인 상태와 권한을 확인해 주세요'); }
 async function applyChange(){
   if(busy||!plan) return;
-  if(!confirm(`${sel.project_name||sel.project_id}\n${ctype==='인력철수'?'인력 철수':'종료일 단축'} (효력일 ${plan.effective})를 적용합니다.\n견적·지급 스케줄·청구 스케줄이 함께 바뀌며 변경 이력은 삭제할 수 없습니다. 진행할까요?`)) return;
-  busy=true; const btn=document.getElementById('btnApply'); btn.disabled=true;
+  const c=chgCountRows(plan);
+  if(!confirm(`${sel.project_name||sel.project_id}\n${c.sheets}개 시트의 ${c.rows}개 행을 바꿉니다. 발행·입금·지급 완료 건은 바뀌지 않습니다.\n변경 이력은 삭제할 수 없습니다. 진행할까요?`)) return;
+  if(plan.prj&&!confirm(`프로젝트 기간도 바꿉니다.\n${plan.prj.oldStart} ~ ${plan.prj.oldEnd}  →  ${plan.prj.newStart} ~ ${plan.prj.newEnd}\n(사업기회·프로젝트 두 곳에 반영) 이대로 진행할까요?`)) return;
+  busy=true; const btn=$('btnApply'); btn.disabled=true;
   try{
     if(!(await ensureSheet(R.S18[0],HEADERS.S18))) throw new Error('변경 이력 탭(S18)을 준비하지 못했습니다');
-    const rows=await readS18(), now=kstNow16();
-    const rec=chgRecord(plan,{change_id:chgNextId(rows,kstToday().slice(0,4)),project_id:sel.project_id,pipeline_id:sel.pipeline_id,type:ctype,
-      reason_code:document.getElementById('selReason').value,reason_memo:document.getElementById('memo').value.trim(),created_at:now});
-    rows.push(rec); if(!(await writeS18(rows))) throw new Error('변경 이력(S18) 저장 실패');
+    const rs=await readS18(), now=kstNow16();
+    const rec=chgRecord(plan,{change_id:chgNextId(rs,kstToday().slice(0,4)),project_id:sel.project_id,pipeline_id:sel.pipeline_id,reason_memo:$('reason').value.trim(),created_at:now});
+    rs.push(rec); if(!(await writeS18(rs))) throw new Error('변경 이력(S18) 저장 실패');
     await runSteps(rec);
   }catch(e){ toast(e.message,true); }
   busy=false; btn.disabled=false;
@@ -295,18 +389,18 @@ async function resumeChange(id){
 }
 async function runSteps(rec){
   const imp=JSON.parse(rec.impact_json||'{}'); const done=new Set(String(rec.steps_done||'').split(',').filter(Boolean)); const bad=[];
-  const writeAll=async(R_,W_,H,rows,key)=>{ if(!(await clearAndWrite(...W_,[H,...rowsFor(H,dedupe(rows,key))]))) throw new Error(W_[0]+' 저장 실패'); };
+  const writeAll=async(W_,H,rs,key)=>{ if(!(await clearAndWrite(...W_,[H,...rowsFor(H,dedupe(rs,key))]))) throw new Error(W_[0]+' 저장 실패'); };
   const steps={
-    '견적':async()=>{ const rows=toObj(await fetchSheet(...R.S12)).filter(r=>r.estimate_id); const r=chgApplyEstimate(rows,imp.est); bad.push(...r.conflicts); await writeAll(R.S12,W.S12,HEADERS.S12,r.rows,'estimate_id'); },
-    '지급스케줄':async()=>{ if(!(imp.payout||[]).length) return; const raw=await fetchSheetSafe(...R.S15); if(!raw) return; const r=chgApplyPayout(toObj(raw).filter(x=>x.payout_id),imp.payout); bad.push(...r.conflicts); await writeAll(R.S15,W.S15,HEADERS.S15,r.rows,'payout_id'); },
-    '매출':async()=>{ if(!(imp.rev||[]).length) return; const raw=await fetchSheetSafe(...R.S04); if(!raw) return; const r=chgApplyBilling(toObj(raw).filter(x=>x.revenue_id),'S04',imp.rev); bad.push(...r.conflicts); await writeAll(R.S04,W.S04,HEADERS.S04,r.rows,'revenue_id'); },
-    '매입':async()=>{ if(!(imp.cost||[]).length) return; const raw=await fetchSheetSafe(...R.S05); if(!raw) return; const r=chgApplyBilling(toObj(raw).filter(x=>x.cost_id),'S05',imp.cost); bad.push(...r.conflicts); await writeAll(R.S05,W.S05,HEADERS.S05,r.rows,'cost_id'); },
+    '견적':async()=>{ const rs=toObj(await fetchSheet(...R.S12)).filter(r=>r.estimate_id); const r=chgApplyEstimate(rs,imp.est,rec.pipeline_id,kstToday()); bad.push(...r.conflicts); await writeAll(W.S12,HEADERS.S12,r.rows,'estimate_id'); },
+    '지급스케줄':async()=>{ if(!(imp.payout||[]).length) return; const raw=await fetchSheetSafe(...R.S15); const cur=raw?toObj(raw).filter(x=>x.payout_id):[]; const r=chgApplyPayout(cur,imp.payout); bad.push(...r.conflicts); await writeAll(W.S15,HEADERS.S15,r.rows,'payout_id'); },
+    '매출':async()=>{ if(!(imp.rev||[]).length) return; const raw=await fetchSheetSafe(...R.S04); const cur=raw?toObj(raw).filter(x=>x.revenue_id):[]; const r=chgApplyBilling(cur,'S04',imp.rev); bad.push(...r.conflicts); await writeAll(W.S04,HEADERS.S04,r.rows,'revenue_id'); },
+    '매입':async()=>{ if(!(imp.cost||[]).length) return; const raw=await fetchSheetSafe(...R.S05); const cur=raw?toObj(raw).filter(x=>x.cost_id):[]; const r=chgApplyBilling(cur,'S05',imp.cost); bad.push(...r.conflicts); await writeAll(W.S05,HEADERS.S05,r.rows,'cost_id'); },
     '프로젝트':async()=>{ if(!imp.prj) return; const p1=toObj(await fetchSheet(...R.S01)).filter(x=>x.pipeline_id), p3=toObj(await fetchSheet(...R.S03)).filter(x=>x.project_id);
-      const r=chgApplyProject(p1,p3,rec.pipeline_id,rec.project_id,imp.prj.newEnd); await writeAll(R.S01,W.S01,HEADERS.S01,r.pls,'pipeline_id'); await writeAll(R.S03,W.S03,HEADERS.S03,r.prjs,'project_id'); },
+      const r=chgApplyProject(p1,p3,rec.pipeline_id,rec.project_id,imp.prj); await writeAll(W.S01,HEADERS.S01,r.pls,'pipeline_id'); await writeAll(W.S03,HEADERS.S03,r.prjs,'project_id'); },
     '이력':async()=>{ const raw=await fetchSheetSafe(...R.S14); const list=raw?toObj(raw):[]; const H=['hist_id','changed_at','pipeline_id','target','old_value','new_value','reason','source'];
       let n=list.reduce((m,h)=>Math.max(m,parseInt((h.hist_id||'').replace(/\D/g,''))||0),0)+1;
-      list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:kstNow16(),pipeline_id:rec.pipeline_id,target:'프로젝트 변경',old_value:`${rec.change_type} ${rec.target_item||''}`.trim()+` (효력일 ${rec.effective_date})`,new_value:`매출 ${wf(rec.sell_before)}→${wf(rec.sell_after)} / 매입 ${wf(rec.buy_before)}→${wf(rec.buy_after)}`,reason:rec.reason_code+(rec.reason_memo?' · '+rec.reason_memo:''),source:rec.change_id});
-      await writeAll(R.S14,W.S14,H,list,'hist_id'); }
+      list.push({hist_id:'H-'+String(n).padStart(4,'0'),changed_at:kstNow16(),pipeline_id:rec.pipeline_id,target:'프로젝트 변경',old_value:`${rec.change_type} ${rec.target_item||''}`.trim()+` (${rec.effective_date} 부터)`,new_value:`매출 ${wf(rec.sell_before)}→${wf(rec.sell_after)} / 매입 ${wf(rec.buy_before)}→${wf(rec.buy_after)}`,reason:(rec.reason_code?rec.reason_code+(rec.reason_memo?' · ':''):'')+String(rec.reason_memo||'').slice(0,200),source:rec.change_id});
+      await writeAll(W.S14,H,list,'hist_id'); }
   };
   let failed='';
   for(const s of CHG_STEPS){
@@ -317,32 +411,40 @@ async function runSteps(rec){
   rec.status=failed?'부분실패':'적용완료';
   if(bad.length) rec.reason_memo=(String(rec.reason_memo||'')+' [건너뜀: '+bad.join(' / ')+']').slice(0,900);
   await saveRec(rec).catch(()=>{});
-  document.getElementById('pvCard').style.display='none'; plan=null;
+  $('pvCard').style.display='none'; plan=null;
   if(failed) toast(failed+' — 변경 이력에서 「이어서 적용」을 눌러 주세요',true);
   else if(bad.length) toast('일부 행은 바뀌어 건너뛰었습니다: '+bad[0],true);
   else toast('✓ 변경이 적용되었습니다 ('+rec.change_id+')');
-  // 견적이 바뀌었으므로 화면 데이터 갱신
-  try{ ests=toObj(await fetchSheet(...R.S12)).filter(e=>e.pipeline_id); }catch(e){}
+  if(!failed&&sel&&sel.pipeline_id===rec.pipeline_id){ try{ await reloadProject(); }catch(e){} }
   await loadHist(bad);
+}
+async function reloadProject(){
+  const pid=sel.project_id;
+  const [plR,prR,esR]=await Promise.all([fetchSheet(...R.S01),fetchSheet(...R.S03),fetchSheet(...R.S12)]);
+  pls=toObj(plR); ests=toObj(esR).filter(e=>e.pipeline_id); const okPl=new Set(pls.filter(p=>['수주','계약'].includes(p.status)&&p.biz_type!=='용역턴키').map(p=>p.pipeline_id));
+  prjs=toObj(prR).filter(p=>p.project_id&&okPl.has(p.pipeline_id));
+  await selectProject(pid);
 }
 // ── 이력 ─────────────────────────────────────────────────────────────
 async function loadHist(extra){
   try{ hist=(await readS18()).filter(r=>r.project_id===sel.project_id).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))); }catch(e){ hist=[]; }
-  const rows=hist.map(r=>{ const am=safeJ(r.amend_json); const open=am.filter(a=>!a.done).length;
+  const rs=hist.map(r=>{ const am=safeJ(r.amend_json); const open=am.filter(a=>!a.done).length;
     const stc=r.status==='적용완료'?'tag-ok':r.status==='부분실패'?'tag-old':'tag-est';
-    return [r.change_id,esc(r.change_type),esc(r.target_item||'─'),r.effective_date,esc(r.reason_code||''),`<span class="tag ${stc}">${esc(r.status)}</span>`+(r.status!=='적용완료'?` <button class="btn btn-primary" style="flex:none;padding:3px 8px;font-size:11px" onclick="resumeChange('${esc(r.change_id)}')">이어서 적용</button>`:''),
-      `${wf(r.sell_before)}→${wf(r.sell_after)}`,open?`<span class="tag tag-old">미발급 ${open}건</span>`:(am.length?'<span class="tag tag-ok">완료</span>':'─')]; });
-  let h=rows.length?`<div class="ch-wrap"><table class="ch-t" style="min-width:760px"><thead><tr><th>번호</th><th>유형</th><th>대상</th><th>효력일</th><th>사유</th><th>상태</th><th>매출 변화</th><th>수정계산서</th></tr></thead><tbody>${rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===6?'n':i===2||i===4?'l':'c'}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="ch-help">아직 변경 이력이 없습니다.</div>';
+    const why=[r.reason_code,r.reason_memo].filter(Boolean).join(' · ');
+    return [r.change_id,esc(r.created_at||'').slice(0,10),esc(r.change_type),esc(r.target_item||'─'),esc(why),`<span class="tag ${stc}">${esc(r.status)}</span>`+(r.status!=='적용완료'?` <button class="ch-btn" onclick="resumeChange('${esc(r.change_id)}')">이어서 적용</button>`:''),
+      `${wf(r.sell_before)} → ${wf(r.sell_after)}`,`${wf(r.buy_before)} → ${wf(r.buy_after)}`,open?`<span class="tag tag-old">미발급 ${open}건</span>`:(am.length?'<span class="tag tag-ok">완료</span>':'─')]; });
+  const al=['c','c','c','l','l','c','n','n','c'];
+  let h=rs.length?`<div class="ch-wrap"><table class="ch-t" style="min-width:1120px"><colgroup><col style="width:96px"><col style="width:84px"><col style="width:66px"><col style="width:110px"><col><col style="width:112px"><col style="width:176px"><col style="width:176px"><col style="width:90px"></colgroup><thead><tr><th>번호</th><th>일자</th><th>유형</th><th>내용</th><th>사유</th><th>상태</th><th>매출 변화</th><th>매입 변화</th><th>수정계산서</th></tr></thead><tbody>${rs.map(r=>`<tr>${r.map((v,i)=>`<td class="${al[i]}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="ch-help">아직 변경 이력이 없습니다.</div>';
   const todo=[]; hist.forEach(r=>safeJ(r.amend_json).forEach((a,i)=>todo.push({r,a,i})));
   if(todo.length) h+=`<div class="ch-h">수정세금계산서 발급 확인</div>`+`<div class="ch-wrap"><table class="ch-t" style="min-width:560px"><thead><tr><th>변경 건</th><th>구분</th><th>귀속월</th><th>감액 공급가액</th><th>발급 기한(참고)</th><th>발급 완료</th></tr></thead><tbody>${todo.map(({r,a,i})=>`<tr><td class="c">${r.change_id}</td><td class="c">${a.kind}</td><td class="c">${a.month}</td><td class="n">${wf(a.cut_amount)}</td><td class="c">${a.due_date}</td><td class="c"><input type="checkbox" ${a.done?'checked':''} onchange="toggleAmend('${esc(r.change_id)}',${i},this.checked)" aria-label="발급 완료"></td></tr>`).join('')}</tbody></table></div>`;
   if(extra&&extra.length) h+=`<div class="po-note">${extra.map(esc).join('<br>')}</div>`;
-  document.getElementById('hsBody').innerHTML=h;
+  $('hsBody').innerHTML=h;
 }
 function safeJ(s){ try{ const v=JSON.parse(s||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
 async function toggleAmend(id,i,on){
-  try{ const rows=await readS18(); const r=rows.find(x=>x.change_id===id); if(!r) throw new Error('변경 건을 찾지 못했습니다');
+  try{ const rs=await readS18(); const r=rs.find(x=>x.change_id===id); if(!r) throw new Error('변경 건을 찾지 못했습니다');
     const am=safeJ(r.amend_json); if(!am[i]) throw new Error('항목을 찾지 못했습니다'); am[i].done=!!on; r.amend_json=JSON.stringify(am);
-    if(!(await writeS18(rows))) throw new Error('저장 실패'); toast('✓ 저장했습니다'); await loadHist();
+    if(!(await writeS18(rs))) throw new Error('저장 실패'); toast('✓ 저장했습니다'); await loadHist();
   }catch(e){ toast(e.message,true); await loadHist(); }
 }
 window.addEventListener('load',loadAll);

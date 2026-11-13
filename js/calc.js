@@ -118,6 +118,14 @@ function monthlyAmounts(price,sd,ed,opt){
     acc+=v; return {...x,amount:v};
   });
 }
+// v3.11.1: 견적 없이 총액(계약금액·직접입력)만 있을 때의 월별 안분 — 월 가중치는 견적과 같은 투입일 앵커 M/M(mmMonthly).
+// 예) 5,600만원, 11/16~3/15(=4.00M/M) → 11월 0.5·12~2월 1·3월 0.5 → 700만/1,400만/1,400만/1,400만/700만. 각 월 백원 절사, 마지막 월이 잔액.
+function allocByMM(total,sd,ed){
+  const mm=mmMonthly(sd,ed); if(!mm.length) return null;
+  const w=mm.reduce((s,x)=>s+x.mm,0); if(!(w>0)) return null;
+  let acc=0;
+  return mm.map((x,i)=>{ const v=(i===mm.length-1)?total-acc:Math.floor(total*x.mm/w/100)*100; acc+=v; return {y:x.y,m:x.m,mm:x.mm,amount:v}; });
+}
 // 견적 인건비 한 행의 총액(단가×투입). 기간이 있고 MM이 날짜 계산값과 같으면 월별 금액 합(부분월 절사 반영), 아니면 단가×MM(직접 고친 MM 존중). 급여형 매입은 기존 식 그대로.
 function laborAmt(e,field){
   const p=parseInt(String(e[field]??'').replace(/,/g,''),10)||0, mm=parseFloat(e.mm)||0;
