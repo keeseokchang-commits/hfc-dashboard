@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=3.11.1">
+<link rel="stylesheet" href="css/common.css?v=3.11.2">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -376,12 +376,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.11.1"></script>
-<script src="js/common.js?v=3.11.1"></script>
-<script src="js/auth.js?v=3.11.1"></script>
-<script src="js/calc.js?v=3.11.1"></script>
-<script src="js/payout.js?v=3.11.1"></script>
-<script src="js/nav.js?v=3.11.1"></script>
+<script src="js/schema.js?v=3.11.2"></script>
+<script src="js/common.js?v=3.11.2"></script>
+<script src="js/auth.js?v=3.11.2"></script>
+<script src="js/calc.js?v=3.11.2"></script>
+<script src="js/payout.js?v=3.11.2"></script>
+<script src="js/nav.js?v=3.11.2"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -1288,11 +1288,25 @@ function initFixCompareSelectors(){
 }
 // 고정비 항목별 계획 대비 실적 — 행을 누르면 그 달의 계획 내역(fixed.html 계획 행)과 실적 내역(통장 거래)을 펼쳐 보여준다(사용자 요청 2026-10-22).
 // 실적은 합계와 같은 기준(순지출: 출금−입금)이며, 같은 유형명으로 들어온 입금(환급·회수)도 거래 목록에 함께 보여 순지출이 어떻게 나왔는지 확인할 수 있다.
+// v3.11.2(사용자 승인): 고정비 계획 대비 실적의 귀속 — 대사(matched_txn_id)로 계획에 연결된 거래는 그 계획의 달·항목으로, 연결 안 된 거래는 거래월·거래 유형 그대로.
+// 한 거래가 여러 계획에 걸려 있으면 처음 만난 계획에만 귀속(이중 계산 방지). 반환: {'YYYY-MM|항목':{sum,items:[{t,net,moved}]}}
+function fciBuckets(){
+  const byId={}; detailAll.forEach(t=>{ byId[t.txn_id]=t; });
+  const ok=t=>{ const c=t.category||'미분류'; if(['매출입금','매입지급','자본납입','기타입금'].includes(bucketOf(c))) return false; return !!((num(t.outflow_amt)||0)-(num(t.inflow_amt)||0)); };
+  const out={}, used=new Set();
+  const put=(ym,c,t,moved)=>{ const k=ym+'|'+c; const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0); const b=out[k]||(out[k]={sum:0,items:[]}); b.sum+=net; b.items.push({t,net,moved}); };
+  [...planFix].sort((a,b)=>String(a.fixed_id||'').localeCompare(String(b.fixed_id||''))).forEach(f=>{
+    splitIds(f.matched_txn_id).forEach(id=>{ const t=byId[id]; if(!t||used.has(id)||!ok(t)) return; used.add(id);
+      put(f.year_month,f.category||'미지정',t,String(t.year_month||'')!==String(f.year_month||'')); });
+  });
+  detailAll.forEach(t=>{ if(used.has(t.txn_id)||!ok(t)) return; put(t.year_month,t.category||'미분류',t,false); });
+  return out;
+}
 const fciOpen=new Set();
 const fciEsc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function fciDetailRow(c,ym){
   const plans=planFix.filter(f=>f.year_month===ym&&(f.category||'미지정')===c).sort((a,b)=>String(a.payment_date||'').localeCompare(String(b.payment_date||'')));
-  const txs=detailAll.filter(t=>t.year_month===ym&&(t.category||'미분류')===c&&((num(t.outflow_amt)||0)-(num(t.inflow_amt)||0))).sort((a,b)=>String(a.txn_date||'').localeCompare(String(b.txn_date||'')));
+  const txs=((fciBuckets()[ym+'|'+c]||{}).items||[]).slice().sort((a,b)=>String(a.t.txn_date||'').localeCompare(String(b.t.txn_date||'')));
   const th='font-size:10px;color:var(--text3);font-weight:600;padding:4px 6px;text-align:right;border-bottom:1px solid var(--border)';
   const td='font-size:11px;padding:4px 6px;text-align:right;border-bottom:1px dashed var(--border);font-weight:400';
   const tdl=td+';text-align:left';
@@ -1302,8 +1316,8 @@ function fciDetailRow(c,ym){
     return `<tr><td style="${tdl}">${fciEsc(f.payment_date||'─')}</td><td style="${tdl}">${fciEsc(f.memo||'─')}${f.has_tax_invoice==='Y'?' <span style="font-size:10px;color:var(--text3)">(세금계산서·부가세 포함)</span>':''}</td><td style="${td}">${won(amt,false)}</td><td style="${td}">${ids.length?'대사 '+ids.length+'건':'<span style="color:var(--text3)">미대사</span>'}</td></tr>`;}).join('')
     :`<tr><td colspan="4" style="${tdl};color:var(--text3)">이 달 계획이 없는 항목입니다(예산 외).</td></tr>`;
   let sum=0;
-  const txBody=txs.length?txs.map(t=>{ const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0); sum+=net;
-    return `<tr><td style="${tdl}">${fciEsc(t.txn_date||'─')}</td><td style="${tdl}">${fciEsc(t.description||'─')}</td><td style="${td}" class="${net<0?'pos':''}">${net<0?'−'+won(-net,false)+' (입금)':won(net,false)}</td></tr>`;}).join('')
+  const txBody=txs.length?txs.map(x=>{ const t=x.t, net=x.net; sum+=net;
+    return `<tr><td style="${tdl}">${fciEsc(t.txn_date||'─')}${x.moved?' <span style="font-size:10px;color:var(--blue,#2563EB)" title="대사로 이 계획 달에 연결된 거래(거래일은 다른 달)">대사 연결</span>':''}</td><td style="${tdl}">${fciEsc(t.description||'─')}</td><td style="${td}" class="${net<0?'pos':''}">${net<0?'−'+won(-net,false)+' (입금)':won(net,false)}</td></tr>`;}).join('')
     +`<tr><td colspan="2" style="${tdl};font-weight:600">순지출 합계</td><td style="${td};font-weight:700">${won(sum,false)}</td></tr>`
     :`<tr><td colspan="3" style="${tdl};color:var(--text3)">이 달 통장 거래가 없습니다(미집행).</td></tr>`;
   return `<tr class="fci-detail"><td colspan="4" style="background:var(--surface2,#F7F8FA);padding:10px 12px;text-align:left"><div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1381,14 +1395,9 @@ function renderFixCompareItems(){
   // (카드값 환급, 급여 오지급 회수 등)을 무시하면 실제 순지출보다 부풀려진 값을 "초과 지출"로
   // 잘못 보여준다. 출금에서 같은 유형명의 입금을 뺀 순지출(net)로 집계 — 법인카드·급여뿐 아니라
   // 입금·출금이 같은 이름으로 오갈 수 있는 모든 고정비 항목에 공통으로 적용되는 원칙.
-  const actual={};
-  detailAll.filter(t=>t.year_month===ym).forEach(t=>{
-    const c=t.category||'미분류';
-    if(['매출입금','매입지급','자본납입','기타입금'].includes(bucketOf(c))) return;   // v3.2.0: 이름 대신 버킷(시스템 코드)으로 판별
-    const net=(num(t.outflow_amt)||0)-(num(t.inflow_amt)||0);
-    if(!net) return;
-    actual[c]=(actual[c]||0)+net;
-  });
+  // v3.11.2: 대사로 계획에 연결된 거래는 계획의 달로 귀속(fciBuckets). 연결 안 된 거래는 거래월 그대로.
+  const actual={}; const bk=fciBuckets();
+  Object.keys(bk).forEach(k=>{ if(k.startsWith(ym+'|')&&bk[k].sum) actual[k.slice(ym.length+1)]=bk[k].sum; });
   const allItems=[...new Set([...Object.keys(plan),...Object.keys(actual)])]
     .sort((a,b)=>(plan[b]||0)+(actual[b]||0)-((plan[a]||0)+(actual[a]||0)));
   if(!allItems.length){ document.getElementById('fixCompareBody').innerHTML='<tr><td colspan="4"><div class="empty-state">데이터 없음</div></td></tr>'; return; }
