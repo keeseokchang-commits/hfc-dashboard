@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>HFC 자금수지</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/common.css?v=3.11.2">
+<link rel="stylesheet" href="css/common.css?v=3.11.3">
 <style>
   :root {
     --bg:#F2F4F7;--surface:#FFFFFF;--surface2:#F7F9FC;
@@ -376,12 +376,12 @@
 <nav class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
 
-<script src="js/schema.js?v=3.11.2"></script>
-<script src="js/common.js?v=3.11.2"></script>
-<script src="js/auth.js?v=3.11.2"></script>
-<script src="js/calc.js?v=3.11.2"></script>
-<script src="js/payout.js?v=3.11.2"></script>
-<script src="js/nav.js?v=3.11.2"></script>
+<script src="js/schema.js?v=3.11.3"></script>
+<script src="js/common.js?v=3.11.3"></script>
+<script src="js/auth.js?v=3.11.3"></script>
+<script src="js/calc.js?v=3.11.3"></script>
+<script src="js/payout.js?v=3.11.3"></script>
+<script src="js/nav.js?v=3.11.3"></script>
 <script>
 let estData = [], actData = [], dashData = [], settings = {};
 let parsedTxns = [], parsedMonthly = {};
@@ -901,14 +901,14 @@ function openDetailModal(ym){
   // 블록2: 입금 내역 — 통장에 실제 들어온 것을 그대로, 계획이 있는 항목(매출 입금)만 보조 비교 표시
   const inEntries=Object.entries(actBy).filter(([,v])=>v.in>0).sort((a,b)=>b[1].in-a[1].in);
   const inItemsHtml=inEntries.length
-    ? inEntries.map(([cat,v])=>flowItem(cat, v.in, INFLOW_TXN_NAMES.includes(cat)?planIn:0, 'in')).join('')
+    ? inEntries.map(([cat,v])=>flowItem(cat, v.in, bucketOf(cat)==='매출입금'?planIn:0, 'in')).join('')
     : '<div class="flow-empty">이번 달 입금 내역이 없습니다</div>';
   const totalIn=act?num(act.act_inflow)||0:inEntries.reduce((s,[,v])=>s+v.in,0);
 
   // 블록3: 출금 내역 — 사용자 확정: "지출 내역 기준"이므로 유형별 총출금을 그대로 표시하고
   // 합계는 실제 통장 총출금(act.act_outflow)과 정확히 일치해야 한다(순지출로 바꾸지 않음).
   const outEntries=Object.entries(actBy).filter(([,v])=>v.out>0).sort((a,b)=>b[1].out-a[1].out);
-  const planForOut=cat=>OUTFLOW_COST_NAMES.includes(cat)?planOutCost:(planFixByCat[cat]||0);
+  const planForOut=cat=>bucketOf(cat)==='매입지급'?planOutCost:(planFixByCat[cat]||0);
   const outItemsHtml=outEntries.length
     ? outEntries.map(([cat,v])=>flowItem(cat, v.out, planForOut(cat), 'out')).join('')
     : '<div class="flow-empty">이번 달 출금 내역이 없습니다</div>';
